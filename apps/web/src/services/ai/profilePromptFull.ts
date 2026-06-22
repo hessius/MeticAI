@@ -1,6 +1,6 @@
 /**
  * Full profile generation prompt + validation/retry logic
- * shared between BrowserAIService and directModeAI.
+ * used by BrowserAIService.
  *
  * Matches the server's prompt structure from apps/server/api/routes/coffee.py
  * for full parity in direct/PWA mode.
@@ -10,7 +10,7 @@ import { validateProfile } from '../../lib/profileValidator'
 
 const MAX_VALIDATION_RETRIES = 2
 
-// ── Prompt Sections (identical to directModeAI.ts constants) ─────────────
+// ── Prompt Sections ──────────────────────────────────────────────────────
 
 const BARISTA_PERSONA = `PERSONA: You are a modern, experimental barista with deep expertise in espresso profiling. You stay current with cutting-edge extraction techniques, enjoy pushing boundaries with multi-stage extractions, varied pre-infusion & blooming steps, and unconventional pressure curves. You're creative, slightly irreverent, and love clever coffee puns.
 
@@ -203,12 +203,19 @@ const PROFILING_KNOWLEDGE = `ESPRESSO PROFILING GUIDE:
 - Multiple exit triggers (primary + time backup) for safety
 - dynamics points x-axis ALWAYS relative to stage start
 
+## Pre-infusion Saturation Rules (#420) — use NATIVE machine triggers
+The machine only honors native exit trigger types ("weight", "pressure", "flow", "time"). Implement the intent below with those native types — do NOT emit app-only pseudo triggers.
+- Dose/water correlation → native WEIGHT trigger: a puck needs ~2× its dose in water to fully saturate (18g dose → ~36ml). Add a weight exit trigger at value ≈ 2 × dose (">=") computed from the actual dose.
+- Pressure rise → native PRESSURE trigger: as the puck saturates, pressure climbs — add a pressure exit trigger at a low threshold (~2 bar, ">=").
+- Always pair both with a native TIME safety backup; whichever fires first ends pre-infusion.
+
 ## Anti-Patterns
 ❌ Single exit trigger without time backup
 ❌ Exact match triggers — use >= comparison
 ❌ >5-6 stages — overcomplicated
 ❌ No safety timeouts
 ❌ Sudden pressure jumps — use 3+ second ramps
+❌ Recommending weight exit triggers for the overall profile or final stage — all Meticulous profiles already have an automatic weight-based exit trigger handled by the machine firmware
 
 `
 

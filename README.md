@@ -70,7 +70,7 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 
 **Quick Install:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/refs/heads/main/scripts/install.sh | bash
 ```
 
 **Docker:**
@@ -80,7 +80,7 @@ docker pull ghcr.io/hessius/meticai:latest
 
 **Upgrading from v1.x:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/migrate-to-unified.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/refs/heads/main/scripts/migrate-to-unified.sh | bash
 ```
 
 
@@ -144,6 +144,16 @@ For power users who want one-tap brewing from their iPhone, you can create custo
 
 [→ iOS Shortcuts setup guide](IOS_SHORTCUTS.md)
 
+### Android App
+
+A native Android app (Capacitor) is available as a signed APK on the
+[Releases page](https://github.com/hessius/MeticAI/releases) — download
+`Metic-<version>.apk` and install it (you may need to allow installs from
+unknown sources). It talks directly to your machine on the local network, so no
+server is required.
+
+[→ Android development & build guide](apps/web/android/README.md)
+
 ## 🎛️ Control Center
 
 Metic includes a real-time Control Center powered by the [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) MQTT bridge:
@@ -201,7 +211,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\addons.ps1
 Remote one-liner (Linux/macOS):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/addons.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/refs/heads/main/scripts/addons.sh | bash
 ```
 
 [→ Full update guide, migration from v1.x, and troubleshooting](UPDATING.md)

@@ -351,6 +351,13 @@
     "stageAnalysis": "Analyse des étapes",
     "profileTarget": "Objectif du profil",
     "exitTriggers": "Conditions de sortie :",
+    "exitTriggerFlowDoseCorrelation": "Corrélation débit/dose",
+    "exitTriggerFlowDoseCorrelationDesc": "Quitter quand l'eau absorbée atteint un multiple de la dose de café",
+    "exitTriggerPressureRise": "Montée en pression",
+    "exitTriggerPressureRiseDesc": "Quitter quand la pression commence à monter (galette saturée)",
+    "exitTriggerDoseMultiplier": "Multiplicateur de dose",
+    "exitTriggerPressureThreshold": "Seuil de pression (bar)",
+    "exitTriggerDoseWeight": "Dose de café (g)",
     "limits": "Limites :",
     "targetReached": "✓ Objectif atteint",
     "hitLimit": "⚠ Limite atteinte",
@@ -447,6 +454,7 @@
     "authorNameDescription": "Votre nom pour le champ auteur dans le JSON du profil généré. Par défaut \"Metic\" si laissé vide.",
     "geminiModel": "Modèle Gemini",
     "geminiModelDescription": "Sélectionnez le modèle Gemini à utiliser pour les fonctions IA.",
+    "geminiModelDescriptionDynamic": "Modèles chargés depuis Google AI. Sélectionnez le modèle à utiliser.",
     "mqttEnabled": "Pont MQTT",
     "mqttEnabledDescription": "Télémétrie machine en temps réel via MQTT. Alimente le tableau de bord en direct.",
     "settingsSaved": "Paramètres enregistrés avec succès !",
@@ -697,7 +705,20 @@
     "importButton": "Importer",
     "fetchingUrl": "Récupération du profil depuis l'URL...",
     "importUrlFailed": "Échec de l'importation depuis l'URL",
-    "invalidUrl": "Veuillez entrer une URL valide"
+    "invalidUrl": "Veuillez entrer une URL valide",
+    "decentEspresso": "Decent",
+    "decentDescription": "Convertir et importer",
+    "decentImportHint": "Téléchargez ou collez un JSON de profil Decent Espresso pour le convertir au format Meticulous.",
+    "uploadDecentFile": "Télécharger un fichier de profil Decent",
+    "orPaste": "ou coller JSON",
+    "pasteDecentJson": "Collez le JSON du profil Decent ici...",
+    "convertButton": "Convertir",
+    "conversionWarnings": "Avertissements de conversion",
+    "convertedPreview": "Aperçu du profil converti",
+    "notDecentFormat": "Format de profil Decent Espresso non valide",
+    "profileName": "Nom",
+    "stages": "étapes",
+    "triggers": "déclencheurs"
   },
   "imageCrop": {
     "title": "Recadrer l'image du profil",
@@ -761,7 +782,9 @@
       "power": "Puissance",
       "temp": "Temp",
       "brewTemp": "Tête d'infusion",
-      "boilerTemp": "Chambre d'infusion"
+      "boilerTemp": "Chambre d'infusion",
+      "targetTemp": "Cible",
+      "tempDelta": "Δ Cible"
     },
     "actions": {
       "start": "Démarrer",
@@ -1030,6 +1053,7 @@
   },
   "markdownEditor": {
     "edit": "Modifier",
+    "editNote": "Modifier la note",
     "preview": "Aperçu",
     "save": "Enregistrer",
     "saving": "Enregistrement...",
@@ -1531,6 +1555,7 @@
     "somethingWentWrong": "Quelque chose s'est mal passé",
     "aiModelUnavailable": "Le modèle d'IA est temporairement indisponible — il s'agit d'une panne côté Google. Essayez de changer de modèle dans les Paramètres, ce qui peut également augmenter l'utilisation des tokens.",
     "aiQuotaExceeded": "Quota d'API dépassé. Veuillez patienter un instant et réessayer.",
+    "aiNoCompatibleModel": "Aucun modèle d'IA compatible n'est disponible pour votre clé API. Vérifiez votre accès à Gemini ou mettez à jour Metic vers la dernière version.",
     "analysisFailed": "Analyse échouée"
   },
   "findSimilar": {
@@ -1703,5 +1728,38 @@
     "quietWeek": "Semaine plus calme ?\nVotre machine s'ennuie de vous.",
     "singleProfileUser": "{{count}} shots d'affilée sur {{name}}.\nTant que ça marche...",
     "profileCollector": "{{count}} profils !\nVous construisez toute une collection."
+  },
+  "machineStatus": {
+    "title": "État de la machine",
+    "serviceHealth": "Santé des services",
+    "systemMetrics": "Métriques système",
+    "diskUsage": "Utilisation du disque",
+    "memoryUsage": "Utilisation mémoire",
+    "cpuTemperature": "Température CPU",
+    "uptime": "Temps de fonctionnement",
+    "lastUpdated": "Dernière mise à jour",
+    "refreshing": "Actualisation...",
+    "unavailable": "État de la machine indisponible",
+    "retry": "Réessayer",
+    "autoRefresh": "Actualisation auto dans",
+    "networkStatus": "Réseau",
+    "justNow": "à l'instant",
+    "secondsAgo": "il y a {{count}}s",
+    "hostname": "Nom d'hôte",
+    "firmware": "Firmware",
+    "wifi": "WiFi",
+    "statusRunning": "En cours",
+    "statusDegraded": "Dégradé",
+    "statusStopped": "Arrêté",
+    "unitDay": "j",
+    "unitHour": "h",
+    "unitMinute": "m",
+    "watcherUnavailable": "La surveillance des services n'est pas disponible — les informations système sont affichées ci-dessous."
+  },
+  "imageGeneration": {
+    "batchCount": "Nombre d'images",
+    "selectImage": "Sélectionner une image",
+    "regenerateSlot": "Régénérer",
+    "generating": "Génération..."
   }
 }

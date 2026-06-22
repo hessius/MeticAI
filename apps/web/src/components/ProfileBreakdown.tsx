@@ -463,7 +463,9 @@ function formatExitTriggers(triggers?: ExitTrigger[], variables?: ProfileVariabl
   
   return triggers.map(t => {
     if (t.value !== undefined) {
-      const unit = t.type === 'weight' ? 'g' : t.type === 'time' ? 's' : ''
+      const unit = t.type === 'weight' ? 'g' : t.type === 'time' ? 's'
+        : t.type === 'flow_dose_correlation' ? '×dose'
+        : t.type === 'pressure_rise' ? 'bar' : ''
       let displayValue: string
       if (typeof t.value === 'string' && t.value.startsWith('$')) {
         const resolved = resolveValue(t.value, variables)

@@ -94,6 +94,10 @@ jobs:
         uses: anchore/sbom-action@v0
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          # Keep the SBOM as a workflow artifact only. Attaching to the GitHub
+          # Release requires `contents: write` (this job is least-privilege
+          # read-only for contents) and fails when the release already exists.
+          upload-release-assets: false
 
   test:
     runs-on: ubuntu-latest

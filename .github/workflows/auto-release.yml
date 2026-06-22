@@ -91,6 +91,9 @@ jobs:
             curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/migrate-to-unified.sh | bash
             ```
             
+            **Android app:**
+            Download the `Metic-v${{ steps.version.outputs.version }}.apk` asset below and install it on your device (enable "Install unknown apps" for your browser/file manager). The APK is attached automatically a few minutes after this release is published.
+            
             ---
             Built from commit: ${{ github.sha }}
           draft: false

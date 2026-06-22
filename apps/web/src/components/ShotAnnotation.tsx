@@ -166,14 +166,13 @@ export function ShotAnnotation({ date, filename, className = '', onAnnotationCha
   
   return (
     <div className={`space-y-2 ${className}`}>
-      <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium flex items-center gap-2">
-          <PencilSimple className="w-4 h-4" />
-          {t('shotAnnotation.title')}
-        </Label>
-        <StarRating value={rating} onChange={handleRatingChange} />
-      </div>
       <MarkdownEditor
+        title={
+          <Label className="text-sm font-medium flex items-center gap-2">
+            <PencilSimple className="w-4 h-4" />
+            {t('shotAnnotation.title')}
+          </Label>
+        }
         value={annotation}
         onChange={setAnnotation}
         onSave={handleSave}
@@ -181,6 +180,12 @@ export function ShotAnnotation({ date, filename, className = '', onAnnotationCha
         saving={isSaving}
         placeholder={t('markdownEditor.placeholder')}
       />
+      <div className="flex items-center gap-2">
+        <Label className="text-sm font-medium text-muted-foreground">
+          {t('shotAnnotation.ratingLabel')}
+        </Label>
+        <StarRating value={rating} onChange={handleRatingChange} />
+      </div>
     </div>
   )
 }

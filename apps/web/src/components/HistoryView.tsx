@@ -44,6 +44,7 @@ import { ProfileImportDialog } from '@/components/ProfileImportDialog'
 import { ProfileBreakdown, ProfileData } from '@/components/ProfileBreakdown'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { FindSimilarOverlay } from '@/components/FindSimilarOverlay'
+import { ImagePickerGrid, type BatchImage } from '@/components/ImagePickerGrid'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { hasFeature } from '@/lib/featureFlags'
@@ -608,6 +609,12 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [isApplyingImage, setIsApplyingImage] = useState(false)
+  // Batch image generation states
+  const [batchCount, setBatchCount] = useState(1)
+  const [batchImages, setBatchImages] = useState<BatchImage[]>([])
+  const [batchSelectedIndex, setBatchSelectedIndex] = useState<number | null>(null)
+  const [batchLoading, setBatchLoading] = useState<boolean[]>([])
+  const [showBatchPicker, setShowBatchPicker] = useState(false)
   // Lightbox state for viewing profile image
   const [showLightbox, setShowLightbox] = useState(false)
   const resultsCardRef = useRef<HTMLDivElement>(null)
@@ -945,37 +952,81 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
       const serverUrl = await getServerUrl()
       const tagsParam = entryTags.join(',')
       
-      // Use preview mode to get the image without saving
-      const response = await fetch(
-        `${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/generate-image?style=${selectedStyle}&tags=${encodeURIComponent(tagsParam)}&preview=true`,
-        { method: 'POST' }
-      )
-      
-      if (response.status === 402) {
-        setGenerateError(t('history.paidKeyRequired'))
-        return
-      }
-      
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: t('history.generationFailed') }))
-        throw new Error(typeof error.detail === 'string' ? error.detail : error.detail?.message || t('history.imageGenerationFailed'))
-      }
-      
-      const data = await response.json()
-      
-      // Show the preview dialog with the generated image
-      if (data.image_data) {
-        // Make sure we close any other dialogs first
-        setShowLightbox(false)
-        setPreviewImage(data.image_data)
-        setShowPreviewDialog(true)
+      if (batchCount > 1) {
+        // Batch mode: show picker grid with loading states
+        const placeholders: BatchImage[] = Array.from({ length: batchCount }, (_, i) => ({
+          index: i,
+          image: null,
+        }))
+        setBatchImages(placeholders)
+        setBatchLoading(Array(batchCount).fill(true))
+        setBatchSelectedIndex(null)
+        setShowBatchPicker(true)
         setShowStylePicker(false)
+        setShowLightbox(false)
+
+        const response = await fetch(
+          `${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/generate-image?style=${selectedStyle}&tags=${encodeURIComponent(tagsParam)}&preview=true&count=${batchCount}`,
+          { method: 'POST' }
+        )
+
+        if (response.status === 402) {
+          setGenerateError(t('history.paidKeyRequired'))
+          setShowBatchPicker(false)
+          return
+        }
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ detail: t('history.generationFailed') }))
+          throw new Error(typeof error.detail === 'string' ? error.detail : error.detail?.message || t('history.imageGenerationFailed'))
+        }
+
+        const data = await response.json()
+        const images: BatchImage[] = (data.images || []).map((img: { index: number; image?: string | null; error?: string }) => ({
+          index: img.index,
+          image: img.image || null,
+          error: img.error,
+        }))
+        setBatchImages(images)
+        setBatchLoading(Array(batchCount).fill(false))
+
+        // Auto-select first successful image
+        const firstSuccess = images.find(img => img.image && !img.error)
+        if (firstSuccess) {
+          setBatchSelectedIndex(firstSuccess.index)
+        }
       } else {
-        throw new Error(t('history.noImageData'))
+        // Single image mode: existing flow
+        const response = await fetch(
+          `${serverUrl}/api/profile/${encodeURIComponent(entry.profile_name)}/generate-image?style=${selectedStyle}&tags=${encodeURIComponent(tagsParam)}&preview=true`,
+          { method: 'POST' }
+        )
+        
+        if (response.status === 402) {
+          setGenerateError(t('history.paidKeyRequired'))
+          return
+        }
+        
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ detail: t('history.generationFailed') }))
+          throw new Error(typeof error.detail === 'string' ? error.detail : error.detail?.message || t('history.imageGenerationFailed'))
+        }
+        
+        const data = await response.json()
+        
+        if (data.image_data) {
+          setShowLightbox(false)
+          setPreviewImage(data.image_data)
+          setShowPreviewDialog(true)
+          setShowStylePicker(false)
+        } else {
+          throw new Error(t('history.noImageData'))
+        }
       }
     } catch (err) {
       console.error('Failed to generate image:', err)
       setGenerateError(err instanceof Error ? err.message : t('history.imageGenerationFailed'))
+      setShowBatchPicker(false)
     } finally {
       setIsGeneratingImage(false)
     }
@@ -1063,6 +1114,22 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
   const handleDiscardPreview = () => {
     setShowPreviewDialog(false)
     setPreviewImage(null)
+    setShowBatchPicker(false)
+    setBatchImages([])
+    setBatchSelectedIndex(null)
+  }
+
+  const handleBatchApprove = async () => {
+    if (batchSelectedIndex === null) return
+    const selected = batchImages.find(img => img.index === batchSelectedIndex)
+    if (!selected?.image) return
+    
+    // Use the single-image approve flow with the selected image
+    setPreviewImage(selected.image)
+    setShowBatchPicker(false)
+    setBatchImages([])
+    setBatchSelectedIndex(null)
+    setShowPreviewDialog(true)
   }
 
   const handleSaveNotes = async () => {
@@ -1563,10 +1630,12 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
             transition={{ delay: 0.3 }}
             className="space-y-2"
           >
-            <Label className={`text-sm font-semibold tracking-wide ${notes ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
-              {t('history.notes')}
-            </Label>
             <MarkdownEditor
+              title={
+                <Label className={`text-sm font-semibold tracking-wide ${notes ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
+                  {t('history.notes')}
+                </Label>
+              }
               value={notes}
               onChange={setNotes}
               onSave={handleSaveNotes}
@@ -1758,6 +1827,26 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                           ))}
                         </div>
                         
+                        {/* Batch count selector */}
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-medium text-muted-foreground">{t('imageGeneration.batchCount')}</Label>
+                          <div className="flex gap-2">
+                            {[1, 2, 3, 4].map((n) => (
+                              <button
+                                key={n}
+                                onClick={() => setBatchCount(n)}
+                                className={`flex-1 py-1.5 text-sm font-medium rounded-md border transition-all ${
+                                  batchCount === n
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border/30 hover:border-border/50 text-foreground/80'
+                                }`}
+                              >
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
                         <Button
                           onClick={handleGenerateImage}
                           className="w-full h-10 text-sm font-semibold"
@@ -1983,6 +2072,54 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                     <Check size={20} className="mr-2" weight="bold" />
                   )}
                   {isApplyingImage ? t('history.applying') : t('history.apply')}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Batch Image Picker Dialog */}
+      <AnimatePresence>
+        {showBatchPicker && (
+          <motion.div
+            key="batch-picker-dialog"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => handleDiscardPreview()}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative max-w-lg w-full bg-card rounded-2xl p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-bold text-center mb-4">{t('history.generatedImagePreview')}</h3>
+              <ImagePickerGrid
+                images={batchImages}
+                selectedIndex={batchSelectedIndex}
+                onSelect={setBatchSelectedIndex}
+                loading={batchLoading}
+              />
+              <div className="flex gap-3 mt-6">
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12"
+                  onClick={handleDiscardPreview}
+                >
+                  <XCircle size={20} className="mr-2" weight="bold" />
+                  {t('history.discard')}
+                </Button>
+                <Button
+                  className="flex-1 h-12"
+                  onClick={handleBatchApprove}
+                  disabled={batchSelectedIndex === null || batchLoading.some(Boolean)}
+                >
+                  <Check size={20} className="mr-2" weight="bold" />
+                  {t('history.apply')}
                 </Button>
               </div>
             </motion.div>

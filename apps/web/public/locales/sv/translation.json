@@ -351,6 +351,13 @@
     "stageAnalysis": "Steganalys",
     "profileTarget": "Profilmål",
     "exitTriggers": "Avslutningsvillkor:",
+    "exitTriggerFlowDoseCorrelation": "Flöde/dos-korrelation",
+    "exitTriggerFlowDoseCorrelationDesc": "Avsluta när absorberat vatten når en multipel av kaffedosen",
+    "exitTriggerPressureRise": "Tryckstigning",
+    "exitTriggerPressureRiseDesc": "Avsluta när trycket börjar stiga (pucken mättad)",
+    "exitTriggerDoseMultiplier": "Dos-multiplikator",
+    "exitTriggerPressureThreshold": "Trycktröskel (bar)",
+    "exitTriggerDoseWeight": "Kaffedos (g)",
     "limits": "Gränser:",
     "targetReached": "✓ Mål uppnått",
     "hitLimit": "⚠ Gräns nådd",
@@ -447,6 +454,7 @@
     "authorNameDescription": "Ditt namn för författarfältet i genererad profil-JSON. Standardvärde \"Metic\" om det lämnas tomt.",
     "geminiModel": "Gemini-modell",
     "geminiModelDescription": "Välj vilken Gemini-modell som ska användas för AI-funktioner.",
+    "geminiModelDescriptionDynamic": "Modeller hämtade från Google AI. Välj vilken modell som ska användas.",
     "mqttEnabled": "MQTT-brygga",
     "mqttEnabledDescription": "Realtidstelemetri från maskinen via MQTT. Driver den direkta kontrollpanelen.",
     "settingsSaved": "Inställningar sparade framgångsrikt!",
@@ -702,7 +710,20 @@
     "importButton": "Importera",
     "fetchingUrl": "Hämtar profil från URL...",
     "importUrlFailed": "Kunde inte importera från URL",
-    "invalidUrl": "Ange en giltig URL"
+    "invalidUrl": "Ange en giltig URL",
+    "decentEspresso": "Decent",
+    "decentDescription": "Konvertera & importera",
+    "decentImportHint": "Ladda upp eller klistra in en Decent Espresso-profil-JSON för att konvertera den till Meticulous-format.",
+    "uploadDecentFile": "Ladda upp Decent-profilfil",
+    "orPaste": "eller klistra in JSON",
+    "pasteDecentJson": "Klistra in Decent-profil-JSON här...",
+    "convertButton": "Konvertera",
+    "conversionWarnings": "Konverteringsvarningar",
+    "convertedPreview": "Förhandsgranskning av konverterad profil",
+    "notDecentFormat": "Inte ett giltigt Decent Espresso-profilformat",
+    "profileName": "Namn",
+    "stages": "steg",
+    "triggers": "utlösare"
   },
   "imageCrop": {
     "title": "Beskär profilbild",
@@ -766,7 +787,9 @@
       "power": "Effekt",
       "temp": "Temp",
       "brewTemp": "Brygghuvud",
-      "boilerTemp": "Bryggkammare"
+      "boilerTemp": "Bryggkammare",
+      "targetTemp": "Mål",
+      "tempDelta": "Δ Mål"
     },
     "actions": {
       "start": "Starta",
@@ -1030,6 +1053,7 @@
   },
   "markdownEditor": {
     "edit": "Redigera",
+    "editNote": "Redigera anteckning",
     "preview": "Förhandsgranska",
     "save": "Spara",
     "saving": "Sparar...",
@@ -1531,6 +1555,7 @@
     "somethingWentWrong": "Något gick fel",
     "aiModelUnavailable": "AI-modellen är tillfälligt otillgänglig — detta är ett avbrott på Googles sida. Prova att byta till en annan modell i Inställningar, vilket också kan öka tokenanvändningen.",
     "aiQuotaExceeded": "API-kvoten har överskridits. Vänta en stund och försök igen.",
+    "aiNoCompatibleModel": "Ingen kompatibel AI-modell är tillgänglig för din API-nyckel. Kontrollera din Gemini-åtkomst eller uppdatera Metic till senaste versionen.",
     "analysisFailed": "Analys misslyckades"
   },
   "findSimilar": {
@@ -1703,5 +1728,38 @@
     "quietWeek": "Lugnare vecka?\nDin maskin saknar dig.",
     "singleProfileUser": "{{count}} shots i rad på {{name}}.\nOm det funkar...",
     "profileCollector": "{{count}} profiler!\nDu bygger en fin samling."
+  },
+  "machineStatus": {
+    "title": "Maskinstatus",
+    "serviceHealth": "Tjänsthälsa",
+    "systemMetrics": "Systemmått",
+    "diskUsage": "Diskanvändning",
+    "memoryUsage": "Minnesanvändning",
+    "cpuTemperature": "CPU-temperatur",
+    "uptime": "Drifttid",
+    "lastUpdated": "Senast uppdaterad",
+    "refreshing": "Uppdaterar...",
+    "unavailable": "Maskinstatus otillgänglig",
+    "retry": "Försök igen",
+    "autoRefresh": "Automatisk uppdatering om",
+    "networkStatus": "Nätverk",
+    "justNow": "just nu",
+    "secondsAgo": "{{count}}s sedan",
+    "hostname": "Värdnamn",
+    "firmware": "Firmware",
+    "wifi": "WiFi",
+    "statusRunning": "Körs",
+    "statusDegraded": "Försämrad",
+    "statusStopped": "Stoppad",
+    "unitDay": "d",
+    "unitHour": "t",
+    "unitMinute": "m",
+    "watcherUnavailable": "Tjänstövervakning är inte tillgänglig — systeminformation visas nedan."
+  },
+  "imageGeneration": {
+    "batchCount": "Antal bilder",
+    "selectImage": "Välj en bild",
+    "regenerateSlot": "Generera om",
+    "generating": "Genererar..."
   }
 }

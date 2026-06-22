@@ -1,0 +1,85 @@
+name: Build Android App
+
+on:
+  push:
+    branches: [main, 'version/**']
+    paths:
+      - 'apps/web/**'
+      - 'VERSION'
+  pull_request:
+    branches: [main, 'version/**']
+    paths:
+      - 'apps/web/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    name: Build Capacitor Android
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Bun (attempt 1)
+        id: setup_bun_1
+        continue-on-error: true
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Setup Bun (attempt 2)
+        id: setup_bun_2
+        if: steps.setup_bun_1.outcome == 'failure'
+        continue-on-error: true
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Setup Bun (attempt 3)
+        if: steps.setup_bun_2.outcome == 'failure'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build web app for Capacitor
+        run: VITE_MACHINE_MODE=capacitor bun run build
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build Android (debug, unsigned)
+        working-directory: apps/web/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Report build result
+        run: |
+          APK=apps/web/android/app/build/outputs/apk/debug/app-debug.apk
+          if [ -f "$GITHUB_WORKSPACE/$APK" ]; then
+            SIZE=$(du -h "$GITHUB_WORKSPACE/$APK" | cut -f1)
+            echo "🤖 Android debug APK: ${SIZE}"
+          else
+            echo "🤖 Android build completed"
+          fi
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: metic-android-debug-apk
+          path: apps/web/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

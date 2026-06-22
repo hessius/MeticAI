@@ -53,6 +53,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { getServerUrl } from '@/lib/config'
+import { getActiveShotOverride } from '@/lib/activeShotOverride'
 import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,14 @@ interface ProfileStageInfo {
 // Component
 // ---------------------------------------------------------------------------
 
+/**
+ * On-target temperature threshold (°C). The brew head is considered "on target"
+ * when |current − target| is within this value. Shared by the delta tile color
+ * (#482) and the "Lance's standard" ready-banner easter egg so the two stay in
+ * lockstep — change it here and both update.
+ */
+export const TEMP_ON_TARGET_THRESHOLD = 2.3
+
 export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotViewProps) {
   const { t } = useTranslation()
   const chartDataRef = useRef<ChartDataPoint[]>([])
@@ -124,6 +133,17 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const { notification: hapticsNotification } = useHaptics()
   const { shotComplete: playShotComplete } = useSoundEffects()
   const { notifyBrewComplete } = useBrewNotifications()
+
+  // Brew Head target delta tile (#482): color-coded difference from target temp.
+  const tempDelta = getTempTileDisplay('delta', ms.brew_head_temperature, ms.target_temperature, t)
+
+  // Prefer the temporary override weight target (when this shot was started
+  // with variable overrides) so the live tile reflects what's actually brewing.
+  const override = getActiveShotOverride()
+  const effectiveTargetWeight =
+    override && override.profileName === ms.active_profile && override.finalWeight != null
+      ? override.finalWeight
+      : ms.target_weight
 
   // Summary stats (computed once when shot completes via brewing-detection cleanup)
   const [summary, setSummary] = useState<{
@@ -383,8 +403,8 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
               <>
                 {/* Prominent READY banner */}
                 {isReady && (() => {
-                  // "Lance's standard" easter egg: when temp is within 2.3°C of target, show enhanced display
-                  const isLancesStandard = temp != null && targetTemp != null && Math.abs(temp - targetTemp) <= 2.3
+                  // "Lance's standard" easter egg: when temp is on-target, show enhanced display
+                  const isLancesStandard = temp != null && targetTemp != null && Math.abs(temp - targetTemp) <= TEMP_ON_TARGET_THRESHOLD
                   return (
                   <Card className={`p-4 ${isLancesStandard ? 'border-emerald-400 bg-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.4)] dark:shadow-[0_0_40px_rgba(16,185,129,0.5)]' : 'border-emerald-500/50 bg-emerald-500/10'}`}>
                     <div className="flex flex-col items-center gap-2">
@@ -503,15 +523,9 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       label={t('controlCenter.metrics.flow')}
                     />
                   </div>
-                  {/* Row 2: Weight, Temperature */}
+                  {/* Row 2 (pre-shot): Brew Head, Brew Chamber, Target Δ — weight
+                      is omitted because the scale auto-tares when the shot starts */}
                   <div className="grid grid-cols-3 gap-2">
-                    <MetricTile
-                      icon={<Scales size={14} />}
-                      value={ms.shot_weight?.toFixed(1) ?? '0.0'}
-                      unit={ms.target_weight != null ? `/${ms.target_weight.toFixed(0)}g` : 'g'}
-                      label={t('controlCenter.metrics.weight')}
-                      onClick={() => cmd(() => machine.tareScale(), 'tared')}
-                    />
                     <MetricTile
                       icon={<Thermometer size={14} />}
                       value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
@@ -523,6 +537,13 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                       value={ms.boiler_temperature?.toFixed(1) ?? '—'}
                       unit="°C"
                       label={t('controlCenter.metrics.boilerTemp', 'Brew Chamber')}
+                    />
+                    <MetricTile
+                      icon={<Thermometer size={14} />}
+                      value={tempDelta.value}
+                      unit={tempDelta.unit}
+                      label={tempDelta.label}
+                      valueClassName={tempDelta.valueClassName}
                     />
                   </div>
                 </div>
@@ -620,17 +641,9 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                   label={t('controlCenter.metrics.flow')}
                 />
               </div>
-              {/* Row 2: Weight, Temperature */}
+              {/* Row 2 (during shot): Brew Head, Brew Chamber, Weight — the
+                  target Δ slot is replaced by weight once brewing starts */}
               <div className="grid grid-cols-3 gap-2">
-                <MetricTile
-                  icon={<Scales size={14} />}
-                  value={ms.shot_weight?.toFixed(1) ?? '0.0'}
-                  unit={ms.target_weight != null ? `/${ms.target_weight.toFixed(0)}g` : 'g'}
-                  label={t('controlCenter.metrics.weight')}
-                  progress={ms.target_weight != null && ms.target_weight > 0
-                    ? Math.min(100, ((ms.shot_weight ?? 0) / ms.target_weight) * 100)
-                    : undefined}
-                />
                 <MetricTile
                   icon={<Thermometer size={14} />}
                   value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
@@ -642,6 +655,15 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
                   value={ms.boiler_temperature?.toFixed(1) ?? '—'}
                   unit="°C"
                   label={t('controlCenter.metrics.boilerTemp', 'Brew Chamber')}
+                />
+                <MetricTile
+                  icon={<Scales size={14} />}
+                  value={ms.shot_weight?.toFixed(1) ?? '0.0'}
+                  unit={effectiveTargetWeight != null ? `/${effectiveTargetWeight.toFixed(0)}g` : 'g'}
+                  label={t('controlCenter.metrics.weight')}
+                  progress={effectiveTargetWeight != null && effectiveTargetWeight > 0
+                    ? Math.min(100, ((ms.shot_weight ?? 0) / effectiveTargetWeight) * 100)
+                    : undefined}
                 />
               </div>
             </div>
@@ -766,13 +788,76 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function MetricTile({ icon, value, unit, label, progress, onClick }: {
+// ---------------------------------------------------------------------------
+// Brew Head temperature display — tap to cycle current / target / delta (#482)
+// ---------------------------------------------------------------------------
+
+export type TempDisplayMode = 'current' | 'target' | 'delta'
+
+export interface TempTileDisplay {
+  value: string
+  unit: string
+  label: string
+  valueClassName?: string
+}
+
+/**
+ * Pure formatter for the Brew Head temperature tile.
+ *
+ * Returns the value/unit/label (and an optional color class for the delta) for
+ * the given display mode. Kept free of React/DOM so it can be unit-tested
+ * without rendering the (large) LiveShotView.
+ */
+export function getTempTileDisplay(
+  mode: TempDisplayMode,
+  current: number | null,
+  target: number | null,
+  t: (key: string, fallback?: string) => string,
+): TempTileDisplay {
+  const unit = '°C'
+
+  if (mode === 'target') {
+    return {
+      value: target != null ? target.toFixed(1) : '—',
+      unit,
+      label: t('controlCenter.metrics.targetTemp', 'Target'),
+    }
+  }
+
+  if (mode === 'delta') {
+    if (current == null || target == null) {
+      return { value: '—', unit, label: t('controlCenter.metrics.tempDelta', 'Δ Target') }
+    }
+    const d = current - target
+    const valueClassName = Math.abs(d) <= TEMP_ON_TARGET_THRESHOLD
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : d > 0
+        ? 'text-orange-600 dark:text-orange-400'
+        : 'text-blue-600 dark:text-blue-400'
+    return {
+      value: `${d >= 0 ? '+' : ''}${d.toFixed(1)}`,
+      unit,
+      label: t('controlCenter.metrics.tempDelta', 'Δ Target'),
+      valueClassName,
+    }
+  }
+
+  // current
+  return {
+    value: current != null ? current.toFixed(1) : '—',
+    unit,
+    label: t('controlCenter.metrics.brewTemp', 'Brew Head'),
+  }
+}
+
+function MetricTile({ icon, value, unit, label, progress, onClick, valueClassName }: {
   icon?: React.ReactNode
   value: string
   unit: string
   label: string
   progress?: number
   onClick?: () => void
+  valueClassName?: string
 }) {
   return (
     <div
@@ -782,7 +867,7 @@ function MetricTile({ icon, value, unit, label, progress, onClick }: {
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } } : undefined}
     >
-      <div className="text-lg font-bold tabular-nums text-foreground flex items-center justify-center gap-1">
+      <div className={`text-lg font-bold tabular-nums flex items-center justify-center gap-1 ${valueClassName ?? 'text-foreground'}`}>
         {icon}
         {value}
         <span className="text-[10px] text-muted-foreground font-normal">{unit}</span>

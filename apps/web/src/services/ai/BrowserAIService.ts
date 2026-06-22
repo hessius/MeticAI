@@ -31,6 +31,9 @@ import { retryWithBackoff } from './retryUtils'
 import i18n from 'i18next'
 
 import { STORAGE_KEYS } from '@/lib/constants'
+import { safeRandomUUID } from '@/lib/uuid'
+import { resolveWorkingModel, type ModelClient } from './modelResolver'
+import { AIServiceError, type AIErrorCode as AIErrorCodeBase } from './aiErrors'
 
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
 const IMAGE_MODEL = 'imagen-4.0-generate-001'
@@ -63,15 +66,8 @@ function getClient(): GoogleGenAI {
  * Typed AI service error codes — UI layer translates these via i18n.
  * This keeps the service layer free of user-facing strings.
  */
-export type AIErrorCode = 'API_KEY_MISSING' | 'QUOTA_EXCEEDED' | 'API_KEY_INVALID' | 'MODEL_NOT_FOUND' | 'NETWORK_ERROR' | 'SERVICE_UNAVAILABLE' | 'IMAGE_GENERATION_FAILED' | 'IMAGE_NO_DATA' | 'UNKNOWN'
-
-export class AIServiceError extends Error {
-  constructor(public readonly code: AIErrorCode, cause?: unknown) {
-    super(code)
-    this.name = 'AIServiceError'
-    if (cause !== undefined) Object.defineProperty(this, 'cause', { value: cause })
-  }
-}
+export type AIErrorCode = AIErrorCodeBase
+export { AIServiceError }
 
 /** Map common Gemini SDK errors to typed error codes */
 function wrapApiError(err: unknown): never {
@@ -87,6 +83,34 @@ function wrapApiError(err: unknown): never {
   if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch'))
     throw new AIServiceError('NETWORK_ERROR', err)
   throw new AIServiceError('UNKNOWN', err)
+}
+
+/** Client shape used for text generation: model resolution plus generateContent. */
+type TextGenClient = ModelClient & {
+  models: {
+    generateContent: (args: { model: string; contents: unknown; config?: unknown }) => Promise<unknown>
+  }
+}
+
+/**
+ * Run a text generateContent call through dynamic model resolution with a
+ * single reactive retry: if the call fails with a model-not-found error, the
+ * working model is re-resolved (bypassing cache) and the call is retried once.
+ */
+export async function generateTextWithRetry(
+  client: TextGenClient,
+  configured: string,
+  req: { contents: unknown; config?: unknown },
+): Promise<unknown> {
+  const model = await resolveWorkingModel(client, configured)
+  try {
+    return await client.models.generateContent({ model, ...req })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (!(msg.includes('404') || msg.includes('NOT_FOUND'))) throw err
+    const retryModel = await resolveWorkingModel(client, configured, true)
+    return client.models.generateContent({ model: retryModel, ...req })
+  }
 }
 
 export function createBrowserAIService(): AIService {
@@ -137,10 +161,9 @@ export function createBrowserAIService(): AIService {
 
       let response
       try {
-        response = await client.models.generateContent({
-          model: getGeminiModel(),
+        response = await generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
           contents: [{ role: 'user', parts }],
-        })
+        }) as { text?: string }
       } catch (err) {
         wrapApiError(err)
       }
@@ -151,10 +174,9 @@ export function createBrowserAIService(): AIService {
 
       // Validation + retry loop
       const generateFix = async (fixPrompt: string) => {
-        const fixResponse = await client.models.generateContent({
-          model: getGeminiModel(),
+        const fixResponse = await generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
           contents: [{ role: 'user', parts: [{ text: fixPrompt }] }],
-        })
+        }) as { text?: string }
         return fixResponse.text ?? ''
       }
 
@@ -188,11 +210,10 @@ export function createBrowserAIService(): AIService {
       let response
       try {
         response = await retryWithBackoff(() =>
-          client.models.generateContent({
-            model: getGeminiModel(),
+          generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
           })
-        )
+        ) as { text?: string }
       } catch (err) {
         wrapApiError(err)
       }
@@ -257,10 +278,9 @@ export function createBrowserAIService(): AIService {
 
       let response
       try {
-        response = await client.models.generateContent({
-          model: getGeminiModel(),
+        response = await generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        })
+        }) as { text?: string }
       } catch (err) {
         wrapApiError(err)
       }
@@ -290,7 +310,7 @@ export function createBrowserAIService(): AIService {
     createDialInSession: async (coffee: Record<string, unknown>): Promise<DialInSession> => {
       // In browser mode, sessions are client-side only
       return {
-        id: crypto.randomUUID(),
+        id: safeRandomUUID(),
         coffee,
         steps: [],
       }
@@ -302,10 +322,9 @@ export function createBrowserAIService(): AIService {
 
       let response
       try {
-        response = await client.models.generateContent({
-          model: getGeminiModel(),
+        response = await generateTextWithRetry(client as unknown as TextGenClient, getGeminiModel(), {
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        })
+        }) as { text?: string }
       } catch (err) {
         wrapApiError(err)
       }

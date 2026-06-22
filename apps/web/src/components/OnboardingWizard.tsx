@@ -407,7 +407,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 value={machineIp}
                 onChange={(e) => {
                   setMachineIp(e.target.value)
-                  setConnectionStatus('idle')
+                  setConnectionStatus(prev => (prev === 'idle' ? prev : 'idle'))
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && handleTestConnection()}
                 className="flex-1"
@@ -456,7 +456,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               value={machineIp}
               onChange={(e) => {
                 setMachineIp(e.target.value)
-                setConnectionStatus('idle')
+                setConnectionStatus(prev => (prev === 'idle' ? prev : 'idle'))
               }}
               onKeyDown={(e) => e.key === 'Enter' && handleTestConnection()}
               className="flex-1"
@@ -498,6 +498,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           placeholder={t('onboarding.name.placeholder')}
           value={authorName}
           onChange={(e) => setAuthorName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); next() } }}
         />
       </div>
     </div>
@@ -521,6 +522,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           placeholder={t('onboarding.ai.keyPlaceholder')}
           value={geminiKey}
           onChange={(e) => setGeminiKey(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); next() } }}
         />
         <p className="text-xs text-muted-foreground">
           {t('onboarding.ai.keyHint')}

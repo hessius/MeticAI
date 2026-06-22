@@ -45,5 +45,7 @@ export function formatGeminiError(err: unknown): string {
     return i18n.t('error.aiModelUnavailable')
   if (raw.includes('429') || raw.includes('RESOURCE_EXHAUSTED') || raw.includes('quota'))
     return i18n.t('error.aiQuotaExceeded')
+  if (raw.includes('404') || raw.includes('NOT_FOUND'))
+    return i18n.t('error.aiNoCompatibleModel')
   return raw || i18n.t('error.analysisFailed')
 }

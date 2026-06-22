@@ -21,9 +21,11 @@ import {
   MagicWand,
   DownloadSimple,
   Info,
-  LinkSimple
+  LinkSimple,
+  ArrowsClockwise
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { detectDecentFormat, convertDecentToMeticulous, type ConversionResult } from '@/services/decentConverter'
 
 interface MachineProfile {
   id: string
@@ -59,7 +61,7 @@ interface ProfileImportDialogProps {
   onGenerateNew: () => void
 }
 
-type ImportStep = 'choose' | 'file' | 'machine' | 'url' | 'importing' | 'bulk-importing' | 'success' | 'bulk-success' | 'error'
+type ImportStep = 'choose' | 'file' | 'machine' | 'url' | 'decent' | 'decent-preview' | 'importing' | 'bulk-importing' | 'success' | 'bulk-success' | 'error'
 
 export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUnavailable = false, initialUrl, onClose, onImported, onGenerateNew }: ProfileImportDialogProps) {
   const { t } = useTranslation()
@@ -74,7 +76,10 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
   const [bulkLogs, setBulkLogs] = useState<string[]>([])
   const [generateDescriptions, setGenerateDescriptions] = useState(aiConfigured)
   const [importUrl, setImportUrl] = useState('')
+  const [decentJson, setDecentJson] = useState('')
+  const [decentPreview, setDecentPreview] = useState<ConversionResult | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const decentFileInputRef = useRef<HTMLInputElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const autoImportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const handleUrlImportRef = useRef<(urlOverride?: string) => Promise<void>>(async () => {})
@@ -100,6 +105,10 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
       setBulkLogs([])
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setGenerateDescriptions(aiConfigured)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDecentJson('')
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDecentPreview(null)
       if (initialUrl) {
         autoImportTimerRef.current = setTimeout(() => handleUrlImportRef.current(initialUrl), 100)
       }
@@ -191,6 +200,79 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
     }
   }
   useEffect(() => { handleUrlImportRef.current = handleUrlImport })
+
+  const handleDecentParse = (json: string) => {
+    try {
+      const parsed = JSON.parse(json)
+      if (!detectDecentFormat(parsed)) {
+        setError(t('profileImport.notDecentFormat'))
+        setDecentPreview(null)
+        return
+      }
+      setError(null)
+      const result = convertDecentToMeticulous(parsed)
+      setDecentPreview(result)
+      setStep('decent-preview')
+    } catch {
+      setError(t('profileImport.invalidJson'))
+      setDecentPreview(null)
+    }
+  }
+
+  const handleDecentFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    try {
+      const text = await file.text()
+      setDecentJson(text)
+      handleDecentParse(text)
+    } catch {
+      setError(t('profileImport.readingFile'))
+    }
+  }
+
+  const handleDecentImport = async () => {
+    if (!decentPreview) return
+
+    setStep('importing')
+    setImportProgress(t('profileImport.importingProfile'))
+    setError(null)
+
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/profile/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profile: decentPreview.profile,
+          generate_description: generateDescriptions,
+          source: 'file'
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        const errorMessage = typeof errorData.detail === 'string'
+          ? errorData.detail
+          : errorData.detail?.error || errorData.detail?.message || t('profileImport.importFailed')
+        throw new Error(errorMessage)
+      }
+
+      const result = await response.json()
+
+      if (result.status === 'exists') {
+        setError(t('profileImport.profileExists', { name: result.profile_name || decentPreview.profile.name }))
+        setStep('error')
+        return
+      }
+
+      setImportedProfileName(result.profile_name)
+      setStep('success')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('profileImport.importFailed'))
+      setStep('error')
+    }
+  }
 
   const handleBulkImport = async () => {
     setStep('bulk-importing')
@@ -427,7 +509,7 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                   <div className="flex-1 border-t border-border/30" />
                 </div>
                 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                   <Button
                     variant="outline"
                     onClick={() => fileInputRef.current?.click()}
@@ -446,6 +528,16 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                     <LinkSimple size={28} weight="duotone" className="text-primary" />
                     <span className="text-sm font-medium">{t('profileImport.fromUrl')}</span>
                     <span className="text-[10px] text-muted-foreground">{t('profileImport.jsonOrMet')}</span>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={() => { setDecentJson(''); setDecentPreview(null); setError(null); setStep('decent') }}
+                    className="h-24 flex-col gap-2 border-border/50 hover:border-primary/50 hover:bg-primary/5"
+                  >
+                    <ArrowsClockwise size={28} weight="duotone" className="text-primary" />
+                    <span className="text-sm font-medium">{t('profileImport.decentEspresso')}</span>
+                    <span className="text-[10px] text-muted-foreground">{t('profileImport.decentDescription')}</span>
                   </Button>
                   
                   <Button
@@ -490,6 +582,14 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                   onChange={handleFileSelect}
                   className="hidden"
                   aria-label={t('profileImport.importFileAriaLabel')}
+                />
+                <input
+                  ref={decentFileInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleDecentFileSelect}
+                  className="hidden"
+                  aria-label={t('profileImport.decentEspresso')}
                 />
               </motion.div>
             )}
@@ -580,6 +680,91 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => { setImportUrl(''); setStep('choose') }} className="flex-1">{t('profileImport.back')}</Button>
                   <Button onClick={() => handleUrlImport()} disabled={!importUrl.trim()} className="flex-1">
+                    <DownloadSimple size={18} className="mr-2" weight="bold" />
+                    {t('profileImport.importButton')}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step: Decent Espresso Import */}
+            {step === 'decent' && (
+              <motion.div key="decent" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-3">
+                <Label className="text-sm font-medium">{t('profileImport.decentEspresso')}</Label>
+                <p className="text-xs text-muted-foreground">{t('profileImport.decentImportHint')}</p>
+                <Button
+                  variant="outline"
+                  onClick={() => decentFileInputRef.current?.click()}
+                  className="w-full h-12 gap-2"
+                >
+                  <Upload size={18} weight="duotone" />
+                  {t('profileImport.uploadDecentFile')}
+                </Button>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 border-t border-border/30" />
+                  <span className="text-xs text-muted-foreground font-medium">{t('profileImport.orPaste')}</span>
+                  <div className="flex-1 border-t border-border/30" />
+                </div>
+                <textarea
+                  className="w-full h-32 rounded-lg border border-border/50 bg-secondary/30 p-3 text-xs font-mono resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  placeholder={t('profileImport.pasteDecentJson')}
+                  value={decentJson}
+                  onChange={(e) => setDecentJson(e.target.value)}
+                />
+                {error && (
+                  <Alert variant="destructive" className="border-destructive/30 bg-destructive/8">
+                    <Warning size={14} weight="fill" />
+                    <AlertDescription className="text-xs">{error}</AlertDescription>
+                  </Alert>
+                )}
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => { setDecentJson(''); setError(null); setStep('choose') }} className="flex-1">{t('profileImport.back')}</Button>
+                  <Button onClick={() => handleDecentParse(decentJson)} disabled={!decentJson.trim()} className="flex-1">
+                    <ArrowsClockwise size={18} className="mr-2" weight="bold" />
+                    {t('profileImport.convertButton')}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step: Decent Preview */}
+            {step === 'decent-preview' && decentPreview && (
+              <motion.div key="decent-preview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-3">
+                <Label className="text-sm font-medium">{t('profileImport.convertedPreview')}</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{t('profileImport.profileName')}:</span>
+                    <span className="text-sm font-medium">{decentPreview.profile.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px]">{decentPreview.profile.stages.length} {t('profileImport.stages')}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{decentPreview.profile.temperature}°C</Badge>
+                    <Badge variant="outline" className="text-[10px]">{decentPreview.profile.final_weight}g</Badge>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto space-y-1.5 pr-1">
+                    {decentPreview.profile.stages.map((stage, idx) => (
+                      <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-secondary/40 border border-border/20">
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 capitalize">{stage.type}</Badge>
+                        <span className="text-xs font-medium truncate flex-1">{stage.name}</span>
+                        <span className="text-[10px] text-muted-foreground">{stage.exit_triggers.length} {t('profileImport.triggers')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {decentPreview.warnings.length > 0 && (
+                  <Alert className="bg-amber-500/5 border-amber-500/20">
+                    <Warning size={14} className="text-amber-500" weight="fill" />
+                    <AlertDescription className="text-xs">
+                      <p className="font-medium mb-1">{t('profileImport.conversionWarnings')}</p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        {decentPreview.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setStep('decent')} className="flex-1">{t('profileImport.back')}</Button>
+                  <Button onClick={handleDecentImport} className="flex-1">
                     <DownloadSimple size={18} className="mr-2" weight="bold" />
                     {t('profileImport.importButton')}
                   </Button>

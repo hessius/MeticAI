@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { QrCode } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { invalidateCatalogueCache } from '@/lib/catalogueCache'
 import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
 import { hasFeature } from '@/lib/featureFlags'
 import { STORAGE_KEYS } from '@/lib/constants'
@@ -28,6 +29,7 @@ const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({
 const RunShotView = lazy(() => import('./components/RunShotView').then(m => ({ default: m.RunShotView })))
 const FormView = lazy(() => import('./views/FormView').then(m => ({ default: m.FormView })))
 const ResultsView = lazy(() => import('./views/ResultsView').then(m => ({ default: m.ResultsView })))
+const MachineStatusCenter = lazy(() => import('./components/MachineStatusCenter').then(m => ({ default: m.MachineStatusCenter })))
 import { useGenerationProgress } from '@/hooks/useGenerationProgress'
 import { useReducedMotion } from '@/hooks/a11y/useScreenReader'
 import { SkipNavigation } from '@/components/SkipNavigation'
@@ -658,6 +660,10 @@ function App() {
       
       const profileJson = extractProfileJson(data.reply)
       setCurrentProfileJson(profileJson)
+
+      // A new profile was just created on the machine — drop the catalogue
+      // cache so it shows up immediately instead of after the TTL expires.
+      invalidateCatalogueCache()
       
       // Fetch the machine profile ID for the created profile, with a small retry to
       // handle delays between creation and appearance in /api/machine/profiles
@@ -824,6 +830,7 @@ function App() {
       case 'live-shot':
       case 'shot-analysis':
       case 'dial-in':
+      case 'machine-status':
         handleBackToStart()
         break
       case 'shot-history': {
@@ -1547,7 +1554,14 @@ function App() {
                     isFollowSystem={isFollowSystem}
                     onToggleTheme={toggleTheme}
                     onSetFollowSystem={setFollowSystem}
+                    onNavigateToStatus={() => setViewState('machine-status')}
                   />
+                </FeatureErrorBoundary>
+              )}
+
+              {viewState === 'machine-status' && (
+                <FeatureErrorBoundary feature="Machine Status">
+                  <MachineStatusCenter onBack={() => setViewState('settings')} />
                 </FeatureErrorBoundary>
               )}
 

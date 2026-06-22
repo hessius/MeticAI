@@ -351,6 +351,13 @@
     "stageAnalysis": "Stufenanalyse",
     "profileTarget": "Profilziel",
     "exitTriggers": "Abbruchbedingungen:",
+    "exitTriggerFlowDoseCorrelation": "Fluss/Dosis-Korrelation",
+    "exitTriggerFlowDoseCorrelationDesc": "Beenden, wenn absorbiertes Wasser ein Vielfaches der Kaffeemenge erreicht",
+    "exitTriggerPressureRise": "Druckanstieg",
+    "exitTriggerPressureRiseDesc": "Beenden, wenn der Druck zu steigen beginnt (Puck gesättigt)",
+    "exitTriggerDoseMultiplier": "Dosis-Multiplikator",
+    "exitTriggerPressureThreshold": "Druckschwelle (bar)",
+    "exitTriggerDoseWeight": "Kaffeemenge (g)",
     "limits": "Grenzwerte:",
     "targetReached": "✓ Ziel erreicht",
     "hitLimit": "⚠ Grenzwert erreicht",
@@ -447,6 +454,7 @@
     "authorNameDescription": "Dein Name für das Autorenfeld im generierten Profil-JSON. Standardmäßig \"Metic\", wenn leer gelassen.",
     "geminiModel": "Gemini-Modell",
     "geminiModelDescription": "Wähle das Gemini-Modell für KI-Funktionen aus.",
+    "geminiModelDescriptionDynamic": "Modelle von Google AI geladen. Wählen Sie das gewünschte Modell.",
     "mqttEnabled": "MQTT-Brücke",
     "mqttEnabledDescription": "Echtzeit-Maschinentelemetrie über MQTT. Betreibt das Live-Dashboard.",
     "settingsSaved": "Einstellungen erfolgreich gespeichert!",
@@ -697,7 +705,20 @@
     "importButton": "Importieren",
     "fetchingUrl": "Profil von URL abrufen...",
     "importUrlFailed": "Import von URL fehlgeschlagen",
-    "invalidUrl": "Bitte geben Sie eine gültige URL ein"
+    "invalidUrl": "Bitte geben Sie eine gültige URL ein",
+    "decentEspresso": "Decent",
+    "decentDescription": "Konvertieren & importieren",
+    "decentImportHint": "Laden Sie eine Decent Espresso-Profil-JSON hoch oder fügen Sie sie ein, um sie ins Meticulous-Format zu konvertieren.",
+    "uploadDecentFile": "Decent-Profildatei hochladen",
+    "orPaste": "oder JSON einfügen",
+    "pasteDecentJson": "Decent-Profil-JSON hier einfügen...",
+    "convertButton": "Konvertieren",
+    "conversionWarnings": "Konvertierungswarnungen",
+    "convertedPreview": "Vorschau des konvertierten Profils",
+    "notDecentFormat": "Kein gültiges Decent Espresso-Profilformat",
+    "profileName": "Name",
+    "stages": "Stufen",
+    "triggers": "Auslöser"
   },
   "imageCrop": {
     "title": "Profilbild zuschneiden",
@@ -761,7 +782,9 @@
       "power": "Leistung",
       "temp": "Temp",
       "brewTemp": "Brühkopf",
-      "boilerTemp": "Brühkammer"
+      "boilerTemp": "Brühkammer",
+      "targetTemp": "Ziel",
+      "tempDelta": "Δ Ziel"
     },
     "actions": {
       "start": "Starten",
@@ -1030,6 +1053,7 @@
   },
   "markdownEditor": {
     "edit": "Bearbeiten",
+    "editNote": "Notiz bearbeiten",
     "preview": "Vorschau",
     "save": "Speichern",
     "saving": "Speichern...",
@@ -1531,6 +1555,7 @@
     "somethingWentWrong": "Etwas ist schiefgelaufen",
     "aiModelUnavailable": "Das KI-Modell ist vorübergehend nicht verfügbar — dies ist ein Google-seitiger Ausfall. Versuchen Sie, in den Einstellungen zu einem anderen Modell zu wechseln, was auch den Token-Verbrauch erhöhen kann.",
     "aiQuotaExceeded": "API-Kontingent überschritten. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+    "aiNoCompatibleModel": "Für deinen API-Schlüssel ist kein kompatibles KI-Modell verfügbar. Bitte prüfe deinen Gemini-Zugang oder aktualisiere Metic auf die neueste Version.",
     "analysisFailed": "Analyse fehlgeschlagen"
   },
   "findSimilar": {
@@ -1703,5 +1728,38 @@
     "quietWeek": "Ruhigere Woche?\nDeine Maschine vermisst dich.",
     "singleProfileUser": "{{count}} Shots in Folge mit {{name}}.\nWenn's funktioniert...",
     "profileCollector": "{{count}} Profile!\nDu baust eine beachtliche Sammlung auf."
+  },
+  "machineStatus": {
+    "title": "Maschinenstatus",
+    "serviceHealth": "Dienststatus",
+    "systemMetrics": "Systemmetriken",
+    "diskUsage": "Festplattennutzung",
+    "memoryUsage": "Speichernutzung",
+    "cpuTemperature": "CPU-Temperatur",
+    "uptime": "Betriebszeit",
+    "lastUpdated": "Zuletzt aktualisiert",
+    "refreshing": "Aktualisierung...",
+    "unavailable": "Maschinenstatus nicht verfügbar",
+    "retry": "Erneut versuchen",
+    "autoRefresh": "Automatische Aktualisierung in",
+    "networkStatus": "Netzwerk",
+    "justNow": "gerade eben",
+    "secondsAgo": "vor {{count}}s",
+    "hostname": "Hostname",
+    "firmware": "Firmware",
+    "wifi": "WLAN",
+    "statusRunning": "Läuft",
+    "statusDegraded": "Beeinträchtigt",
+    "statusStopped": "Gestoppt",
+    "unitDay": "T",
+    "unitHour": "Std",
+    "unitMinute": "Min",
+    "watcherUnavailable": "Dienstüberwachung ist nicht verfügbar — Systeminformationen werden unten angezeigt."
+  },
+  "imageGeneration": {
+    "batchCount": "Anzahl der Bilder",
+    "selectImage": "Bild auswählen",
+    "regenerateSlot": "Neu generieren",
+    "generating": "Wird generiert..."
   }
 }

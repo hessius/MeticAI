@@ -1036,6 +1036,43 @@ describe('DirectModeInterceptor regression harness', () => {
       })
     })
 
+    it('invalidates the profile list cache after importing a new profile', async () => {
+      const profiles: ProfileIdent[] = [nestedMachineProfiles()[0]]
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': () => jsonResponse(profiles),
+        'POST /api/v1/profile/save': ({ init }: FetchCall) => {
+          const saved = JSON.parse(String(init?.body)) as { id?: string; name?: string }
+          profiles.push({
+            id: saved.id || 'imported-1',
+            name: saved.name || 'Imported',
+            profile: saved,
+          } as unknown as ProfileIdent)
+          return jsonResponse({ ok: true })
+        },
+      }))
+
+      // Prime the catalogue cache with the single existing profile.
+      const first = await window.fetch('/api/machine/profiles')
+      const firstBody = await readJson<{ profiles: Array<{ name: string }> }>(first)
+      expect(firstBody.profiles.map((p) => p.name)).toEqual(['Turbo Bloom'])
+      expect(localStorage.getItem(STORAGE_KEYS.PROFILE_LIST_CACHE)).not.toBeNull()
+
+      // Import a brand-new profile from a file.
+      const importResponse = await window.fetch('/api/profile/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 'file', profile: { id: 'imported-1', name: 'Imported Joy' } }),
+      })
+      expect(importResponse.status).toBe(200)
+      // Cache must be dropped so the new profile is not hidden behind stale data.
+      expect(localStorage.getItem(STORAGE_KEYS.PROFILE_LIST_CACHE)).toBeNull()
+
+      // The next catalogue fetch reflects the newly created profile.
+      const second = await window.fetch('/api/machine/profiles')
+      const secondBody = await readJson<{ profiles: Array<{ name: string }> }>(second)
+      expect(secondBody.profiles.map((p) => p.name)).toEqual(['Turbo Bloom', 'Imported Joy'])
+    })
+
     it('rejects empty direct machine profile rename requests before saving', async () => {
       const saveRoute = vi.fn(() => jsonResponse({ ok: true }))
       installInterceptor(createMachineFetch({
@@ -1207,6 +1244,55 @@ describe('DirectModeInterceptor regression harness', () => {
           expect.objectContaining({ stage_name: 'Ramp', target_pressure: 8 }),
         ]),
       )
+    })
+
+    it('renders a short dynamics ramp over real time instead of compressing it to instant (#483)', async () => {
+      const rampProfile = [
+        {
+          change_id: 'change-ramp',
+          profile: {
+            id: 'profile-ramp',
+            name: 'Ramp Hold',
+            author: 'MeticAI',
+            author_id: 'author-ramp',
+            previous_authors: [],
+            display: { description: 'ramp then hold' },
+            temperature: 93,
+            final_weight: 36,
+            variables: [],
+            stages: [
+              {
+                name: 'Ramp',
+                type: 'pressure',
+                key: 'pressure_ramp',
+                // 3→9 bar over the first 2s, then hold at 9 bar to ~30s
+                dynamics: { points: [[0, 3], [2, 9], [30, 9]], over: 'time', interpolation: 'linear' },
+                exit_triggers: [{ type: 'time', value: 8 }],
+                limits: [],
+              },
+            ],
+          },
+        },
+      ] as unknown as ProfileIdent[]
+
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': rampProfile,
+      }))
+
+      const response = await window.fetch('/api/profile/Ramp%20Hold/target-curves')
+      expect(response.status).toBe(200)
+      const body = await readJson<{ target_curves: Array<{ time: number; target_pressure?: number }> }>(response)
+      const curve = body.target_curves
+
+      // The ramp's end (9 bar) must land at its real 2s offset — the old scaling
+      // (duration / maxX) compressed it toward t=0 (~0.53s), rendering it instant.
+      const nineBar = curve.find(point => point.target_pressure === 9)
+      expect(nineBar).toBeDefined()
+      expect(nineBar!.time).toBeCloseTo(2, 1)
+
+      // Stage starts at 3 bar and the final value is held to the 8s exit.
+      expect(curve[0]).toMatchObject({ time: 0, target_pressure: 3 })
+      expect(curve.some(point => point.time === 8 && point.target_pressure === 9)).toBe(true)
     })
 
     it('preserves flat profile.image in direct profile info and image proxy routes', async () => {

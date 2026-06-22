@@ -150,6 +150,65 @@ describe('discovery', () => {
       )
       expect(await discoverMachines()).toEqual([])
     })
+
+    it('should not throw when ZeroConf emits an undefined/service-less watch result (Android)', async () => {
+      // On Android the capacitor-zeroconf watch callback can fire with an
+      // undefined or service-less result; reading result.service unguarded
+      // threw "Cannot read properties of undefined (reading 'service')".
+      vi.useFakeTimers()
+      try {
+        mockedIsNative.mockReturnValue(true)
+        const { ZeroConf } = await import('capacitor-zeroconf')
+        const callbacks: Array<(r: unknown) => void> = []
+        vi.mocked(ZeroConf.watch).mockImplementation(((_opts: unknown, cb: (r: unknown) => void) => {
+          callbacks.push(cb)
+          return Promise.resolve(undefined)
+        }) as unknown as typeof ZeroConf.watch)
+        vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('timeout'))
+
+        const promise = discoverMachines()
+        // The synchronous setup registers the single watch callback before the
+        // function suspends on its discovery timeout.
+        expect(callbacks.length).toBe(1)
+        for (const cb of callbacks) {
+          expect(() => cb(undefined)).not.toThrow()
+          expect(() => cb({ action: 'added' })).not.toThrow()
+          expect(() => cb({ action: 'resolved', service: undefined })).not.toThrow()
+        }
+        await vi.advanceTimersByTimeAsync(10000)
+        await expect(promise).resolves.toEqual([])
+      } finally {
+        vi.useRealTimers()
+        mockedIsNative.mockReturnValue(false)
+      }
+    })
+
+    it('should watch ONLY _meticulous._tcp on native (Android single-browser constraint)', async () => {
+      // The capacitor-zeroconf JmDNS backend on Android only registers a
+      // browser on the FIRST watch() call; a second concurrent watch (e.g. a
+      // diagnostic _http._tcp browse) is silently ignored, which previously
+      // prevented the real _meticulous._tcp browse from ever starting and made
+      // auto-detection always fail on Android.
+      vi.useFakeTimers()
+      try {
+        mockedIsNative.mockReturnValue(true)
+        const { ZeroConf } = await import('capacitor-zeroconf')
+        const watchedTypes: string[] = []
+        vi.mocked(ZeroConf.watch).mockImplementation(((opts: { type: string }) => {
+          watchedTypes.push(opts.type)
+          return Promise.resolve(undefined)
+        }) as unknown as typeof ZeroConf.watch)
+        vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('timeout'))
+
+        const promise = discoverMachines()
+        expect(watchedTypes).toEqual(['_meticulous._tcp'])
+        await vi.advanceTimersByTimeAsync(10000)
+        await promise
+      } finally {
+        vi.useRealTimers()
+        mockedIsNative.mockReturnValue(false)
+      }
+    })
   })
 
   // -------------------------------------------------------------------

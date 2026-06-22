@@ -11,6 +11,11 @@ from logging_config import get_logger
 
 logger = get_logger()
 
+
+class ModelUnavailableError(RuntimeError):
+    """Raised when no compatible Gemini model can be found."""
+
+
 # Lazy-loaded Gemini client
 _gemini_client: Optional[genai.Client] = None
 _DEFAULT_MODEL = "gemini-2.5-flash"
@@ -25,6 +30,171 @@ def get_model_name() -> str:
     """
     value = os.environ.get("GEMINI_MODEL", "").strip()
     return value or _DEFAULT_MODEL
+
+
+async def validate_model(model_name: str) -> bool:
+    """Check if a model is available via the Gemini API."""
+    try:
+        client = get_gemini_client()
+    except ValueError:
+        return False
+    try:
+        await asyncio.to_thread(client.models.get, model=model_name)
+        return True
+    except Exception as e:
+        logger.warning("Model %s unavailable: %s", model_name, e)
+        return False
+
+
+async def get_available_models() -> list[dict]:
+    """Return list of available Gemini models suitable for text generation."""
+    try:
+        client = get_gemini_client()
+    except ValueError:
+        return []
+    try:
+        models = await asyncio.to_thread(lambda: list(client.models.list()))
+        result = []
+        for m in models:
+            if hasattr(m, "supported_actions") and "generateContent" in (
+                m.supported_actions or []
+            ):
+                if not _is_text_model(_model_short_name(m.name or "")):
+                    continue
+                result.append(
+                    {
+                        "id": m.name,
+                        "display_name": m.display_name or m.name,
+                        "description": m.description or "",
+                    }
+                )
+        return result
+    except Exception as e:
+        logger.error("Failed to list models: %s", e)
+        return []
+
+
+# Name fragments that identify non-text model families to skip.
+_NON_TEXT_FRAGMENTS = (
+    "embedding",
+    "aqa",
+    "imagen",
+    "image",
+    "tts",
+    "computer-use",
+    "robotics",
+)
+# Patterns that mark a model as preview/experimental/dated-snapshot (unstable).
+_UNSTABLE_RE = re.compile(r"(preview|experimental|-exp\b|exp$|-\d{2}-\d{2}|-\d{3,4}$)")
+
+
+def _model_short_name(name: str) -> str:
+    """Strip a leading 'models/' prefix and lowercase."""
+    return name.split("/")[-1].strip().lower()
+
+
+def _is_text_model(short: str) -> bool:
+    """True only for Gemini text-chat models.
+
+    Requires the ``gemini-`` prefix (excludes non-Gemini families such as
+    gemma, lyria, nano-banana, deep-research and antigravity) and rejects
+    special-purpose Gemini variants (image, tts, computer-use, robotics, …)
+    via ``_NON_TEXT_FRAGMENTS``.
+    """
+    if not short.startswith("gemini-"):
+        return False
+    return not any(f in short for f in _NON_TEXT_FRAGMENTS)
+
+
+def rank_models(models: list[dict]) -> Optional[str]:
+    """Pick the best generateContent-capable model from a discovered list.
+
+    Heuristic: prefer stable over preview/experimental; within a tier prefer
+    flash > flash-lite > pro > other; within a class prefer the highest
+    gemini-<major>.<minor> version. Returns the model id (without the
+    'models/' prefix) or None if nothing compatible remains.
+
+    The ``-\\d{3,4}$`` / dated-snapshot patterns in ``_UNSTABLE_RE`` intentionally
+    treat pinned version snapshots (e.g. ``gemini-2.0-flash-001``) as lower-priority
+    than the floating stable alias (e.g. ``gemini-2.5-flash``); this is by design so
+    the resolver prefers the auto-updating stable alias over a frozen snapshot.
+
+    Model *class* (flash > flash-lite > pro > other) takes precedence over version
+    number — a lower-tier model of any generation beats a higher-tier model, because
+    cost and latency outweigh marginal quality for this summarization use case.
+    """
+    candidates = []
+    for m in models:
+        raw = m.get("id") or ""
+        short = _model_short_name(raw)
+        if not _is_text_model(short):
+            continue
+        candidates.append(short)
+    if not candidates:
+        return None
+
+    def score(short: str):
+        unstable = 1 if _UNSTABLE_RE.search(short) else 0
+        if "flash-lite" in short:
+            cls = 1
+        elif "flash" in short:
+            cls = 0
+        elif "pro" in short:
+            cls = 2
+        else:
+            cls = 3
+        vm = re.search(r"gemini-(\d+)\.(\d+)", short)
+        major, minor = (int(vm.group(1)), int(vm.group(2))) if vm else (0, 0)
+        # Lower tuple sorts first: stable, then class, then highest version, then name.
+        return (unstable, cls, -major, -minor, short)
+
+    return min(candidates, key=score)
+
+
+async def get_working_model() -> str:
+    """Return a working model id, validating the configured model first and
+    falling back to dynamic discovery via the live models list.
+
+    Raises ModelUnavailableError when no compatible model can be found.
+    """
+    configured = get_model_name()
+    if await validate_model(configured):
+        _validated_model_cache["model"] = configured
+        return configured
+
+    logger.warning("Configured model '%s' unavailable, discovering alternatives…", configured)
+    best = rank_models(await get_available_models())
+    if best:
+        logger.info("Selected fallback model via discovery: %s", best)
+        _validated_model_cache["model"] = best
+        return best
+
+    logger.error("No compatible Gemini model found via discovery!")
+    raise ModelUnavailableError("No compatible Gemini model is available for this API key.")
+
+
+# Cache for the last validated working model
+_validated_model_cache: dict[str, str] = {}
+
+
+def get_working_model_sync() -> str:
+    """Return cached working model or fall back to get_model_name().
+
+    Avoids async validation in sync contexts.  The cache is populated
+    by ``get_working_model()`` (called at startup and via the /available-models
+    endpoint) so the first generation request always uses a validated model.
+    """
+    return _validated_model_cache.get("model", get_model_name())
+
+
+def get_working_model_force() -> str:
+    """Synchronously re-resolve a working model, bypassing the cache.
+
+    Runs the async resolver in a fresh event loop (safe because the SDK call
+    is already off the asyncio loop in a thread executor).
+    """
+    _validated_model_cache.pop("model", None)
+    return asyncio.run(get_working_model())
 
 
 # Noise prefixes to filter from error messages (used by parse_gemini_error)
@@ -87,6 +257,9 @@ Break down every shot into four distinct, controllable phases:
 - **Target Flow**: 2-4 ml/s
 - **Target Pressure Limit**: ~2 bar
 - **Duration**: Until first drops appear, or specific volume (5-8 ml) delivered
+- **Exit (#420, native triggers)**: end on a native weight trigger at ≈ 2 × dose
+  (water/dose correlation) AND a native pressure trigger (~2 bar, pressure rise),
+  with a time safety backup — whichever fires first
 
 ### Phase 2: Bloom (Dwell) - Optional
 - **Goal**: Allow saturated puck to rest, releasing CO2, enabling deeper penetration
@@ -114,7 +287,7 @@ Break down every shot into four distinct, controllable phases:
 **Goal**: Balanced, full-bodied shot with rich crema and chocolate/caramel notes
 
 **Profile Steps**:
-1. Pre-infusion: Flow @ 3 ml/s, end when pressure reaches 2.0 bar
+1. Pre-infusion: Flow @ 3 ml/s, end when pressure reaches 2.0 bar OR weight reaches 2× dose (time backup)
 2. Infusion: Pressure @ 9.0 bar, end when 25g yielded
 3. Tapering: Linearly decrease pressure 9.0 bar to 5.0 bar, end when 36g total
 
@@ -123,7 +296,7 @@ Break down every shot into four distinct, controllable phases:
 **Goal**: Bright, clear, acidic shot highlighting floral and fruit notes
 
 **Profile Steps**:
-1. Pre-infusion: Flow @ 6 ml/s, end when pressure reaches 1.5 bar
+1. Pre-infusion: Flow @ 6 ml/s, end when pressure reaches 1.5 bar OR weight reaches 2× dose (time backup)
 2. Infusion: Pressure @ 6.0 bar, end after 15 seconds total
 3. Tapering: Linearly decrease pressure 6.0 bar to 3.0 bar, end when 54g total (1:3 ratio)
 
@@ -141,7 +314,7 @@ Note: No pressure target, entirely flow-controlled
 **Goal**: Manage excess CO2 for even extraction and sweetness
 
 **Profile Steps**:
-1. Pre-infusion: Flow @ 3 ml/s, end when pressure reaches 2.0 bar
+1. Pre-infusion: Flow @ 3 ml/s, end when pressure reaches 2.0 bar OR weight reaches 2× dose (time backup)
 2. Bloom: Hold lever position (zero flow) for 20 seconds
 3. Infusion: Pressure @ 8.0 bar, end when 30g yielded
 4. Tapering: Linearly decrease pressure 8.0 bar to 4.0 bar, end when 38g total
@@ -201,6 +374,21 @@ Note: No pressure target, entirely flow-controlled
 **Pre-infusion Exit Strategy**:
 - Use pressure threshold (<= 2 bar) OR flow threshold (>= 0.2 ml/s) OR weight threshold (>= 0.3g)
 - Multiple triggers ensure stage exits when saturation achieved, not on exact timing
+
+**Pre-infusion Saturation Rules (#420) — express with NATIVE machine triggers**:
+The machine only honors native exit trigger types ("weight", "pressure", "flow",
+"time"). Implement the following intent using those native types so the machine
+actually acts on them — do NOT emit app-only pseudo triggers.
+- **Dose/water correlation → native WEIGHT trigger**: A puck needs roughly twice
+  its dose in water to fully saturate (e.g., an 18 g dose absorbs ~36 ml). Add a
+  weight exit trigger with value ≈ 2 × dose (comparison ">="), computing it from
+  the actual dose in the request. This ends pre-infusion once enough water has
+  been delivered, regardless of grind.
+- **Pressure rise → native PRESSURE trigger**: As the puck saturates, resistance
+  builds and pressure climbs. Add a pressure exit trigger at a low threshold
+  (~2 bar, ">=") so the stage ends the moment pressure starts to rise.
+- Always pair both with a TIME safety backup; whichever native trigger fires
+  first ends pre-infusion.
 
 **Infusion/Hold Exit Strategy**:
 - Always use weight threshold with >= comparison for target yield
@@ -280,6 +468,7 @@ Note: No pressure target, entirely flow-controlled
 **❌ Too Many Stages**: More than 5-6 stages = overcomplicated. 3-4 stages is usually optimal.
 **❌ No Safety Timeouts**: Missing time-based triggers = risk of infinite extraction.
 **❌ Pressure Spikes**: Sudden pressure jumps = channeling risk. Use gentle ramps (3+ seconds).
+**❌ Recommending Weight Exit Triggers**: All Meticulous profiles automatically have a weight-based exit trigger at the overall profile level. NEVER recommend adding a weight exit trigger for the overall profile or for the final stage — it is always already present and handled by the machine firmware. Only recommend weight triggers for intermediate stages when needed.
 
 ## 6. Equipment Factors
 
@@ -305,6 +494,7 @@ PROFILING_KNOWLEDGE_DISTILLED = """\
 
 ## Four-Phase Structure
 1. **Pre-infusion**: Flow 2-4 ml/s, pressure limit ~2 bar, exit on pressure threshold or weight ~5-8g
+   Saturation rules (#420), as NATIVE triggers: native weight exit at ≈ 2 × dose (water/dose correlation) AND native pressure exit (~2 bar, pressure rise), plus a time backup
 2. **Bloom** (optional): Zero flow, hold 0.5-1.5 bar, 5-30s. Use for fresh coffee or light roasts
 3. **Infusion**: Ramp to target pressure/flow. This is where 60-75% of yield extracts
 4. **Taper**: Decline pressure/flow over final 20-30% of yield. Reduces bitterness and astringency
@@ -331,6 +521,7 @@ PROFILING_KNOWLEDGE_DISTILLED = """\
 - Gentle pressure ramps (3-4s) prevent channeling; aggressive (<2s) risk it
 - Keep profiles to 3-4 stages (5-6 max). Simpler = more reliable
 - Pre-infusion: ~5-10% of yield. Infusion: 60-75%. Taper: remaining 20-30%
+- NEVER recommend adding a weight exit trigger for the overall profile or the final stage — all Meticulous profiles already have an automatic weight-based exit trigger handled by firmware
 """
 
 
@@ -531,6 +722,9 @@ class _GeminiModelWrapper:
     def generate_content(self, contents):
         """Call generate_content on the Gemini API (synchronous).
 
+        On a model-not-found error, re-resolves the working model once via
+        ``get_working_model_force()`` and retries exactly once.
+
         Args:
             contents: A string, list of strings, PIL images, or mixed list
                      (same format accepted by both old and new SDK).
@@ -538,10 +732,24 @@ class _GeminiModelWrapper:
         Returns:
             GenerateContentResponse with .text attribute.
         """
-        return self._client.models.generate_content(
-            model=get_model_name(),
-            contents=contents,
-        )
+        try:
+            return self._client.models.generate_content(
+                model=get_working_model_sync(),
+                contents=contents,
+            )
+        except Exception as e:
+            text = str(e).lower()
+            is_model_gone = ("not_found" in text and "model" in text) or (
+                "404" in text and "model" in text
+            )
+            if not is_model_gone:
+                raise
+            logger.warning("Model not found during generation; re-resolving…")
+            new_model = get_working_model_force()
+            return self._client.models.generate_content(
+                model=new_model,
+                contents=contents,
+            )
 
     async def async_generate_content(self, contents):
         """Non-blocking wrapper around generate_content.

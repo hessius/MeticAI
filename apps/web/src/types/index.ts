@@ -124,6 +124,7 @@ export type ViewState =
   | 'shot-analysis'
   | 'profile-catalogue'
   | 'dial-in'
+  | 'machine-status'
   | 'onboarding';
 
 // ============================================================================

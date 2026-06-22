@@ -1,6 +1,6 @@
 """Profile management endpoints."""
 
-from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException, Query
 from typing import Optional, Any
 from datetime import datetime, timezone
 import json
@@ -59,7 +59,7 @@ from services.analysis_service import (
 from services.settings_service import load_settings
 from api.routes.shots import _prepare_profile_for_llm
 from utils.file_utils import deep_convert_to_dict
-from services.temp_profile_service import is_temp_profile
+from services.temp_profile_service import is_temp_profile, get_active, apply_variable_overrides
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -578,6 +578,7 @@ async def generate_profile_image(
     style: str = "abstract",
     tags: str = "",
     preview: bool = False,
+    count: int = Query(default=1, ge=1, le=4),
 ):
     """Generate an AI image for a profile using Google's Imagen model.
 
@@ -589,9 +590,11 @@ async def generate_profile_image(
         style: Image style (abstract, minimalist, pixel-art, watercolor, modern, vintage)
         tags: Comma-separated tags to include in the prompt
         preview: If true, return the image as base64 without saving to profile
+        count: Number of images to generate (1-4). When >1, returns an array of images.
 
     Returns:
-        Success status with generated image info (and image data if preview=true)
+        count=1: Single-image response (backward compatible)
+        count>1: {"images": [...], "count": N} with per-image results
     """
     request_id = request.state.request_id
 
@@ -603,6 +606,7 @@ async def generate_profile_image(
                 "profile_name": profile_name,
                 "style": style,
                 "tags": tags,
+                "count": count,
             },
         )
 
@@ -655,110 +659,160 @@ async def generate_profile_image(
                 detail="AI features are unavailable. Please configure a Gemini API key in Settings.",
             )
 
-        response = client.models.generate_images(
-            model="imagen-4.0-fast-generate-001",
-            prompt=full_prompt,
-            config=genai_types.GenerateImagesConfig(
-                number_of_images=1,
-                aspect_ratio="1:1",
-                output_mime_type="image/png",
-            ),
-        )
+        async def _generate_single(index: int) -> dict:
+            """Generate and process a single image. Returns result dict."""
+            try:
+                gen_response = await asyncio.to_thread(
+                    client.models.generate_images,
+                    model="imagen-4.0-fast-generate-001",
+                    prompt=full_prompt,
+                    config=genai_types.GenerateImagesConfig(
+                        number_of_images=1,
+                        aspect_ratio="1:1",
+                        output_mime_type="image/png",
+                    ),
+                )
 
-        # Extract image data from response
-        if not response.generated_images or len(response.generated_images) == 0:
-            logger.error(
-                "Image generation returned no images", extra={"request_id": request_id}
-            )
-            raise HTTPException(
-                status_code=500,
-                detail="Image generation completed but no image was returned by the model",
-            )
+                if (
+                    not gen_response.generated_images
+                    or len(gen_response.generated_images) == 0
+                ):
+                    return {"index": index, "image": None, "error": "No image returned by model"}
 
-        generated = response.generated_images[0]
-        image_data = generated.image.image_bytes
+                generated = gen_response.generated_images[0]
+                raw_bytes = generated.image.image_bytes
 
-        # Process the image (crop/resize) — CPU-bound, offload to thread
-        loop = asyncio.get_running_loop()
-        image_data_uri, png_bytes = await loop.run_in_executor(
-            None, process_image_for_profile, image_data, "image/png"
-        )
+                loop = asyncio.get_running_loop()
+                data_uri, png_bytes = await loop.run_in_executor(
+                    None, process_image_for_profile, raw_bytes, "image/png"
+                )
 
-        # Cache the processed image for fast retrieval
-        _set_cached_image(profile_name, png_bytes)
+                # Cache with indexed key for batch, plain key for single
+                cache_key = (
+                    f"{profile_name}_batch_{index}" if count > 1 else profile_name
+                )
+                _set_cached_image(cache_key, png_bytes)
 
-        logger.info(
-            f"Processed generated image for profile: {profile_name} (size: {len(image_data_uri)} chars)",
-            extra={"request_id": request_id},
-        )
+                return {"index": index, "image": data_uri}
+            except Exception as exc:
+                logger.warning(
+                    f"Batch image {index} failed: {exc}",
+                    extra={"request_id": request_id, "index": index},
+                )
+                return {"index": index, "image": None, "error": "Image generation failed"}
 
-        # If preview mode, return the image without saving
-        if preview:
+        # --- Single image (count=1): preserve original response format ---
+        if count == 1:
+            result = await _generate_single(0)
+
+            if result.get("error"):
+                raise HTTPException(
+                    status_code=500,
+                    detail=result["error"],
+                )
+
+            image_data_uri = result["image"]
+
             logger.info(
-                f"Returning preview image for profile: {profile_name}",
+                f"Processed generated image for profile: {profile_name} (size: {len(image_data_uri)} chars)",
+                extra={"request_id": request_id},
+            )
+
+            if preview:
+                logger.info(
+                    f"Returning preview image for profile: {profile_name}",
+                    extra={"request_id": request_id, "style": style},
+                )
+                return {
+                    "status": "preview",
+                    "message": f"Preview image generated for profile '{profile_name}'",
+                    "style": style,
+                    "prompt": full_prompt,
+                    "prompt_metadata": prompt_metadata,
+                    "image_data": image_data_uri,
+                }
+
+            # Find the profile and update it
+            profiles_result = await async_list_profiles()
+
+            if hasattr(profiles_result, "error") and profiles_result.error:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Machine API error: {profiles_result.error}",
+                )
+
+            matching_profile = None
+            for partial_profile in profiles_result:
+                if partial_profile.name == profile_name:
+                    full_profile = await async_get_profile(partial_profile.id)
+                    if hasattr(full_profile, "error") and full_profile.error:
+                        continue
+                    matching_profile = full_profile
+                    break
+
+            if not matching_profile:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Profile '{profile_name}' not found on machine",
+                )
+
+            from meticulous.profile import Display
+
+            existing_accent = None
+            if matching_profile.display:
+                existing_accent = matching_profile.display.accentColor
+
+            matching_profile.display = Display(
+                image=image_data_uri, accentColor=existing_accent
+            )
+
+            save_result = await async_save_profile(matching_profile)
+
+            if hasattr(save_result, "error") and save_result.error:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Failed to save profile: {save_result.error}",
+                )
+
+            logger.info(
+                f"Successfully generated and saved profile image: {profile_name}",
                 extra={"request_id": request_id, "style": style},
             )
+
             return {
-                "status": "preview",
-                "message": f"Preview image generated for profile '{profile_name}'",
+                "status": "success",
+                "message": f"Image generated for profile '{profile_name}'",
+                "profile_id": matching_profile.id,
                 "style": style,
                 "prompt": full_prompt,
                 "prompt_metadata": prompt_metadata,
-                "image_data": image_data_uri,
             }
 
-        # Find the profile and update it
-        profiles_result = await async_list_profiles()
-
-        if hasattr(profiles_result, "error") and profiles_result.error:
-            raise HTTPException(
-                status_code=502, detail=f"Machine API error: {profiles_result.error}"
-            )
-
-        matching_profile = None
-        for partial_profile in profiles_result:
-            if partial_profile.name == profile_name:
-                full_profile = await async_get_profile(partial_profile.id)
-                if hasattr(full_profile, "error") and full_profile.error:
-                    continue
-                matching_profile = full_profile
-                break
-
-        if not matching_profile:
-            raise HTTPException(
-                status_code=404, detail=f"Profile '{profile_name}' not found on machine"
-            )
-
-        # Update the display image
-        from meticulous.profile import Display
-
-        existing_accent = None
-        if matching_profile.display:
-            existing_accent = matching_profile.display.accentColor
-
-        matching_profile.display = Display(
-            image=image_data_uri, accentColor=existing_accent
+        # --- Batch mode (count > 1): parallel generation, preview-only ---
+        results = await asyncio.gather(
+            *[_generate_single(i) for i in range(count)]
         )
 
-        save_result = await async_save_profile(matching_profile)
-
-        if hasattr(save_result, "error") and save_result.error:
-            raise HTTPException(
-                status_code=502, detail=f"Failed to save profile: {save_result.error}"
-            )
-
+        successful = [r for r in results if r.get("image")]
         logger.info(
-            f"Successfully generated and saved profile image: {profile_name}",
-            extra={"request_id": request_id, "style": style},
+            f"Batch image generation: {len(successful)}/{count} succeeded for {profile_name}",
+            extra={"request_id": request_id},
         )
+
+        if not successful:
+            raise HTTPException(
+                status_code=500,
+                detail="All image generation attempts failed",
+            )
 
         return {
-            "status": "success",
-            "message": f"Image generated for profile '{profile_name}'",
-            "profile_id": matching_profile.id,
+            "status": "preview",
+            "message": f"Generated {len(successful)} of {count} images for profile '{profile_name}'",
             "style": style,
             "prompt": full_prompt,
             "prompt_metadata": prompt_metadata,
+            "images": results,
+            "count": count,
         }
 
     except HTTPException:
@@ -1137,6 +1191,20 @@ async def get_profile_target_curves(profile_name: str, request: Request):
                                             ]
                         else:
                             profile_dict[attr] = val
+
+                # Apply active temporary variable overrides so the live graph
+                # reflects the shot actually running (ephemeral override load),
+                # not the saved profile. The active temp profile keeps the
+                # original name when save_mode is "none"/"save_original".
+                active = get_active()
+                if active and active.get("profile_name") == profile_name:
+                    overrides = (active.get("original_params") or {}).get(
+                        "overrides"
+                    ) or {}
+                    if overrides:
+                        profile_dict = apply_variable_overrides(
+                            profile_dict, overrides
+                        )
 
                 curves = generate_estimated_target_curves(profile_dict)
                 return {"status": "success", "target_curves": curves}
@@ -2757,6 +2825,18 @@ async def import_from_url(request: Request):
             raise HTTPException(
                 status_code=400, detail="URL did not return a valid profile object"
             )
+        # Auto-detect Decent Espresso format and convert
+        from services.decent_converter import detect_decent_format, convert_decent_to_meticulous
+
+        decent_converted = False
+        if detect_decent_format(profile_json):
+            logger.info(
+                "Detected Decent Espresso format, converting",
+                extra={"request_id": request_id},
+            )
+            result = convert_decent_to_meticulous(profile_json)
+            profile_json = result["profile"]
+            decent_converted = True
         if not profile_json.get("name"):
             raise HTTPException(
                 status_code=400, detail="Profile is missing a 'name' field"
@@ -2836,6 +2916,7 @@ async def import_from_url(request: Request):
             "has_description": reply is not None
             and "Description generation failed" not in reply,
             "uploaded_to_machine": machine_profile_id is not None,
+            "converted_from_decent": decent_converted,
         }
     except HTTPException:
         raise
@@ -2849,6 +2930,29 @@ async def import_from_url(request: Request):
         raise HTTPException(
             status_code=500, detail={"status": "error", "error": str(e)}
         )
+
+
+@router.post("/convert-decent")
+@router.post("/api/convert-decent")
+async def convert_decent_profile(request: Request):
+    """Convert a Decent Espresso profile to Meticulous format.
+
+    Accepts a Decent profile JSON and returns the converted Meticulous
+    profile along with any conversion warnings.  Does NOT save or
+    upload — the caller should use ``/api/profile/import`` afterwards.
+    """
+    from services.decent_converter import detect_decent_format, convert_decent_to_meticulous
+
+    body = await request.json()
+
+    if not detect_decent_format(body):
+        raise HTTPException(
+            status_code=400,
+            detail="Not a valid Decent Espresso profile format",
+        )
+
+    result = convert_decent_to_meticulous(body)
+    return result
 
 
 @router.post("/api/profile/import-all")

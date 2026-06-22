@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,6 +20,10 @@ interface MarkdownEditorProps {
   saving?: boolean
   readOnly?: boolean
   className?: string
+  /** Section title rendered on the same line as the inline Edit button. */
+  title?: ReactNode
+  /** Extra header content (e.g. a rating) shown next to the Edit button. */
+  headerExtra?: ReactNode
 }
 
 export function MarkdownEditor({
@@ -31,6 +35,8 @@ export function MarkdownEditor({
   saving = false,
   readOnly = false,
   className = '',
+  title,
+  headerExtra,
 }: MarkdownEditorProps) {
   const { t } = useTranslation()
   const [isEditing, setIsEditing] = useState(false)
@@ -68,10 +74,36 @@ export function MarkdownEditor({
     )
   }
 
+  // Shared header: section title + a subtle inline Edit button (matches the
+  // "Edit Profile" affordance). The Edit button only shows in display mode
+  // when there is a note to edit; an empty note uses the "Add a note" button.
+  const header = (title || headerExtra) ? (
+    <div className="flex items-center justify-between gap-2">
+      <div className="min-w-0">{title}</div>
+      <div className="flex items-center gap-1 shrink-0">
+        {headerExtra}
+        {!isEditing && value && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-muted-foreground/60 hover:text-foreground gap-1"
+            onClick={handleStartEdit}
+            title={t('markdownEditor.editNote')}
+            aria-label={t('markdownEditor.editNote')}
+          >
+            <PencilSimple size={14} weight="bold" />
+            {t('markdownEditor.editNote')}
+          </Button>
+        )}
+      </div>
+    </div>
+  ) : null
+
   // Editing mode
   if (isEditing) {
     return (
       <div className={`space-y-2 ${className}`}>
+        {header}
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant={showPreview ? 'outline' : 'secondary'}
@@ -109,7 +141,7 @@ export function MarkdownEditor({
             {saving ? t('markdownEditor.saving') : t('markdownEditor.save')}
           </Button>
         </div>
-        
+
         {showPreview ? (
           <Card className="p-4 min-h-[120px] bg-muted/30">
             {value ? (
@@ -133,20 +165,13 @@ export function MarkdownEditor({
     )
   }
 
-  // Display mode with edit button
+  // Display mode
   return (
-    <div className={`relative group ${className}`}>
+    <div className={`space-y-2 ${className}`}>
+      {header}
       {value ? (
         <Card className="p-4 bg-muted/30">
           <MarkdownText text={value} />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={handleStartEdit}
-          >
-            <PencilSimple className="w-4 h-4" />
-          </Button>
         </Card>
       ) : (
         <Button

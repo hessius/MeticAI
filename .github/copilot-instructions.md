@@ -8,13 +8,22 @@ Metic is an AI-powered controller for the Meticulous Espresso Machine. Stack: Py
 - **Settings Hot-Reload:** Changing `METICULOUS_IP` or `GEMINI_API_KEY` restarts services (`s6-svc -r`) without full container restart.
 - **Environment:** Requires `.env` with `GEMINI_API_KEY` and `METICULOUS_IP`.
 
+## Dual Runtime — Feature Parity (read before any logic change)
+
+Metic ships in **two runtimes** that implement the same behavior twice:
+
+- **Server mode:** React web app + Python FastAPI backend (`apps/server/`) for AI analysis, profile generation, target-curve math, recommendations, machine I/O.
+- **Native/Capacitor mode:** iOS app with **no Python server** — that logic is reimplemented client-side in `apps/web/src/services/interceptor/DirectModeInterceptor.ts`, `apps/web/src/services/ai/`, `apps/web/src/lib/directModeAI.ts`, and `apps/web/src/lib/profileAnalysis.ts`.
+
+**Guardrail (do this automatically, without being asked):** any change to analysis / profile / curve / recommendation / dial-in / machine-API logic in one runtime **must** be mirrored in the other within the same change, with tests on both sides. After fixing one side, always grep the other runtime for the parallel implementation. Mismatched behavior between runtimes is a release-blocking bug. See `.github/CONVENTIONS.md` → Quality Gate #7 and *Architecture Patterns → Dual runtime*.
+
 ## Conventions
 
 **All project conventions** (versioning, quality gates, testing, commits, i18n, release process) are defined in `.github/CONVENTIONS.md`. Read it before starting any work.
 
 ## Skills
 
-Detailed domain instructions are in `.github/skills/`: `workflow.md`, `testing.md`, `frontend.md`, `backend.md`, `release.md`, `conventions.md`, `browser-testing.md`.
+Detailed domain instructions are in `.github/skills/`: `workflow.md`, `testing.md`, `frontend.md`, `backend.md`, `release.md`, `conventions.md`, `browser-testing.md`, `android.md`.
 
 ## Barista Persona (Profile Generation)
 

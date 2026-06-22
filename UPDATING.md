@@ -3,7 +3,7 @@
 ## Quick Update (v2.x)
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 docker compose pull
 docker compose up -d
 ```
@@ -23,7 +23,7 @@ docker ps | grep watchtower
 **Enable Watchtower on an existing installation:**
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 docker compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d
 ```
 
@@ -41,7 +41,7 @@ If your Metic instance is outdated and Watchtower didn't update it (or you don't
 ### Option B: Run `update.sh`
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 ./update.sh
 ```
 
@@ -50,7 +50,7 @@ This script pulls the latest image and restarts containers. It also handles v1.x
 ### Option C: Manual Pull
 
 ```bash
-cd ~/MeticAI
+cd ~/Metic
 docker compose pull
 docker compose up -d
 ```
@@ -103,10 +103,10 @@ cp ~/MeticAI/.env ~/metic-backup.env
 # 2. Remove old installation
 cd ~/MeticAI
 docker compose down -v
-cd ~ && rm -rf Metic
+cd ~ && rm -rf MeticAI
 
 # 3. Fresh install
-curl -fsSL https://raw.githubusercontent.com/hessius/Metic/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/refs/heads/main/scripts/install.sh | bash
 
 # 4. Or clone and start manually
 git clone https://github.com/hessius/MeticAI.git

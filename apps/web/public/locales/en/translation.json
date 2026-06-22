@@ -358,6 +358,13 @@
     "stageAnalysis": "Stage Analysis",
     "profileTarget": "Profile target",
     "exitTriggers": "Exit Triggers:",
+    "exitTriggerFlowDoseCorrelation": "Flow/Dose Correlation",
+    "exitTriggerFlowDoseCorrelationDesc": "Exit when water absorbed reaches a multiple of the coffee dose",
+    "exitTriggerPressureRise": "Pressure Rise",
+    "exitTriggerPressureRiseDesc": "Exit when pressure starts rising (puck saturated)",
+    "exitTriggerDoseMultiplier": "Dose multiplier",
+    "exitTriggerPressureThreshold": "Pressure threshold (bar)",
+    "exitTriggerDoseWeight": "Coffee dose (g)",
     "limits": "Limits:",
     "targetReached": "✓ Reached Target",
     "hitLimit": "⚠ Hit Limit",
@@ -454,6 +461,7 @@
     "authorNameDescription": "Your name for the author field in generated profile JSON. Defaults to \"Metic\" if left empty.",
     "geminiModel": "Gemini Model",
     "geminiModelDescription": "Select which Gemini model to use for AI features.",
+    "geminiModelDescriptionDynamic": "Models loaded from Google AI. Select which model to use.",
     "mqttEnabled": "MQTT Bridge",
     "mqttEnabledDescription": "Real-time machine telemetry via MQTT. Powers the live Control Center dashboard.",
     "addToHomeAssistant": "Add to Home Assistant",
@@ -709,7 +717,20 @@
     "importButton": "Import",
     "fetchingUrl": "Fetching profile from URL...",
     "importUrlFailed": "Failed to import from URL",
-    "invalidUrl": "Please enter a valid URL"
+    "invalidUrl": "Please enter a valid URL",
+    "decentEspresso": "Decent",
+    "decentDescription": "Convert & import",
+    "decentImportHint": "Upload or paste a Decent Espresso profile JSON to convert it to Meticulous format.",
+    "uploadDecentFile": "Upload Decent Profile File",
+    "orPaste": "or paste JSON",
+    "pasteDecentJson": "Paste Decent profile JSON here...",
+    "convertButton": "Convert",
+    "conversionWarnings": "Conversion warnings",
+    "convertedPreview": "Converted profile preview",
+    "notDecentFormat": "Not a valid Decent Espresso profile format",
+    "profileName": "Name",
+    "stages": "stages",
+    "triggers": "triggers"
   },
   "imageCrop": {
     "title": "Crop Profile Image",
@@ -773,7 +794,9 @@
       "power": "Power",
       "temp": "Temp",
       "brewTemp": "Brew Head",
-      "boilerTemp": "Brew Chamber"
+      "boilerTemp": "Brew Chamber",
+      "targetTemp": "Target",
+      "tempDelta": "Δ Target"
     },
     "actions": {
       "start": "Start",
@@ -1131,6 +1154,7 @@
   },
   "markdownEditor": {
     "edit": "Edit",
+    "editNote": "Edit Note",
     "preview": "Preview",
     "save": "Save",
     "saving": "Saving...",
@@ -1538,6 +1562,7 @@
     "somethingWentWrong": "Something went wrong",
     "aiModelUnavailable": "The AI model is temporarily unavailable — this is a Google-side outage. Try switching to a different model in Settings, which may also increase token usage.",
     "aiQuotaExceeded": "API quota exceeded. Please wait a moment and try again.",
+    "aiNoCompatibleModel": "No compatible AI model is available for your API key. Please check your Gemini access or update Metic to the latest version.",
     "analysisFailed": "Analysis failed"
   },
   "findSimilar": {
@@ -1710,5 +1735,38 @@
     "quietWeek": "Slower week?\nYour machine misses you.",
     "singleProfileUser": "{{count}} shots in a row on {{name}}.\nIf it ain't broke...",
     "profileCollector": "{{count}} profiles!\nYou're building quite the collection."
+  },
+  "machineStatus": {
+    "title": "Machine Status",
+    "serviceHealth": "Service Health",
+    "systemMetrics": "System Metrics",
+    "diskUsage": "Disk Usage",
+    "memoryUsage": "Memory Usage",
+    "cpuTemperature": "CPU Temperature",
+    "uptime": "Uptime",
+    "lastUpdated": "Last updated",
+    "refreshing": "Refreshing...",
+    "unavailable": "Machine status unavailable",
+    "retry": "Retry",
+    "autoRefresh": "Auto-refresh in",
+    "networkStatus": "Network",
+    "justNow": "just now",
+    "secondsAgo": "{{count}}s ago",
+    "hostname": "Hostname",
+    "firmware": "Firmware",
+    "wifi": "WiFi",
+    "statusRunning": "Running",
+    "statusDegraded": "Degraded",
+    "statusStopped": "Stopped",
+    "unitDay": "d",
+    "unitHour": "h",
+    "unitMinute": "m",
+    "watcherUnavailable": "Service health monitoring is not available — system info is shown below."
+  },
+  "imageGeneration": {
+    "batchCount": "Number of images",
+    "selectImage": "Select an image",
+    "regenerateSlot": "Regenerate",
+    "generating": "Generating..."
   }
 }

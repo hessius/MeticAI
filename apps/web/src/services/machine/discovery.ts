@@ -48,7 +48,9 @@ export function onDiscoveryLog(listener: DiscoveryLogListener): () => void {
 function dlog(msg: string) {
   const ts = new Date().toISOString().slice(11, 23)
   const entry = `[${ts}] ${msg}`
-  console.error(`[Discovery] ${entry}`)
+  // Use console.log (not console.error): these are diagnostics, and on the
+  // Android WebView console.error is bridged/heavier, adding main-thread jank.
+  console.log(`[Discovery] ${entry}`)
   _logListeners.forEach(fn => { try { fn(entry) } catch { /* ignore */ } })
 }
 
@@ -147,33 +149,24 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
     })
     dlog('STEP 3: discovery state ready')
 
-    // Step 4: Start diagnostic _http._tcp browse
-    try {
-      dlog('STEP 4: starting _http._tcp diagnostic browse...')
-      ZeroConf.watch(
-        { type: '_http._tcp', domain: 'local.' },
-        (result) => {
-          const svc = result.service
-          dlog(`[diag] _http._tcp: action=${result.action} name=${svc?.name} host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} port=${svc?.port}`)
-        },
-      ).then(() => {
-        dlog('STEP 4: _http._tcp watch() promise resolved')
-      }).catch((e: unknown) => {
-        dlog(`STEP 4: _http._tcp watch() REJECTED: ${e}`)
-      })
-      dlog('STEP 4: _http._tcp watch() call returned (fire-and-forget)')
-    } catch (e) {
-      dlog(`STEP 4: _http._tcp watch() THREW: ${e}`)
-    }
-
-    // Step 5: Start main _meticulous._tcp browse
+    // Step 5: Start main _meticulous._tcp browse.
+    //
+    // IMPORTANT (Android): the capacitor-zeroconf JmDNS backend only registers
+    // a browser on the FIRST watch() call (ZeroConf.java guards on
+    // `browserManager == null`). Any second concurrent watch() — e.g. a
+    // diagnostic `_http._tcp` browse — is silently ignored, so the real
+    // `_meticulous._tcp` browse would never start and auto-detection would
+    // always fail. We therefore watch ONLY `_meticulous._tcp`. Browsing a
+    // single low-traffic service type also avoids flooding the WebView main
+    // thread with a callback per LAN HTTP service (which caused input focus
+    // difficulty and typing freezes during onboarding).
     try {
       dlog('STEP 5: starting _meticulous._tcp browse...')
       ZeroConf.watch(
         { type: '_meticulous._tcp', domain: 'local.' },
         (result) => {
-          const svc = result.service
-          dlog(`Zeroconf event: action=${result.action} name=${svc?.name} host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} ipv6=${JSON.stringify(svc?.ipv6Addresses)} port=${svc?.port} type=${svc?.type} domain=${svc?.domain} txt=${JSON.stringify(svc?.txtRecord)}`)
+          const svc = result?.service
+          dlog(`Zeroconf event: action=${result?.action} name=${svc?.name} host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} ipv6=${JSON.stringify(svc?.ipv6Addresses)} port=${svc?.port} type=${svc?.type} domain=${svc?.domain} txt=${JSON.stringify(svc?.txtRecord)}`)
 
           if (svc && (result.action === 'added' || result.action === 'resolved')) {
             const host = svc.ipv4Addresses?.[0] || svc.hostname || `${svc.name}.local`
@@ -221,7 +214,6 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
 
     // Step 8: Cleanup (fire-and-forget — DO NOT await; unwatch/close can hang)
     ZeroConf.unwatch({ type: '_meticulous._tcp', domain: 'local.' }).catch(() => {})
-    ZeroConf.unwatch({ type: '_http._tcp', domain: 'local.' }).catch(() => {})
     ZeroConf.close().catch(() => {})
     dlog('STEP 8: cleanup dispatched (non-blocking)')
 

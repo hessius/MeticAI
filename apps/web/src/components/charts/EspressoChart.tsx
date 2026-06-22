@@ -23,6 +23,7 @@ import {
   STAGE_COLORS,
   STAGE_BORDER_COLORS,
   getChartTheme,
+  computeLeftAxisMax,
   type ChartDataPoint,
   type StageRange,
   type ProfileTargetPoint,
@@ -113,9 +114,7 @@ export function EspressoChart({
   )
   // Power (0–100%) is normalized to the left axis range so it doesn't
   // compress pressure/flow readings (Option B from #183).
-  const computedLeftMax = leftAxisMax ?? Math.ceil(
-    Math.max(maxPressure, maxFlow) * 1.1,
-  )
+  const computedLeftMax = leftAxisMax ?? computeLeftAxisMax(maxPressure, maxFlow)
   // Always start at zero — never display negative values
   const computedLeftMin = 0
 
@@ -311,7 +310,7 @@ export function EspressoChart({
               axisLine={{ stroke: theme.axisLineStroke }}
               tickLine={{ stroke: theme.axisLineStroke }}
               width={35}
-              allowDataOverflow={false}
+              allowDataOverflow={true}
             />
             {showWeight && (
               <YAxis

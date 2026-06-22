@@ -202,7 +202,8 @@ def _format_exit_triggers(
             comparison, comparison
         )
 
-        unit = {"time": "s", "weight": "g", "pressure": "bar", "flow": "ml/s"}.get(
+        unit = {"time": "s", "weight": "g", "pressure": "bar", "flow": "ml/s",
+                "flow_dose_correlation": "×dose", "pressure_rise": "bar"}.get(
             trigger_type, ""
         )
 
@@ -321,7 +322,8 @@ def _determine_exit_trigger_hit(
             was_hit = abs(actual_value - value) < tolerance
 
         # Build a proper description with the resolved value
-        unit = {"time": "s", "weight": "g", "pressure": "bar", "flow": "ml/s"}.get(
+        unit = {"time": "s", "weight": "g", "pressure": "bar", "flow": "ml/s",
+                "flow_dose_correlation": "×dose", "pressure_rise": "bar"}.get(
             trigger_type, ""
         )
         trigger_info = {
@@ -674,6 +676,102 @@ def _interpolate_weight_to_time(
     return weight_time_pairs[-1][1]
 
 
+def _target_key_for_type(stage_type: str) -> Optional[str]:
+    """Return the target-curve data key for a stage type, or None if unsupported."""
+    if stage_type == "pressure":
+        return "target_pressure"
+    if stage_type == "flow":
+        return "target_flow"
+    if stage_type == "power":
+        return "target_power"
+    return None
+
+
+def _build_time_based_curve_points(
+    dynamics_points: list,
+    variables: list,
+    stage_name: str,
+    stage_type: str,
+    stage_start: float,
+    stage_end: float,
+) -> list[dict]:
+    """Build target-curve points for a time-based, multi-point stage.
+
+    Dynamics point x-values are absolute seconds measured from the start of the
+    stage; they describe the real-time target curve the machine follows. They
+    must therefore be plotted at their actual offset (``stage_start + x``) and
+    NOT rescaled to fill the stage duration. Rescaling distorts ramps: a short
+    ramp inside a longer stage gets stretched, and a ramp followed by a long
+    hold gets compressed until the ramp looks instantaneous (the reported bug).
+
+    Behaviour:
+      * Each point is emitted at its absolute time within the stage.
+      * If the final dynamics point ends before ``stage_end``, the last value is
+        held flat until ``stage_end`` (the machine holds the final target).
+      * If a dynamics point lies beyond ``stage_end`` (the stage exited early via
+        another trigger), the curve is linearly clipped at the boundary.
+    """
+    key = _target_key_for_type(stage_type)
+    if key is None:
+        return []
+
+    stage_duration = stage_end - stage_start
+
+    def _resolve(raw):
+        if isinstance(raw, str) and raw.startswith("$"):
+            resolved, _ = _resolve_variable(raw, variables)
+            return _safe_float(resolved)
+        return _safe_float(raw)
+
+    points: list[dict] = []
+    prev_t: Optional[float] = None
+    prev_v: Optional[float] = None
+    last_t: Optional[float] = None
+    last_v: Optional[float] = None
+
+    for dp in dynamics_points:
+        dp_t = _safe_float(dp[0])
+        dp_v = _resolve(dp[1] if len(dp) > 1 else dp[0])
+
+        if dp_t > stage_duration:
+            # Stage exited before reaching this point — clip at the boundary.
+            if prev_t is not None and dp_t > prev_t:
+                frac = (stage_duration - prev_t) / (dp_t - prev_t)
+                boundary_v = prev_v + (dp_v - prev_v) * frac
+            else:
+                boundary_v = dp_v
+            points.append(
+                {
+                    "time": round(stage_end, 2),
+                    "stage_name": stage_name,
+                    key: round(boundary_v, 1),
+                }
+            )
+            return points
+
+        points.append(
+            {
+                "time": round(stage_start + dp_t, 2),
+                "stage_name": stage_name,
+                key: round(dp_v, 1),
+            }
+        )
+        prev_t, prev_v = dp_t, dp_v
+        last_t, last_v = dp_t, dp_v
+
+    # Hold the final target value until the stage ends, if the curve finished early.
+    if last_t is not None and last_t < stage_duration - 1e-6:
+        points.append(
+            {
+                "time": round(stage_end, 2),
+                "stage_name": stage_name,
+                key: round(last_v, 1),
+            }
+        )
+
+    return points
+
+
 def _generate_profile_target_curves(
     profile_data: dict, shot_stage_times: dict, shot_data: dict
 ) -> list[dict]:
@@ -794,37 +892,20 @@ def _generate_profile_target_curves(
                 data_points.append(point_start)
                 data_points.append(point_end)
             else:
-                # Multiple points - interpolate based on relative time within stage
-                # dynamics_points format: [[time1, value1], [time2, value2], ...]
-                max_dynamics_time = max(_safe_float(p[0]) for p in dynamics_points)
-
-                # Scale factor to map dynamics time to actual stage duration
-                scale = (
-                    stage_duration / max_dynamics_time if max_dynamics_time > 0 else 1
+                # Multiple points define a real-time target curve. Dynamics
+                # times are absolute seconds within the stage, so plot them at
+                # their true offsets instead of rescaling to the stage length
+                # (rescaling distorts ramps — see _build_time_based_curve_points).
+                data_points.extend(
+                    _build_time_based_curve_points(
+                        dynamics_points,
+                        variables,
+                        stage_name,
+                        stage_type,
+                        stage_start,
+                        stage_end,
+                    )
                 )
-
-                for dp in dynamics_points:
-                    dp_time = _safe_float(dp[0])
-                    dp_value = dp[1] if len(dp) > 1 else dp[0]
-
-                    # Resolve variable if needed
-                    if isinstance(dp_value, str) and dp_value.startswith("$"):
-                        resolved, _ = _resolve_variable(dp_value, variables)
-                        dp_value = _safe_float(resolved)
-                    else:
-                        dp_value = _safe_float(dp_value)
-
-                    actual_time = stage_start + (dp_time * scale)
-
-                    point = {"time": round(actual_time, 2), "stage_name": stage_name}
-                    if stage_type == "pressure":
-                        point["target_pressure"] = round(dp_value, 1)
-                    elif stage_type == "flow":
-                        point["target_flow"] = round(dp_value, 1)
-                    elif stage_type == "power":
-                        point["target_power"] = round(dp_value, 1)
-
-                    data_points.append(point)
 
         # For weight-based dynamics, map weight values to time using actual shot data
         elif dynamics_over == "weight":
@@ -1012,27 +1093,16 @@ def generate_estimated_target_curves(profile_data: dict) -> list[dict]:
             pt_e[key] = round(value, 1)
             data_points += [pt_s, pt_e]
         else:
-            max_x = max(_safe_float(p[0]) for p in dynamics_points)
-            scale = duration / max_x if max_x > 0 else 1
-
-            for dp in dynamics_points:
-                dp_x = _safe_float(dp[0])
-                dp_val = dp[1] if len(dp) > 1 else dp[0]
-                if isinstance(dp_val, str) and dp_val.startswith("$"):
-                    resolved, _ = _resolve_variable(dp_val, variables)
-                    dp_val = _safe_float(resolved)
-                else:
-                    dp_val = _safe_float(dp_val)
-
-                actual_time = stage_start + dp_x * scale
-                pt = {"time": round(actual_time, 2), "stage_name": stage_name}
-                key = (
-                    "target_pressure"
-                    if stage_type == "pressure"
-                    else ("target_power" if stage_type == "power" else "target_flow")
+            data_points.extend(
+                _build_time_based_curve_points(
+                    dynamics_points,
+                    variables,
+                    stage_name,
+                    stage_type,
+                    stage_start,
+                    stage_end,
                 )
-                pt[key] = round(dp_val, 1)
-                data_points.append(pt)
+            )
 
         running_time = stage_end
 

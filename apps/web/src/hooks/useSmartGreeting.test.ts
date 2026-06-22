@@ -112,7 +112,9 @@ function baseCtx(overrides: Partial<GreetingContext> = {}): GreetingContext {
 
 describe('countShotsToday', () => {
   it('counts shots from today only', () => {
-    const now = Date.now() / 1000
+    const todayNoon = new Date()
+    todayNoon.setHours(12, 0, 0, 0)
+    const now = todayNoon.getTime() / 1000
     const yesterday = now - 25 * 60 * 60
     const shots = [
       makeRecentShot({ time: now - 60 }),       // today

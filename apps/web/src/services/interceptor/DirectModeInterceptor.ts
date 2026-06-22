@@ -1,7 +1,8 @@
 import { STORAGE_KEYS } from '@/lib/constants'
-import { createBrowserAIService } from '@/services/ai/BrowserAIService'
+import { createBrowserAIService, generateTextWithRetry } from '@/services/ai/BrowserAIService'
 import { retryWithBackoff, formatGeminiError } from '@/services/ai/retryUtils'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
+import { CapacitorHttp } from '@capacitor/core'
 import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './directModeHttp'
 import { deriveStructuralTags } from '@/lib/profileAnalysis'
 import type { AnalyzableProfile } from '@/lib/profileAnalysis'
@@ -164,7 +165,95 @@ function roundScore(value: number): number {
   return Math.round(value * 10) / 10
 }
 
+function parseSizeToMB(sizeStr: string): number {
+  const match = sizeStr.match(/([\d.]+)\s*(GB|MB|KB|TB)/i)
+  if (!match) return 0
+  const value = parseFloat(match[1])
+  const unit = match[2].toUpperCase()
+  if (unit === 'TB') return value * 1024 * 1024
+  if (unit === 'GB') return value * 1024
+  if (unit === 'KB') return value / 1024
+  return value
+}
+
+function parseUptimeToSeconds(uptimeStr: string): number {
+  let total = 0
+  const re = /(\d+)\s*(days?|hours?|minutes?|seconds?)/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(uptimeStr)) !== null) {
+    const val = parseInt(m[1], 10)
+    const unit = m[2].toLowerCase()
+    if (unit.startsWith('day')) total += val * 86400
+    else if (unit.startsWith('hour')) total += val * 3600
+    else if (unit.startsWith('minute')) total += val * 60
+    else total += val
+  }
+  return total
+}
+
+/** Coerce a per-service uptime (string like '0 hours 41 minutes' or numeric
+ * seconds) into integer seconds, or null when unavailable. */
+function coerceServiceUptime(value: unknown): number | null {
+  if (typeof value === 'string' && value.trim()) return parseUptimeToSeconds(value)
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.round(value)
+  return null
+}
+
+/** Transform raw watcher /status response into the shape MachineStatusCenter expects. */
+function transformWatcherResponse(raw: Record<string, unknown>): Record<string, unknown> {
+  // Services: object { name: { status } } → array [{ name, status, uptime }]
+  const rawServices = raw.services
+  let services: { name: string; status: string; uptime: number | null }[] = []
+  if (rawServices && typeof rawServices === 'object' && !Array.isArray(rawServices)) {
+    services = Object.entries(rawServices as Record<string, { status?: string; uptime?: string | number }>).map(([name, info]) => ({
+      name,
+      status: info?.status ?? 'unknown',
+      uptime: coerceServiceUptime(info?.uptime),
+    }))
+  } else if (Array.isArray(rawServices)) {
+    services = rawServices as typeof services
+  }
+
+  // System metrics
+  const mem = raw.memoryUsage as Record<string, string> | undefined
+  const discs = raw.discs as Array<{ mountpoint: string; usage: Record<string, string> }> | undefined
+  const uptimeStr = typeof raw.uptime === 'string' ? raw.uptime : ''
+
+  const memTotal = mem ? parseSizeToMB(mem.total ?? '') : 0
+  const memUsed = mem ? parseSizeToMB(mem.used ?? '') : 0
+
+  let diskTotal = 0
+  let diskUsed = 0
+  if (Array.isArray(discs)) {
+    const rootDisc = discs.find((d) => d.mountpoint === '/')
+    if (rootDisc?.usage) {
+      diskTotal = parseSizeToMB(rootDisc.usage.total ?? '') / 1024 // GB
+      diskUsed = parseSizeToMB(rootDisc.usage.used ?? '') / 1024
+    }
+  }
+
+  const uptimeSecs = uptimeStr ? parseUptimeToSeconds(uptimeStr) : null
+  let system: Record<string, unknown> | null = null
+  if (memTotal || diskTotal || uptimeSecs) {
+    system = {
+      memory_total: memTotal ? Math.round(memTotal) : null,
+      memory_used: memUsed ? Math.round(memUsed) : null,
+      disk_total: diskTotal ? Math.round(diskTotal * 100) / 100 : null,
+      disk_used: diskUsed ? Math.round(diskUsed * 100) / 100 : null,
+      cpu_temperature: null,
+      uptime: uptimeSecs,
+    }
+  }
+
+  return { services, system }
+}
+
 const DIRECT_PROFILE_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+
+// Tracks the currently-running ephemeral override profile so the live view's
+// target curves reflect the temporary variables actually being brewed rather
+// than the saved profile. Cleared whenever a shot starts without overrides.
+let _activeOverrideProfile: { name: string; profile: CachedProfile } | null = null
 
 class DirectImageValidationError extends Error {
   constructor(message: string, public readonly status = 400) {
@@ -281,6 +370,81 @@ function resolveProfileValue(value: unknown, variables: Array<Record<string, unk
   return safeNumber(value)
 }
 
+/**
+ * Build target-curve points for a time-based, multi-point stage.
+ *
+ * Dynamics point x-values are absolute seconds measured from the start of the
+ * stage; they describe the real-time target curve the machine follows. They
+ * must be plotted at their actual offset (stageStart + x), NOT rescaled to fill
+ * the stage duration. Rescaling distorts ramps: a short ramp inside a longer
+ * stage gets stretched, and a ramp followed by a long hold gets compressed
+ * until the ramp looks instantaneous (the reported #483 bug).
+ *
+ * Behaviour:
+ *   - Each point is emitted at its absolute time within the stage.
+ *   - If the final dynamics point ends before stageEnd, the last value is held
+ *     flat until stageEnd (the machine holds the final target).
+ *   - If a dynamics point lies beyond stageEnd (the stage exited early via
+ *     another trigger), the curve is linearly clipped at the boundary.
+ */
+function buildTimeBasedCurvePoints(
+  points: unknown[],
+  variables: Array<Record<string, unknown>>,
+  stageName: string,
+  key: string,
+  stageStart: number,
+  stageEnd: number,
+): Array<Record<string, unknown>> {
+  const stageDuration = stageEnd - stageStart
+  const result: Array<Record<string, unknown>> = []
+  let prevT: number | null = null
+  let prevV: number | null = null
+  let lastT: number | null = null
+  let lastV: number | null = null
+
+  for (const point of points) {
+    if (!Array.isArray(point)) continue
+    const dpT = safeNumber(point[0])
+    const dpV = resolveProfileValue(point[1] ?? point[0], variables)
+
+    if (dpT > stageDuration) {
+      // Stage exited before reaching this point — clip at the boundary.
+      let boundaryV = dpV
+      if (prevT !== null && prevV !== null && dpT > prevT) {
+        const frac = (stageDuration - prevT) / (dpT - prevT)
+        boundaryV = prevV + (dpV - prevV) * frac
+      }
+      result.push({
+        time: Number(stageEnd.toFixed(2)),
+        stage_name: stageName,
+        [key]: Math.round(boundaryV * 10) / 10,
+      })
+      return result
+    }
+
+    result.push({
+      time: Number((stageStart + dpT).toFixed(2)),
+      stage_name: stageName,
+      [key]: Math.round(dpV * 10) / 10,
+    })
+    prevT = dpT
+    prevV = dpV
+    lastT = dpT
+    lastV = dpV
+  }
+
+  // Hold the final target value until the stage ends, if the curve finished early.
+  if (lastT !== null && lastV !== null && lastT < stageDuration - 1e-6) {
+    result.push({
+      time: Number(stageEnd.toFixed(2)),
+      stage_name: stageName,
+      [key]: Math.round(lastV * 10) / 10,
+    })
+  }
+
+  return result
+}
+
 function generateEstimatedTargetCurves(profile: CachedProfile): Array<Record<string, unknown>> {
   const stages = profile.stages ?? []
   const variables = profile.variables ?? []
@@ -329,17 +493,9 @@ function generateEstimatedTargetCurves(profile: CachedProfile): Array<Record<str
         { time: Number(stageEnd.toFixed(2)), stage_name: stageName, [key]: Math.round(value * 10) / 10 },
       )
     } else {
-      const maxX = Math.max(...points.filter(Array.isArray).map((point) => safeNumber(point[0])))
-      const scale = maxX > 0 ? duration / maxX : 1
-      for (const point of points) {
-        if (!Array.isArray(point)) continue
-        const value = resolveProfileValue(point[1] ?? point[0], variables)
-        curves.push({
-          time: Number((stageStart + safeNumber(point[0]) * scale).toFixed(2)),
-          stage_name: stageName,
-          [key]: Math.round(value * 10) / 10,
-        })
-      }
+      curves.push(
+        ...buildTimeBasedCurvePoints(points, variables, stageName, key, stageStart, stageEnd),
+      )
     }
     runningTime = stageEnd
   })
@@ -437,17 +593,9 @@ function generateShotAlignedTargetCurves(
           { time: Number(timing.endTime.toFixed(2)), stage_name: stageName, [key]: Math.round(value * 10) / 10 },
         )
       } else {
-        const maxX = Math.max(...points.filter(Array.isArray).map((p: unknown[]) => safeNumber(p[0])))
-        const scale = maxX > 0 ? stageDuration / maxX : 1
-        for (const point of points) {
-          if (!Array.isArray(point)) continue
-          const value = resolveProfileValue(point[1] ?? point[0], variables)
-          curves.push({
-            time: Number((stageStart + safeNumber(point[0]) * scale).toFixed(2)),
-            stage_name: stageName,
-            [key]: Math.round(value * 10) / 10,
-          })
-        }
+        curves.push(
+          ...buildTimeBasedCurvePoints(points, variables, stageName, key, stageStart, timing.endTime),
+        )
       }
     }
   }
@@ -762,6 +910,15 @@ export function installDirectModeInterceptor(): void {
     }
     try { localStorage.setItem(PROFILE_LIST_CACHE_KEY, JSON.stringify(result)) } catch { /* ignore */ }
     return result
+  }
+
+  // Drop the cached profile list so the next /api/machine/profiles fetch hits
+  // the machine. Call after creating/saving a NEW profile so it shows up
+  // immediately in the catalogue instead of waiting for the TTL to expire.
+  function _invalidateProfileListCache() {
+    _profileCache.clear()
+    try { localStorage.removeItem(PROFILE_LIST_CACHE_KEY) } catch { /* ignore */ }
+    try { localStorage.removeItem(PROFILE_LIST_CACHE_KEY + ':ts') } catch { /* ignore */ }
   }
 
   // Restore profile cache from localStorage on startup
@@ -1109,6 +1266,7 @@ export function installDirectModeInterceptor(): void {
     if (runMatch && method === 'POST') {
       const profileId = decodeURIComponent(runMatch[1])
       return (async () => {
+        _activeOverrideProfile = null
         // Try loading directly first
         let loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
         if (!loadResp.ok) {
@@ -1224,6 +1382,9 @@ export function installDirectModeInterceptor(): void {
             modified.name = newName.trim()
             delete modified.id
           }
+          // Remember the effective profile so the live view's target curves
+          // reflect the temporary overrides actually being brewed.
+          _activeOverrideProfile = { name: (modified.name as string) || originalName, profile: modified as unknown as CachedProfile }
           // Ephemeral load: POST /api/v1/profile/load (loads into memory without persisting)
           const loadResp = await _fetch('/api/v1/profile/load', {
             method: 'POST',
@@ -1234,6 +1395,7 @@ export function installDirectModeInterceptor(): void {
             return jsonResponse({ detail: 'Failed to load modified profile' }, 502)
           }
         } else {
+          _activeOverrideProfile = null
           // No overrides — just load the original by ID
           let loadResp = await _fetch(`/api/v1/profile/load/${profileId}`)
           if (!loadResp.ok) {
@@ -1422,6 +1584,7 @@ export function installDirectModeInterceptor(): void {
             if (!saveResp.ok) {
               return jsonResponse({ status: 'error', detail: 'Failed to save profile to machine' }, 502)
             }
+            _invalidateProfileListCache()
           }
           return jsonResponse({
             status: 'success',
@@ -1447,6 +1610,22 @@ export function installDirectModeInterceptor(): void {
     }
 
 
+    // POST /api/convert-decent → convert Decent profile to Meticulous format
+    if (url.match(/\/api\/convert-decent/) && method === 'POST') {
+      return (async () => {
+        try {
+          const { detectDecentFormat, convertDecentToMeticulous } = await import('@/services/decentConverter')
+          const body = await new Response(init?.body || '{}').json()
+          if (!detectDecentFormat(body)) {
+            return jsonResponse({ detail: 'Not a valid Decent Espresso profile format' }, 400)
+          }
+          return jsonResponse(convertDecentToMeticulous(body))
+        } catch {
+          return jsonResponse({ detail: 'Decent profile conversion failed' }, 500)
+        }
+      })()
+    }
+
     // POST /api/import-from-url -> fetch URL, parse profile JSON, save to machine
     if (url.match(/\/api\/import-from-url/) && method === 'POST') {
       return (async () => {
@@ -1458,10 +1637,19 @@ export function installDirectModeInterceptor(): void {
           try { profileResp = await _fetch(profileUrl) } catch { return jsonResponse({ status: 'error', detail: 'Failed to fetch URL' }, 502) }
           let profileJson: Record<string, unknown>
           try { profileJson = await profileResp.json() } catch { return jsonResponse({ status: 'error', detail: 'URL did not return valid JSON' }, 400) }
+          // Auto-detect Decent format and convert
+          let convertedFromDecent = false
+          const { detectDecentFormat, convertDecentToMeticulous } = await import('@/services/decentConverter')
+          if (detectDecentFormat(profileJson)) {
+            const result = convertDecentToMeticulous(profileJson)
+            profileJson = result.profile as unknown as Record<string, unknown>
+            convertedFromDecent = true
+          }
           if (typeof profileJson.name !== 'string' || !profileJson.name) return jsonResponse({ status: 'error', detail: "Profile is missing a 'name' field" }, 400)
           const saveResp = await _fetch('/api/v1/profile/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profileJson) })
           if (!saveResp.ok) return jsonResponse({ status: 'error', detail: 'Failed to save profile to machine' }, 502)
-          return jsonResponse({ status: 'success', entry_id: 'direct-' + Date.now(), profile_name: profileJson.name as string, has_description: false, uploaded_to_machine: true })
+          _invalidateProfileListCache()
+          return jsonResponse({ status: 'success', entry_id: 'direct-' + Date.now(), profile_name: profileJson.name as string, has_description: false, uploaded_to_machine: true, converted_from_decent: convertedFromDecent })
         } catch { return jsonResponse({ status: 'error', detail: 'Import from URL failed' }, 500) }
       })()
     }
@@ -1526,8 +1714,7 @@ export function installDirectModeInterceptor(): void {
         if (!saveResp.ok) {
           return jsonResponse({ detail: 'Failed to save profile to machine' }, 502)
         }
-        _profileCache.clear()
-        localStorage.removeItem(PROFILE_LIST_CACHE_KEY)
+        _invalidateProfileListCache()
         return jsonResponse({
           status: 'success',
           message: `Profile renamed from '${oldName}' to '${newName}'`,
@@ -1652,10 +1839,36 @@ export function installDirectModeInterceptor(): void {
         const style = parsedUrl.searchParams.get('style') || 'abstract'
         const tags = (parsedUrl.searchParams.get('tags') || '').split(',').map((tag) => tag.trim()).filter(Boolean)
         const preview = parsedUrl.searchParams.get('preview') === 'true'
+        const count = Math.min(4, Math.max(1, parseInt(parsedUrl.searchParams.get('count') || '1', 10) || 1))
         const aiService = createBrowserAIService()
         if (!aiService.isConfigured()) {
           return jsonResponse({ detail: 'AI features are unavailable. Please configure a Gemini API key in Settings.' }, 503)
         }
+
+        if (count > 1) {
+          // Batch mode: fire parallel requests
+          const promises = Array.from({ length: count }, (_, i) =>
+            aiService.generateImage({ profileName: name, style, tags, preview: true })
+              .then(async (blob) => {
+                const dataUri = await blobToDataUri(blob)
+                return { index: i, image: dataUri } as { index: number; image: string | null; error?: string }
+              })
+              .catch((err) => ({
+                index: i,
+                image: null as string | null,
+                error: err instanceof Error ? err.message : 'Generation failed',
+              }))
+          )
+          const results = await Promise.all(promises)
+          return jsonResponse({
+            status: 'preview',
+            message: `Generated images for profile '${name}'`,
+            style,
+            images: results,
+            count,
+          })
+        }
+
         const imageBlob = await aiService.generateImage({ profileName: name, style, tags, preview })
         const imageDataUri = await blobToDataUri(imageBlob)
         if (preview) {
@@ -1856,7 +2069,12 @@ export function installDirectModeInterceptor(): void {
     if (targetCurvesMatch && method === 'GET') {
       return (async () => {
         const name = decodeURIComponent(targetCurvesMatch[1])
-        const profile = await _findProfileByName(name)
+        // Prefer the active override profile so the live graph reflects the
+        // temporary variables actually being brewed.
+        const profile =
+          _activeOverrideProfile && _activeOverrideProfile.name === name
+            ? _activeOverrideProfile.profile
+            : await _findProfileByName(name)
         if (!profile) return jsonResponse({ detail: `Profile '${name}' not found` }, 404)
         return jsonResponse({
           status: 'success',
@@ -1963,6 +2181,61 @@ export function installDirectModeInterceptor(): void {
         }
         return jsonResponse({ status: 'success', profile: responseProfile })
       })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to get profile info' }, 500))
+    }
+
+    // /api/machine/status/health → watcher service proxy
+    if (url.match(/\/api\/machine\/status\/health/)) {
+      return (async () => {
+        try {
+          const machineBase = getDefaultMachineUrl()
+          const parsed = new URL(machineBase)
+          parsed.port = '3000'
+          const watcherUrl = `${parsed.origin}/status`
+
+          let data: Record<string, unknown>
+          if (_isNative) {
+            // Native: use CapacitorHttp to bypass CORS
+            const resp = await CapacitorHttp.get({ url: watcherUrl, connectTimeout: 5000, readTimeout: 5000 })
+            if (resp.status >= 200 && resp.status < 300) {
+              data = typeof resp.data === 'string' ? JSON.parse(resp.data) : resp.data
+            } else {
+              return jsonResponse({ error: 'Watcher service unavailable', services: [], system: null })
+            }
+          } else {
+            const resp = await _originalFetch(watcherUrl, { signal: AbortSignal.timeout(5000) })
+            if (resp.ok) {
+              data = await resp.json()
+            } else {
+              return jsonResponse({ error: 'Watcher service unavailable', services: [], system: null })
+            }
+          }
+          return jsonResponse(transformWatcherResponse(data))
+        } catch {
+          return jsonResponse({ error: 'Watcher service unavailable', services: [], system: null })
+        }
+      })()
+    }
+
+    // /api/machine/system-info → aggregate system info from machine API
+    if (url.match(/\/api\/machine\/system-info/)) {
+      return (async () => {
+        const info: Record<string, unknown> = {}
+        const endpoints: [string, string][] = [
+          ['firmware', '/api/v1/system/firmware'],
+          ['network', '/api/v1/wifi/status'],
+          ['hostname', '/api/v1/wifi/hostname'],
+        ]
+        for (const [key, path] of endpoints) {
+          try {
+            const resp = await _fetch(path)
+            if (resp.ok) info[key] = await resp.json()
+            else info[key] = null
+          } catch {
+            info[key] = null
+          }
+        }
+        return jsonResponse(info)
+      })().catch(() => jsonResponse({ firmware: null, network: null, hostname: null }))
     }
 
     // /api/machine/status → synthetic response (real state comes via Socket.IO)
@@ -2881,11 +3154,10 @@ Rules for recommendations:
           const modelId = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
 
           const response = await retryWithBackoff(() =>
-            client.models.generateContent({
-              model: modelId,
+            generateTextWithRetry(client as never, modelId, {
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
             })
-          )
+          ) as { text?: string }
 
           const analysisText = response.text ?? ''
           return jsonResponse({
@@ -3131,6 +3403,12 @@ Rules for recommendations:
                   _descriptionCache.set(oepf.id, result.analysis)
                   _persistDescriptionCache()
                 }
+                // A new profile was added — drop the stale list cache so it
+                // appears immediately in the catalogue (and the post-create
+                // profile-id lookup can find it).
+                if (saveResponse.ok) {
+                  _invalidateProfileListCache()
+                }
               } catch (e) {
                 console.warn('[direct-mode] Failed to save profile to machine:', e)
               }
@@ -3144,7 +3422,7 @@ Rules for recommendations:
             reply: result.reply,
           })
         } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Unknown error'
+          const msg = formatGeminiError(err)
           return jsonResponse({ status: 'error', reply: msg, analysis: '' })
         }
       })()
@@ -3329,10 +3607,10 @@ Rules for recommendations:
               const client = new GoogleGenAI({ apiKey: key })
               const resolvedName = (profileJson as {name?: string}).name || profileName || 'Unknown Profile'
               const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]`
-              const response = await client.models.generateContent({
-                model: 'gemini-2.5-flash',
+              const configuredModel = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
+              const response = await generateTextWithRetry(client as never, configuredModel, {
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
-              })
+              }) as { text?: string }
               const description = response.text?.trim()
               if (description && !description.includes('generated without AI')) {
                 _descriptionCache.set(profileName, description)
@@ -3387,6 +3665,31 @@ Rules for recommendations:
       return Promise.resolve(jsonResponse({ status: 'ok', mode: 'direct' }))
     }
 
+    // GET /api/available-models → live discovery in direct mode, static fallback offline
+    if (url.match(/\/api\/available-models$/)) {
+      const currentModel = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
+      return (async () => {
+        try {
+          const apiKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
+          if (apiKey) {
+            const [{ listAvailableModels }, { GoogleGenAI }] = await Promise.all([
+              import('../ai/modelResolver'),
+              import('@google/genai'),
+            ])
+            const client = new GoogleGenAI({ apiKey })
+            const models = await listAvailableModels(
+              client as unknown as import('../ai/modelResolver').ModelClient,
+            )
+            if (models.length) return jsonResponse({ models, current: currentModel })
+          }
+        } catch {
+          // fall through to static fallback
+        }
+        const { STATIC_FALLBACK_MODELS } = await import('../ai/modelResolver')
+        return jsonResponse({ models: STATIC_FALLBACK_MODELS, current: currentModel })
+      })()
+    }
+
     // GET /api/version → return app version
     if (url.match(/\/api\/version$/)) {
       return Promise.resolve(jsonResponse({
@@ -3415,7 +3718,27 @@ Rules for recommendations:
       return Promise.resolve(jsonResponse({ enabled: false, installed: false }))
     }
     if (url.match(/\/api\/changelog/)) {
-      return Promise.resolve(jsonResponse({ releases: [] }))
+      return (async () => {
+        try {
+          const resp = await _originalFetch(
+            'https://api.github.com/repos/hessius/MeticAI/releases?per_page=5',
+            { signal: AbortSignal.timeout(8000), headers: { Accept: 'application/vnd.github+json' } }
+          )
+          if (resp.ok) {
+            const releases = await resp.json()
+            return jsonResponse({
+              releases: releases.map((r: { tag_name: string; published_at: string; body: string }) => ({
+                version: r.tag_name,
+                date: r.published_at,
+                body: r.body || 'No release notes available.',
+              })),
+            })
+          }
+          return jsonResponse({ releases: [], error: 'Failed to fetch releases' })
+        } catch {
+          return jsonResponse({ releases: [], error: 'Failed to fetch releases' })
+        }
+      })()
     }
     if (url.match(/\/api\/(check-updates|restart|beta-channel|feedback)/)) {
       return Promise.resolve(jsonResponse({ detail: 'Server administration not available in direct/app mode' }, 501))

@@ -19,6 +19,16 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+@router.get("/api/available-models")
+async def get_available_models_endpoint():
+    """Return list of available Gemini models."""
+    from services.gemini_service import get_available_models, get_model_name
+
+    models = await get_available_models()
+    current = get_model_name()
+    return {"models": models, "current": current}
+
+
 @router.get("/api/health")
 async def health_check():
     """Health check endpoint for Docker and load balancer probes."""

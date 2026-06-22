@@ -3181,6 +3181,35 @@ class TestShotAnalysisHelpers:
         assert "25" in result[0]["description"]  # Contains 25
         assert "s" in result[0]["description"]  # Has seconds unit
 
+    def test_format_exit_triggers_new_types(self):
+        """Test exit trigger formatting for flow_dose_correlation and pressure_rise."""
+        from services.analysis_service import _format_exit_triggers
+
+        triggers = [
+            {"type": "flow_dose_correlation", "value": 2.0, "comparison": ">="},
+            {"type": "pressure_rise", "value": 2.0, "comparison": ">="},
+        ]
+
+        result = _format_exit_triggers(triggers)
+        assert len(result) == 2
+        assert result[0]["type"] == "flow_dose_correlation"
+        assert "×dose" in result[0]["description"]
+        assert result[1]["type"] == "pressure_rise"
+        assert "bar" in result[1]["description"]
+
+    def test_profiling_knowledge_contains_native_preinfusion_rules(self):
+        """PROFILING_KNOWLEDGE expresses #420 pre-infusion intent via native triggers."""
+        from services.gemini_service import PROFILING_KNOWLEDGE
+
+        # #420 saturation rules must steer toward NATIVE machine triggers
+        # (weight ~2x dose + pressure rise), not app-only pseudo triggers.
+        assert "Saturation Rules (#420)" in PROFILING_KNOWLEDGE
+        assert "2 × dose" in PROFILING_KNOWLEDGE
+        assert "native" in PROFILING_KNOWLEDGE.lower()
+        # The old app-monitored pseudo-trigger guidance must be gone.
+        assert "flow_dose_correlation" not in PROFILING_KNOWLEDGE
+        assert "app-monitored" not in PROFILING_KNOWLEDGE.lower()
+
     def test_format_limits_basic(self):
         """Test limits formatting."""
         from services.analysis_service import _format_limits
@@ -3584,6 +3613,96 @@ class TestShotAnalysisHelpers:
         assert pressure_points[0]["target_pressure"] == 2.0
         assert pressure_points[-1]["target_pressure"] == 9.0
 
+    def test_short_ramp_not_compressed_to_instant(self):
+        """Regression: a short ramp inside a longer stage keeps its real duration.
+
+        A 2s ramp from 3->9 bar in a stage that actually ran 30s must occupy its
+        true 2 seconds and then hold at 9 bar — it must NOT be stretched across
+        the whole stage, nor (when a trailing hold point exists) compressed until
+        the ramp looks instantaneous. See issue #483.
+        """
+        from services.analysis_service import _generate_profile_target_curves
+
+        profile_data = {
+            "stages": [
+                {
+                    "name": "Ramp",
+                    "type": "pressure",
+                    # Ramp 3->9 over 2s, then hold at 9 (trailing hold point at 30s).
+                    "dynamics_points": [[0, 3.0], [2, 9.0], [30, 9.0]],
+                    "dynamics_over": "time",
+                }
+            ],
+            "variables": [],
+        }
+
+        # The stage actually ran 30s in the shot.
+        shot_stage_times = {"Ramp": (0.0, 30.0)}
+        shot_data = {
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 3.0}, "status": "Ramp"},
+                {
+                    "time": 30000,
+                    "shot": {"weight": 36.0, "pressure": 9.0},
+                    "status": "Ramp",
+                },
+            ]
+        }
+
+        curves = _generate_profile_target_curves(
+            profile_data, shot_stage_times, shot_data
+        )
+        pressure_points = [c for c in curves if "target_pressure" in c]
+
+        # The 3 -> 9 transition must complete at ~2s, not stretched to 30s and not
+        # collapsed to t=0 (instant).
+        nine_bar_times = [
+            p["time"] for p in pressure_points if p["target_pressure"] == 9.0
+        ]
+        assert nine_bar_times, "expected the curve to reach 9 bar"
+        first_nine = min(nine_bar_times)
+        assert first_nine == pytest.approx(2.0, abs=0.2), (
+            f"ramp should reach 9 bar at ~2s, got {first_nine}s"
+        )
+        # And the final target should still be held at 9 bar at stage end.
+        assert pressure_points[-1]["target_pressure"] == 9.0
+        assert pressure_points[-1]["time"] == pytest.approx(30.0, abs=0.2)
+
+    def test_short_ramp_estimated_curves_not_compressed(self):
+        """Regression (#483): estimated curves also preserve short-ramp duration.
+
+        Without shot data, a 2s ramp in a stage whose estimated duration is longer
+        must still render the ramp over 2 seconds (then hold), instead of being
+        rescaled to fill the estimated duration.
+        """
+        from services.analysis_service import generate_estimated_target_curves
+
+        profile_data = {
+            "stages": [
+                {
+                    "name": "Ramp",
+                    "type": "pressure",
+                    "dynamics_points": [[0, 3.0], [2, 9.0]],
+                    "dynamics_over": "time",
+                    # No time trigger -> estimated duration falls back to 10s.
+                    "exit_triggers": [{"type": "weight", "value": 36}],
+                }
+            ],
+            "variables": [],
+        }
+
+        curves = generate_estimated_target_curves(profile_data)
+        pressure_points = [c for c in curves if "target_pressure" in c]
+
+        nine_bar_times = [
+            p["time"] for p in pressure_points if p["target_pressure"] == 9.0
+        ]
+        assert nine_bar_times
+        assert min(nine_bar_times) == pytest.approx(2.0, abs=0.2)
+        # Final value held at 9 bar to the (estimated) stage end.
+        assert pressure_points[-1]["target_pressure"] == 9.0
+        assert pressure_points[-1]["time"] > 2.0
+
     def test_generate_profile_target_curves_flow_stage(self):
         """Test generating target curves for flow-based stage."""
         from services.analysis_service import _generate_profile_target_curves
@@ -3756,7 +3875,13 @@ class TestShotAnalysisHelpers:
         pressure_values = [p["target_pressure"] for p in pressure_points]
         assert 2.1 in pressure_values
         assert 8.4 in pressure_values
-        assert 3.7 in pressure_values
+        # The dynamics curve's final point is at t=40.9s, but the stage only ran
+        # 26s (19s -> 45s) before exiting, so the curve is clipped at the stage
+        # boundary rather than rescaled to reach the final 3.7 value. The boundary
+        # value is the linear interpolation of 8.4 -> 3.7 at 26s into the stage.
+        assert 3.7 not in pressure_values
+        boundary_value = pressure_points[-1]["target_pressure"]
+        assert 3.7 < boundary_value < 8.4
 
     def test_generate_profile_target_curves_handles_both_formats(self):
         """Test that target curve generation handles both flat and nested dynamics formats."""
@@ -4126,11 +4251,19 @@ class TestEstimatedTargetCurves:
             "variables": [],
         }
         curves = generate_estimated_target_curves(profile)
-        assert len(curves) == 3
-        # Scale: 20/10 = 2x — so times are 0, 10, 20
+        # Dynamics define a ramp over 10s; the stage's time exit is 20s, so the
+        # ramp keeps its real 10s duration and then holds at 9 bar until 20s.
+        # It must NOT be rescaled to span the full 20s (issue #483).
+        assert len(curves) == 4
         assert curves[0]["time"] == 0.0
-        assert curves[1]["time"] == 10.0
-        assert curves[2]["time"] == 20.0
+        assert curves[0]["target_pressure"] == 2.0
+        assert curves[1]["time"] == 5.0
+        assert curves[1]["target_pressure"] == 6.0
+        assert curves[2]["time"] == 10.0
+        assert curves[2]["target_pressure"] == 9.0
+        # Final value held flat to the stage end.
+        assert curves[3]["time"] == 20.0
+        assert curves[3]["target_pressure"] == 9.0
 
     def test_no_time_trigger_uses_default(self):
         """Stage without a time exit trigger uses the 10s default."""
@@ -4806,6 +4939,100 @@ class TestMachineProfilesEndpoint:
         response = client.get("/api/machine/profiles")
         tags = response.json()["profiles"][0]["derived_tags"]
         assert "Bloom" in tags
+
+
+class TestTargetCurvesOverride:
+    """Target-curves endpoint reflects active temporary variable overrides."""
+
+    def _make_profile(self):
+        full = type("FullProfile", (), {})()
+        full.id = "profile-1"
+        full.name = "Override Profile"
+        full.error = None
+        # Single-point pressure stage whose value references a variable, so an
+        # override of that variable changes the estimated target curve.
+        full.stages = [
+            {
+                "name": "Hold",
+                "type": "pressure",
+                "dynamics_points": [[0, "$pressure_var"]],
+                "dynamics_over": "time",
+                "exit_triggers": [{"type": "time", "value": 10}],
+            }
+        ]
+        full.variables = [
+            {"key": "pressure_var", "type": "pressure", "value": 6.0}
+        ]
+        return full
+
+    @patch("api.routes.profiles.get_active")
+    @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
+    def test_curves_use_saved_value_without_active_override(
+        self, mock_list, mock_get, mock_active, client
+    ):
+        mock_profile = type("Profile", (), {})()
+        mock_profile.id = "profile-1"
+        mock_profile.name = "Override Profile"
+        mock_profile.error = None
+        mock_list.return_value = [mock_profile]
+        mock_get.return_value = self._make_profile()
+        mock_active.return_value = None
+
+        response = client.get("/api/profile/Override Profile/target-curves")
+        assert response.status_code == 200
+        curves = response.json()["target_curves"]
+        pressures = {c["target_pressure"] for c in curves if "target_pressure" in c}
+        assert pressures == {6.0}
+
+    @patch("api.routes.profiles.get_active")
+    @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
+    def test_curves_reflect_active_override(
+        self, mock_list, mock_get, mock_active, client
+    ):
+        mock_profile = type("Profile", (), {})()
+        mock_profile.id = "profile-1"
+        mock_profile.name = "Override Profile"
+        mock_profile.error = None
+        mock_list.return_value = [mock_profile]
+        mock_get.return_value = self._make_profile()
+        mock_active.return_value = {
+            "profile_id": "profile-1",
+            "profile_name": "Override Profile",
+            "original_params": {"overrides": {"pressure_var": 9.0}},
+        }
+
+        response = client.get("/api/profile/Override Profile/target-curves")
+        assert response.status_code == 200
+        curves = response.json()["target_curves"]
+        pressures = {c["target_pressure"] for c in curves if "target_pressure" in c}
+        assert pressures == {9.0}
+
+    @patch("api.routes.profiles.get_active")
+    @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
+    def test_curves_ignore_override_for_other_profile(
+        self, mock_list, mock_get, mock_active, client
+    ):
+        mock_profile = type("Profile", (), {})()
+        mock_profile.id = "profile-1"
+        mock_profile.name = "Override Profile"
+        mock_profile.error = None
+        mock_list.return_value = [mock_profile]
+        mock_get.return_value = self._make_profile()
+        # Active override is for a different profile name -> ignored.
+        mock_active.return_value = {
+            "profile_id": "other",
+            "profile_name": "Some Other Profile",
+            "original_params": {"overrides": {"pressure_var": 9.0}},
+        }
+
+        response = client.get("/api/profile/Override Profile/target-curves")
+        assert response.status_code == 200
+        curves = response.json()["target_curves"]
+        pressures = {c["target_pressure"] for c in curves if "target_pressure" in c}
+        assert pressures == {6.0}
 
 
 class TestMachineProfileJsonEndpoint:
@@ -16049,3 +16276,782 @@ class TestRepairEndpoint:
         assert data["skipped_no_json"] == 1
         assert data["repaired_from_machine"] == 0
         assert data["normalized_locally"] == 0
+
+
+class TestAvailableModelsEndpoint:
+    """Tests for the /api/available-models endpoint."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_available_models_returns_list(self, mock_client, client):
+        """Test that /api/available-models returns expected format."""
+        mock_model = Mock()
+        mock_model.name = "gemini-2.5-flash"
+        mock_model.display_name = "Gemini 2.5 Flash"
+        mock_model.description = "Fast model"
+        mock_model.supported_actions = ["generateContent"]
+
+        mock_client.return_value.models.list.return_value = [mock_model]
+
+        response = client.get("/api/available-models")
+        assert response.status_code == 200
+        data = response.json()
+        assert "models" in data
+        assert "current" in data
+        assert isinstance(data["models"], list)
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_available_models_filters_non_generative(self, mock_client, client):
+        """Test that models without generateContent are filtered out."""
+        gen_model = Mock()
+        gen_model.name = "gemini-2.5-flash"
+        gen_model.display_name = "Gemini 2.5 Flash"
+        gen_model.description = "Fast model"
+        gen_model.supported_actions = ["generateContent"]
+
+        embed_model = Mock()
+        embed_model.name = "text-embedding-004"
+        embed_model.display_name = "Text Embedding"
+        embed_model.description = "Embedding model"
+        embed_model.supported_actions = ["embedContent"]
+
+        mock_client.return_value.models.list.return_value = [gen_model, embed_model]
+
+        response = client.get("/api/available-models")
+        data = response.json()
+        assert len(data["models"]) == 1
+        assert data["models"][0]["id"] == "gemini-2.5-flash"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_available_models_filters_non_text_families(self, mock_client, client):
+        """Only Gemini text-chat models are returned; image/tts/computer-use/
+        robotics/nano-banana/gemma/deep-research are excluded."""
+        def _m(name, actions=("generateContent",)):
+            mk = Mock()
+            mk.name = name
+            mk.display_name = name
+            mk.description = ""
+            mk.supported_actions = list(actions)
+            return mk
+
+        models = [
+            _m("gemini-2.5-flash"),
+            _m("gemini-3.1-pro-preview"),
+            _m("gemini-2.5-flash-image"),
+            _m("gemini-2.5-flash-preview-tts"),
+            _m("gemini-2.5-computer-use-preview-10-2025"),
+            _m("gemini-robotics-er-1.5-preview"),
+            _m("nano-banana-pro-preview"),
+            _m("lyria-3-pro-preview"),
+            _m("gemma-4-31b-it"),
+            _m("deep-research-pro-preview-12-2025"),
+        ]
+        mock_client.return_value.models.list.return_value = models
+
+        response = client.get("/api/available-models")
+        ids = {m["id"] for m in response.json()["models"]}
+        assert ids == {"gemini-2.5-flash", "gemini-3.1-pro-preview"}
+
+
+        """Test graceful handling when Gemini API fails."""
+        mock_client.return_value.models.list.side_effect = Exception("API error")
+
+        response = client.get("/api/available-models")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["models"] == []
+
+    @patch.dict(os.environ, {}, clear=False)
+    def test_available_models_no_api_key(self, client):
+        """Test response when no API key is configured."""
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("GEMINI_API_KEY", None)
+            # Reset cached client
+            import services.gemini_service
+            services.gemini_service._gemini_client = None
+
+            response = client.get("/api/available-models")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["models"] == []
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_available_models_includes_current(self, mock_client, client):
+        """Test that current model name is included in response."""
+        mock_client.return_value.models.list.return_value = []
+
+        response = client.get("/api/available-models")
+        data = response.json()
+        assert data["current"] == "gemini-2.5-flash"
+
+
+class TestModelValidation:
+    """Tests for model validation and fallback logic."""
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_validate_model_success(self, mock_client):
+        """Test validate_model returns True for available model."""
+        mock_client.return_value.models.get.return_value = Mock()
+
+        from services.gemini_service import validate_model
+        result = asyncio.run(validate_model("gemini-2.5-flash"))
+        assert result is True
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_validate_model_failure(self, mock_client):
+        """Test validate_model returns False for unavailable model."""
+        mock_client.return_value.models.get.side_effect = Exception("Not found")
+
+        from services.gemini_service import validate_model
+        result = asyncio.run(validate_model("gemini-old-model"))
+        assert result is False
+
+    def test_validate_model_no_api_key(self):
+        """Test validate_model returns False when no API key."""
+        import services.gemini_service
+        services.gemini_service._gemini_client = None
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("GEMINI_API_KEY", None)
+            from services.gemini_service import validate_model
+            result = asyncio.run(validate_model("gemini-2.5-flash"))
+            assert result is False
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("services.gemini_service.get_gemini_client")
+    def test_get_working_model_configured_works(self, mock_client):
+        """Test get_working_model returns configured model when valid."""
+        mock_client.return_value.models.get.return_value = Mock()
+
+        from services.gemini_service import get_working_model
+        result = asyncio.run(get_working_model())
+        assert result == "gemini-2.5-flash"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "k"})
+    @patch("services.gemini_service.get_available_models")
+    @patch("services.gemini_service.validate_model")
+    def test_working_model_uses_dynamic_when_configured_dead(self, mock_validate, mock_list):
+        """Test discovery path is used and result is cached when configured model fails."""
+        from services.gemini_service import get_working_model, _validated_model_cache
+        _validated_model_cache.clear()
+        async def _validate(name):
+            return False
+        mock_validate.side_effect = _validate
+        async def _list():
+            return [{"id": "gemini-2.5-pro"}, {"id": "gemini-2.5-flash"}]
+        mock_list.side_effect = _list
+        result = asyncio.run(get_working_model())
+        assert result == "gemini-2.5-flash"
+        assert _validated_model_cache.get("model") == "gemini-2.5-flash"
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "k"})
+    @patch("services.gemini_service.get_available_models")
+    @patch("services.gemini_service.validate_model")
+    def test_working_model_raises_when_nothing_available(self, mock_validate, mock_list):
+        """Test ModelUnavailableError is raised when discovery returns no models."""
+        from services.gemini_service import get_working_model, ModelUnavailableError, _validated_model_cache
+        _validated_model_cache.clear()
+        async def _validate(name):
+            return False
+        mock_validate.side_effect = _validate
+        async def _list():
+            return []
+        mock_list.side_effect = _list
+        with pytest.raises(ModelUnavailableError):
+            asyncio.run(get_working_model())
+
+
+# ─── Machine Status Endpoint Tests ──────────────────────────────────────────
+
+
+@patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key", "METICULOUS_IP": "http://meticulous.local"})
+class TestMachineStatusHealth:
+    """Tests for GET /api/machine/status/health."""
+
+    @pytest.fixture
+    def client(self):
+        return TestClient(app)
+
+    @patch("api.routes.machine_status.httpx.AsyncClient")
+    def test_returns_watcher_data(self, mock_client_cls, client):
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "services": [{"name": "meticulous", "status": "running"}],
+            "system": {"cpu_temperature": 55, "uptime": 3600},
+        }
+        mock_response.raise_for_status = Mock()
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client_cls.return_value = mock_client
+
+        response = client.get("/api/machine/status/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert "services" in data
+        assert data["services"][0]["name"] == "meticulous"
+
+    @patch("api.routes.machine_status.httpx.AsyncClient")
+    def test_returns_error_when_unreachable(self, mock_client_cls, client):
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client_cls.return_value = mock_client
+
+        response = client.get("/api/machine/status/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["error"] == "Watcher service unavailable"
+        assert data["services"] == []
+
+
+class TestWatcherHelpers:
+    """Unit tests for machine_status helper functions."""
+
+    def test_watcher_url_ipv4(self):
+        from api.routes.machine_status import _watcher_url
+
+        assert _watcher_url("http://192.168.1.50:8080") == "http://192.168.1.50:3000"
+        assert _watcher_url("http://meticulous.local") == "http://meticulous.local:3000"
+
+    def test_watcher_url_brackets_ipv6(self):
+        from api.routes.machine_status import _watcher_url
+
+        assert _watcher_url("http://[fe80::1]:8080") == "http://[fe80::1]:3000"
+        assert _watcher_url("https://[2001:db8::1]") == "https://[2001:db8::1]:3000"
+
+    def test_transform_parses_per_service_uptime(self):
+        from api.routes.machine_status import _transform_watcher_response
+
+        out = _transform_watcher_response({
+            "services": {
+                "meticulous": {"status": "running", "uptime": "1 hours 2 minutes"},
+                "watcher": {"status": "running", "uptime": 90},
+                "idle": {"status": "stopped"},
+            }
+        })
+        by_name = {s["name"]: s for s in out["services"]}
+        assert by_name["meticulous"]["uptime"] == 3720
+        assert by_name["watcher"]["uptime"] == 90
+        assert by_name["idle"]["uptime"] is None
+
+
+@patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key", "METICULOUS_IP": "http://meticulous.local"})
+class TestMachineSystemInfo:
+    """Tests for GET /api/machine/system-info."""
+
+    @pytest.fixture
+    def client(self):
+        return TestClient(app)
+
+    @patch("api.routes.machine_status.httpx.AsyncClient")
+    def test_returns_system_info(self, mock_client_cls, client):
+        def mock_get(url):
+            resp = Mock()
+            resp.status_code = 200
+            if "firmware" in url:
+                resp.json.return_value = {"version": "1.2.3"}
+            elif "wifi/status" in url:
+                resp.json.return_value = {"ssid": "HomeWiFi"}
+            elif "hostname" in url:
+                resp.json.return_value = {"hostname": "meticulous"}
+            return resp
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=mock_get)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client_cls.return_value = mock_client
+
+        response = client.get("/api/machine/system-info")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["firmware"]["version"] == "1.2.3"
+        assert data["network"]["ssid"] == "HomeWiFi"
+        assert data["hostname"]["hostname"] == "meticulous"
+
+    @patch("api.routes.machine_status.httpx.AsyncClient")
+    def test_handles_partial_failure(self, mock_client_cls, client):
+        def mock_get(url):
+            if "firmware" in url:
+                raise httpx.ConnectError("Connection refused")
+            resp = Mock()
+            resp.status_code = 200
+            resp.json.return_value = {"ssid": "HomeWiFi"}
+            return resp
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=mock_get)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client_cls.return_value = mock_client
+
+        response = client.get("/api/machine/system-info")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["firmware"] is None
+
+
+class TestDecentConverter:
+    """Tests for the Decent Espresso profile converter."""
+
+    VALID_DECENT = {
+        "title": "Londinium",
+        "author": "John Doe",
+        "notes": "A classic lever profile",
+        "beverage_type": "espresso",
+        "steps": [
+            {
+                "name": "preinfusion",
+                "temperature": 92.0,
+                "sensor": "coffee",
+                "pump": "flow",
+                "transition": "fast",
+                "flow": 4.0,
+                "seconds": 8.0,
+                "exit": {
+                    "type": "pressure_over",
+                    "condition": 4.0,
+                    "or": {"type": "time_over", "condition": 30.0},
+                },
+            },
+            {
+                "name": "extraction",
+                "temperature": 93.0,
+                "pump": "pressure",
+                "pressure": 9.0,
+                "seconds": 60.0,
+                "exit": {"type": "weight_over", "condition": 36.0},
+            },
+        ],
+    }
+
+    def test_detect_decent_format_valid(self):
+        """Recognises valid Decent profiles."""
+        from services.decent_converter import detect_decent_format
+
+        assert detect_decent_format(self.VALID_DECENT) is True
+
+    def test_detect_decent_format_meticulous(self):
+        """Rejects Meticulous-format profiles."""
+        from services.decent_converter import detect_decent_format
+
+        meticulous = {"name": "Test", "stages": [{"type": "flow"}]}
+        assert detect_decent_format(meticulous) is False
+
+    def test_detect_decent_format_empty(self):
+        """Rejects empty or non-dict data."""
+        from services.decent_converter import detect_decent_format
+
+        assert detect_decent_format({}) is False
+        assert detect_decent_format(None) is False
+        assert detect_decent_format([]) is False
+        assert detect_decent_format("string") is False
+
+    def test_detect_decent_format_no_steps(self):
+        """Rejects profiles without steps."""
+        from services.decent_converter import detect_decent_format
+
+        assert detect_decent_format({"title": "No Steps"}) is False
+        assert detect_decent_format({"steps": []}) is False
+
+    def test_convert_basic(self):
+        """Converts a basic Decent profile to Meticulous format."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        result = convert_decent_to_meticulous(self.VALID_DECENT)
+        profile = result["profile"]
+        warnings = result["warnings"]
+
+        assert profile["name"] == "Londinium"
+        assert profile["author"] == "John Doe"
+        assert len(profile["stages"]) == 2
+        assert profile["temperature"] == 92.0
+        assert profile["final_weight"] == 36.0
+        assert len(warnings) == 0
+
+        # Check first stage (flow)
+        s0 = profile["stages"][0]
+        assert s0["type"] == "flow"
+        assert s0["name"] == "preinfusion"
+        assert s0["dynamics"]["type"] == "flow"
+        assert s0["dynamics"]["points"] == [[0.0, 4.0]]
+        # Should have pressure_over and time_over triggers from OR chain
+        assert len(s0["exit_triggers"]) == 2
+        assert s0["exit_triggers"][0]["type"] == "pressure"
+        assert s0["exit_triggers"][0]["direction"] == "above"
+        assert s0["exit_triggers"][1]["type"] == "time"
+
+        # Check second stage (pressure)
+        s1 = profile["stages"][1]
+        assert s1["type"] == "pressure"
+        assert s1["dynamics"]["type"] == "pressure"
+        assert s1["dynamics"]["points"] == [[0.0, 9.0]]
+        assert s1["exit_triggers"][0]["type"] == "weight"
+        assert s1["exit_triggers"][0]["value"] == 36.0
+
+    def test_convert_smooth_transition(self):
+        """Smooth transitions create ramped dynamics with two points."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        data = {
+            "title": "Ramp Test",
+            "steps": [
+                {
+                    "name": "ramp",
+                    "pump": "pressure",
+                    "pressure": 9.0,
+                    "transition": "smooth",
+                    "seconds": 10.0,
+                    "sensor": "coffee",
+                }
+            ],
+        }
+        result = convert_decent_to_meticulous(data)
+        stage = result["profile"]["stages"][0]
+        assert len(stage["dynamics"]["points"]) == 2
+        assert stage["dynamics"]["points"][0] == [0.0, 0.0]
+        assert stage["dynamics"]["points"][1] == [10.0, 9.0]
+
+    def test_convert_unknown_pump(self):
+        """Unknown pump types produce a warning and default to pressure."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        data = {
+            "title": "Unknown Pump",
+            "steps": [{"name": "test", "pump": "steam", "sensor": "coffee"}],
+        }
+        result = convert_decent_to_meticulous(data)
+        assert len(result["warnings"]) == 1
+        assert "steam" in result["warnings"][0]
+        assert result["profile"]["stages"][0]["type"] == "pressure"
+
+    def test_convert_empty_steps(self):
+        """Empty steps list produces a warning."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        result = convert_decent_to_meticulous({"title": "Empty", "steps": []})
+        assert "No stages" in result["warnings"][0]
+
+    def test_convert_unknown_exit_type(self):
+        """Unknown exit types produce a warning."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        data = {
+            "title": "Bad Exit",
+            "steps": [
+                {
+                    "name": "test",
+                    "pump": "flow",
+                    "flow": 3.0,
+                    "sensor": "coffee",
+                    "exit": {"type": "magic_over", "condition": 5.0},
+                }
+            ],
+        }
+        result = convert_decent_to_meticulous(data)
+        assert any("magic_over" in w for w in result["warnings"])
+
+    def test_convert_preserves_notes(self):
+        """Profile notes become display.description."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        result = convert_decent_to_meticulous(self.VALID_DECENT)
+        assert result["profile"]["display"]["description"] == "A classic lever profile"
+
+    def test_convert_stage_structure(self):
+        """Converted stages have all required Meticulous fields."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        result = convert_decent_to_meticulous(self.VALID_DECENT)
+        for stage in result["profile"]["stages"]:
+            assert "key" in stage
+            assert "type" in stage
+            assert "name" in stage
+            assert "dynamics" in stage
+            assert "exit_triggers" in stage
+            assert "limits" in stage
+            assert isinstance(stage["limits"], list)
+            assert stage["dynamics"]["interpolation"] == "linear"
+            assert stage["dynamics"]["over"] == "time"
+
+    def test_convert_exit_relative_and_comparison(self):
+        """Exit triggers get correct relative and comparison defaults."""
+        from services.decent_converter import convert_decent_to_meticulous
+
+        result = convert_decent_to_meticulous(self.VALID_DECENT)
+        # time trigger should have relative=True
+        time_triggers = [
+            t
+            for s in result["profile"]["stages"]
+            for t in s["exit_triggers"]
+            if t["type"] == "time"
+        ]
+        assert all(t["relative"] is True for t in time_triggers)
+        # non-time triggers should have relative=False
+        non_time = [
+            t
+            for s in result["profile"]["stages"]
+            for t in s["exit_triggers"]
+            if t["type"] != "time"
+        ]
+        assert all(t["relative"] is False for t in non_time)
+        # All should have comparison >=
+        all_triggers = [
+            t for s in result["profile"]["stages"] for t in s["exit_triggers"]
+        ]
+        assert all(t["comparison"] == ">=" for t in all_triggers)
+
+
+class TestConvertDecentEndpoint:
+    """Tests for the /api/convert-decent endpoint."""
+
+    VALID_DECENT = TestDecentConverter.VALID_DECENT
+
+    def test_convert_decent_success(self, client):
+        """Returns converted profile for valid Decent input."""
+        resp = client.post("/api/convert-decent", json=self.VALID_DECENT)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "profile" in data
+        assert "warnings" in data
+        assert data["profile"]["name"] == "Londinium"
+        assert len(data["profile"]["stages"]) == 2
+
+    def test_convert_decent_not_decent_format(self, client):
+        """Returns 400 for non-Decent profiles."""
+        meticulous = {"name": "Test", "stages": [{"type": "flow"}]}
+        resp = client.post("/api/convert-decent", json=meticulous)
+        assert resp.status_code == 400
+        assert "Decent" in resp.json()["detail"]
+
+    def test_convert_decent_dual_route(self, client):
+        """Both /convert-decent and /api/convert-decent work."""
+        resp = client.post("/convert-decent", json=self.VALID_DECENT)
+        assert resp.status_code == 200
+
+    def test_convert_decent_empty_body(self, client):
+        """Returns 400 for empty body."""
+        resp = client.post("/api/convert-decent", json={})
+        assert resp.status_code == 400
+
+
+class TestImportFromUrlDecentAutoDetect:
+    """Tests for Decent auto-detection in /api/import-from-url."""
+
+    DECENT_PROFILE = {
+        "title": "Decent URL Import",
+        "author": "URL Author",
+        "steps": [
+            {
+                "name": "pi",
+                "pump": "flow",
+                "flow": 3.5,
+                "sensor": "coffee",
+                "seconds": 10,
+                "exit": {"type": "pressure_over", "condition": 3.0},
+            }
+        ],
+    }
+
+    @staticmethod
+    def _mock_httpx_stream(response_bytes=b"{}", raise_for_status_error=None):
+        """Build a mock httpx.AsyncClient that streams response_bytes."""
+
+        class FakeStream:
+            def __init__(self):
+                self.status_code = 200
+
+            def raise_for_status(self):
+                if raise_for_status_error:
+                    raise raise_for_status_error
+
+            async def aiter_bytes(self, chunk_size=8192):
+                yield response_bytes
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+        class FakeClient:
+            def __init__(self, **kwargs):
+                pass
+
+            def stream(self, method, url):
+                return FakeStream()
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+        return FakeClient
+
+    @patch("api.routes.profiles._validate_url_for_ssrf")
+    @patch("api.routes.profiles.save_history")
+    @patch("api.routes.profiles.load_history", return_value=[])
+    @patch("api.routes.profiles.async_create_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles._generate_profile_description")
+    def test_decent_auto_detected_from_url(
+        self,
+        mock_desc,
+        mock_create,
+        mock_load,
+        mock_save,
+        mock_ssrf,
+        client,
+    ):
+        """Decent profiles from URL are auto-detected and converted."""
+        import json as _json
+
+        mock_desc.return_value = "Converted Decent profile"
+        mock_create.return_value = {"id": "machine-123"}
+
+        content = _json.dumps(self.DECENT_PROFILE).encode()
+        with patch("httpx.AsyncClient", self._mock_httpx_stream(content)):
+            resp = client.post(
+                "/api/import-from-url",
+                json={"url": "https://example.com/decent.json"},
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["converted_from_decent"] is True
+        # The profile name should come from "title" field after conversion
+        assert data["profile_name"] == "Decent URL Import"
+
+
+class TestRankModels:
+    """Tests for the dynamic model ranking heuristic."""
+
+    def _m(self, name):
+        return {"id": name, "display_name": name, "description": ""}
+
+    def test_prefers_flash_over_pro(self):
+        from services.gemini_service import rank_models
+        models = [self._m("gemini-2.5-pro"), self._m("gemini-2.5-flash")]
+        assert rank_models(models) == "gemini-2.5-flash"
+
+    def test_prefers_higher_version(self):
+        from services.gemini_service import rank_models
+        models = [self._m("gemini-2.0-flash"), self._m("gemini-2.5-flash")]
+        assert rank_models(models) == "gemini-2.5-flash"
+
+    def test_flash_beats_flash_lite(self):
+        from services.gemini_service import rank_models
+        models = [self._m("gemini-2.5-flash-lite"), self._m("gemini-2.5-flash")]
+        assert rank_models(models) == "gemini-2.5-flash"
+
+    def test_flash_lite_beats_pro(self):
+        from services.gemini_service import rank_models
+        models = [self._m("gemini-2.5-pro"), self._m("gemini-2.5-flash-lite")]
+        assert rank_models(models) == "gemini-2.5-flash-lite"
+
+    def test_prefers_stable_over_preview(self):
+        from services.gemini_service import rank_models
+        models = [self._m("gemini-3.0-flash-preview-09-2025"), self._m("gemini-2.5-flash")]
+        assert rank_models(models) == "gemini-2.5-flash"
+
+    def test_allows_preview_as_last_resort(self):
+        from services.gemini_service import rank_models
+        models = [self._m("gemini-3.0-flash-exp")]
+        assert rank_models(models) == "gemini-3.0-flash-exp"
+
+    def test_excludes_non_text_families(self):
+        from services.gemini_service import rank_models
+        models = [self._m("imagen-4.0-generate-001"), self._m("text-embedding-004")]
+        assert rank_models(models) is None
+
+    def test_excludes_special_gemini_and_non_gemini_families(self):
+        from services.gemini_service import rank_models
+        models = [
+            self._m("gemini-2.5-computer-use-preview-10-2025"),
+            self._m("gemini-robotics-er-1.5-preview"),
+            self._m("gemini-3.1-flash-image"),
+            self._m("nano-banana-pro-preview"),
+            self._m("lyria-3-pro-preview"),
+            self._m("gemma-4-31b-it"),
+            self._m("gemini-2.5-flash"),
+        ]
+        assert rank_models(models) == "gemini-2.5-flash"
+
+    def test_excludes_all_non_text_returns_none(self):
+        from services.gemini_service import rank_models
+        models = [
+            self._m("gemini-2.5-computer-use-preview-10-2025"),
+            self._m("nano-banana-pro-preview"),
+            self._m("gemma-4-31b-it"),
+        ]
+        assert rank_models(models) is None
+
+    def test_strips_models_prefix(self):
+        from services.gemini_service import rank_models
+        models = [self._m("models/gemini-2.5-flash")]
+        assert rank_models(models) == "gemini-2.5-flash"
+
+    def test_empty_returns_none(self):
+        from services.gemini_service import rank_models
+        assert rank_models([]) is None
+
+
+class TestReactiveRetry:
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "k"})
+    def test_generate_reresolves_and_retries_on_model_not_found(self):
+        from services.gemini_service import _GeminiModelWrapper, _validated_model_cache
+        _validated_model_cache["model"] = "gemini-2.5-flash"
+
+        calls = {"n": 0}
+        class FakeResp:
+            text = "ok"
+        class FakeModels:
+            def generate_content(self, model, contents):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    raise Exception("404 NOT_FOUND: model gemini-2.5-flash is not found")
+                return FakeResp()
+        class FakeClient:
+            models = FakeModels()
+
+        vm = _GeminiModelWrapper(FakeClient())
+        with patch("services.gemini_service.get_working_model_force", return_value="gemini-2.5-pro"):
+            resp = vm.generate_content("hi")
+        assert resp.text == "ok"
+        assert calls["n"] == 2
+
+
+@pytest.mark.skipif(
+    os.environ.get("RUN_LIVE_GEMINI_TESTS") != "1",
+    reason="opt-in live integration test; set RUN_LIVE_GEMINI_TESTS=1 with a real GEMINI_API_KEY",
+)
+class TestLiveModelListing:
+    """Opt-in: hits the real Gemini API to prove discovery works end-to-end."""
+
+    def test_get_available_models_returns_real_models(self):
+        import asyncio
+        # Reset any cached client so the env key is used.
+        import services.gemini_service as gs
+        gs._gemini_client = None
+        models = asyncio.run(gs.get_available_models())
+        assert isinstance(models, list)
+        assert len(models) > 0, "Expected at least one generateContent model"
+        assert all("id" in m for m in models)
+
+    def test_rank_models_picks_a_real_model(self):
+        import asyncio
+        import services.gemini_service as gs
+        gs._gemini_client = None
+        best = gs.rank_models(asyncio.run(gs.get_available_models()))
+        assert best, "rank_models should select a model from the live list"
+        # The selected model must actually validate against the API.
+        assert asyncio.run(gs.validate_model(best)) is True
