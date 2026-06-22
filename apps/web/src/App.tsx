@@ -173,13 +173,14 @@ function App() {
         if (data?.profile) {
           setLiveProfileData(data.profile as ProfileData)
           // Resolve a profile description for the heating-view disclosure:
-          // prefer a cached AI description, otherwise build a static one.
+          // prefer a cached AI description, otherwise build a concise summary.
           try {
             const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
-            let desc = descCache?.get(profileName) ?? ''
+            const profileId = (data.profile as { id?: string }).id
+            let desc = (profileId ? descCache?.get(profileId) : undefined) ?? descCache?.get(profileName) ?? ''
             if (!desc) {
-              const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
-              desc = buildStaticProfileDescription(data.profile)
+              const { buildStaticProfileSummary } = await import('@/lib/staticProfileDescription')
+              desc = buildStaticProfileSummary(data.profile)
             }
             setLiveProfileDescription(desc)
           } catch { /* description is optional */ }

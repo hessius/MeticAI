@@ -26,81 +26,82 @@ interface ProfileJson {
   summary?: string
 }
 
-export function buildStaticProfileDescription(profileJson: ProfileJson): string {
-  const profileName = profileJson.name ?? 'Imported Profile'
+export function buildStaticProfileSummary(profileJson: ProfileJson): string {
   const temperature = profileJson.temperature
   const finalWeight = profileJson.final_weight
   const stages: Stage[] = profileJson.stages ?? []
 
   const existing =
     profileJson.description ?? profileJson.notes ?? profileJson.summary
-  let description: string
+  if (existing) return String(existing).trim()
 
-  if (existing) {
-    description = String(existing).trim()
-  } else {
-    const shotTraits: string[] = []
+  const shotTraits: string[] = []
 
-    for (let i = 0; i < stages.length; i++) {
-      const stage = stages[i]
-      if (!stage || typeof stage !== 'object') continue
-      const sname = (stage.name ?? '').toLowerCase()
-      const dynamics = stage.dynamics ?? ''
-      const points = stage.dynamics_points
+  for (let i = 0; i < stages.length; i++) {
+    const stage = stages[i]
+    if (!stage || typeof stage !== 'object') continue
+    const sname = (stage.name ?? '').toLowerCase()
+    const dynamics = stage.dynamics ?? ''
+    const points = stage.dynamics_points
 
-      if (i === 0 && (/pre/.test(sname) || /infus/.test(sname))) {
-        shotTraits.push('pre-infusion')
-      } else if (/bloom|soak/.test(sname)) {
-        shotTraits.push('bloom')
-      } else if (/ramp/.test(sname) || dynamics === 'ramp') {
-        shotTraits.push('ramp')
-      } else if (/flat/.test(sname) || dynamics === 'flat') {
-        shotTraits.push('flat')
-      } else if (/decline|taper/.test(sname)) {
-        shotTraits.push('decline')
-      }
+    if (i === 0 && (/pre/.test(sname) || /infus/.test(sname))) {
+      shotTraits.push('pre-infusion')
+    } else if (/bloom|soak/.test(sname)) {
+      shotTraits.push('bloom')
+    } else if (/ramp/.test(sname) || dynamics === 'ramp') {
+      shotTraits.push('ramp')
+    } else if (/flat/.test(sname) || dynamics === 'flat') {
+      shotTraits.push('flat')
+    } else if (/decline|taper/.test(sname)) {
+      shotTraits.push('decline')
+    }
 
-      // Detect flat pressure at ~9 bar (classic espresso)
-      if (Array.isArray(points) && points.length >= 2) {
-        try {
-          const pressures = points
-            .filter((p): p is [number, number] => Array.isArray(p) && p.length >= 2)
-            .map(p => Number(p[1]))
-          if (
-            pressures.length > 0 &&
-            pressures.every(p => Math.abs(p - pressures[0]) < 0.3) &&
-            pressures[0] >= 8.0 &&
-            pressures[0] <= 10.0 &&
-            !shotTraits.includes('flat')
-          ) {
-            shotTraits.push('flat')
-          }
-        } catch {
-          // ignore
+    // Detect flat pressure at ~9 bar (classic espresso)
+    if (Array.isArray(points) && points.length >= 2) {
+      try {
+        const pressures = points
+          .filter((p): p is [number, number] => Array.isArray(p) && p.length >= 2)
+          .map(p => Number(p[1]))
+        if (
+          pressures.length > 0 &&
+          pressures.every(p => Math.abs(p - pressures[0]) < 0.3) &&
+          pressures[0] >= 8.0 &&
+          pressures[0] <= 10.0 &&
+          !shotTraits.includes('flat')
+        ) {
+          shotTraits.push('flat')
         }
+      } catch {
+        // ignore
       }
     }
-
-    // Deduplicate while preserving order
-    const uniqueTraits = [...new Map(shotTraits.map(t => [t, t])).values()]
-
-    const parts: string[] = []
-    if (stages.length > 0) {
-      const stageCount = `${stages.length}-stage`
-      if (uniqueTraits.length > 0) {
-        parts.push(`A ${stageCount} extraction featuring ${uniqueTraits.join(', ')}`)
-      } else {
-        parts.push(`A ${stageCount} extraction profile`)
-      }
-    }
-    if (temperature != null) parts.push(`brewed at ${temperature}°C`)
-    if (finalWeight != null) parts.push(`targeting ~${finalWeight}g yield`)
-
-    description =
-      parts.length > 0
-        ? parts.join(' ') + '.'
-        : 'Profile imported successfully.'
   }
+
+  // Deduplicate while preserving order
+  const uniqueTraits = [...new Map(shotTraits.map(t => [t, t])).values()]
+
+  const parts: string[] = []
+  if (stages.length > 0) {
+    const stageCount = `${stages.length}-stage`
+    if (uniqueTraits.length > 0) {
+      parts.push(`A ${stageCount} extraction featuring ${uniqueTraits.join(', ')}`)
+    } else {
+      parts.push(`A ${stageCount} extraction profile`)
+    }
+  }
+  if (temperature != null) parts.push(`brewed at ${temperature}°C`)
+  if (finalWeight != null) parts.push(`targeting ~${finalWeight}g yield`)
+
+  return parts.length > 0 ? parts.join(' ') + '.' : 'Profile imported successfully.'
+}
+
+export function buildStaticProfileDescription(profileJson: ProfileJson): string {
+  const profileName = profileJson.name ?? 'Imported Profile'
+  const temperature = profileJson.temperature
+  const finalWeight = profileJson.final_weight
+  const stages: Stage[] = profileJson.stages ?? []
+
+  const description = buildStaticProfileSummary(profileJson)
 
   // Calculate expected time from stage dynamics_points
   let expectedTime = 'Not specified'
