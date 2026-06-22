@@ -12,6 +12,8 @@ import { HeatingTempChart } from './HeatingTempChart'
 
 export interface HeatingDashboardProps {
   isReady: boolean
+  /** Machine is actively heating/preheating (vs idle/standby). */
+  isHeating?: boolean
   /** "Lance's standard" easter egg: head temp on-target while ready. */
   lancesStandard?: boolean
   profileName: string
@@ -49,15 +51,22 @@ export function HeatingDashboard(props: HeatingDashboardProps) {
     props.preheatCountdown != null && props.preheatCountdown > 0
       ? props.preheatCountdown
       : modelEta
+  // Once the machine reports ready, the hero shows ~0:00 rather than an
+  // estimate; the time-to-ready hero is only meaningful while heating or ready.
+  const heroEta = props.isReady ? 0 : etaSeconds
+  const showHero = props.isReady || props.isHeating
+  const statusLabel = props.isReady
+    ? t('controlCenter.heating.statusReady')
+    : props.isHeating
+      ? t('controlCenter.heating.statusHeating')
+      : t('controlCenter.states.idle')
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <Badge variant={props.isReady ? 'default' : 'secondary'}>
-            {props.isReady
-              ? t('controlCenter.heating.statusReady')
-              : t('controlCenter.heating.statusHeating')}
+            {statusLabel}
           </Badge>
           <span className="truncate text-sm font-medium text-foreground">{props.profileName}</span>
           {props.lancesStandard && (
@@ -71,38 +80,40 @@ export function HeatingDashboard(props: HeatingDashboardProps) {
         </span>
       </div>
 
-      <div className="flex flex-col items-center rounded-xl border border-border bg-card px-4 py-5 text-center">
-        <AnimatePresence mode="wait">
-          {etaSeconds == null ? (
-            <motion.span
-              key="estimating"
-              className="text-2xl font-semibold tabular-nums text-muted-foreground"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-            >
-              {t('controlCenter.heating.estimating')}
-            </motion.span>
-          ) : (
-            <motion.span
-              key="eta"
-              className="text-5xl font-bold tabular-nums tracking-tight text-foreground"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-            >
-              {t('controlCenter.heating.estimatePrefix')}
-              {formatMmSs(etaSeconds)}
-            </motion.span>
-          )}
-        </AnimatePresence>
-        <span className="mt-1 text-sm text-muted-foreground">
-          {t('controlCenter.heating.timeToReady')}
-        </span>
-        <span className="mt-1 max-w-xs text-xs text-muted-foreground">
-          {t('controlCenter.heating.slowsNearTarget')}
-        </span>
-      </div>
+      {showHero && (
+        <div className="flex flex-col items-center rounded-xl border border-border bg-card px-4 py-5 text-center">
+          <AnimatePresence mode="wait">
+            {heroEta == null ? (
+              <motion.span
+                key="estimating"
+                className="text-2xl font-semibold tabular-nums text-muted-foreground"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+              >
+                {t('controlCenter.heating.estimating')}
+              </motion.span>
+            ) : (
+              <motion.span
+                key="eta"
+                className="text-5xl font-bold tabular-nums tracking-tight text-foreground"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+              >
+                {t('controlCenter.heating.estimatePrefix')}
+                {formatMmSs(heroEta)}
+              </motion.span>
+            )}
+          </AnimatePresence>
+          <span className="mt-1 text-sm text-muted-foreground">
+            {t('controlCenter.heating.timeToReady')}
+          </span>
+          <span className="mt-1 max-w-xs text-xs text-muted-foreground">
+            {t('controlCenter.heating.slowsNearTarget')}
+          </span>
+        </div>
+      )}
 
       <HeatingTempChart
         samples={props.samples}
@@ -140,7 +151,7 @@ export function HeatingDashboard(props: HeatingDashboardProps) {
           <AnimatePresence>
             {descOpen && (
               <motion.p
-                className="mt-2 text-sm text-muted-foreground"
+                className="mt-2 whitespace-pre-line text-sm text-muted-foreground"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}

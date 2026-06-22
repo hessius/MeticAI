@@ -28,6 +28,7 @@ vi.mock('./HeatingNumbers', () => ({
 
 const baseProps = {
   isReady: false,
+  isHeating: true,
   profileName: 'Slow-Mo Blossom',
   setTemp: 93,
   chamberTemp: 70,
@@ -66,7 +67,29 @@ describe('HeatingDashboard', () => {
   })
 
   it('shows "ready" status when isReady', () => {
-    render(<HeatingDashboard {...baseProps} isReady />)
+    render(<HeatingDashboard {...baseProps} isReady isHeating={false} />)
     expect(screen.getByText('controlCenter.heating.statusReady')).toBeInTheDocument()
+  })
+
+  it('shows a 0:00 hero (not "estimating") when ready', () => {
+    render(<HeatingDashboard {...baseProps} isReady isHeating={false} />)
+    expect(screen.getByText(/0:00/)).toBeInTheDocument()
+    expect(screen.queryByText('controlCenter.heating.estimating')).not.toBeInTheDocument()
+  })
+
+  it('shows an idle status and hides the time-to-ready hero when neither heating nor ready', () => {
+    render(<HeatingDashboard {...baseProps} isHeating={false} />)
+    expect(screen.getByText('controlCenter.states.idle')).toBeInTheDocument()
+    expect(screen.queryByText('controlCenter.heating.timeToReady')).not.toBeInTheDocument()
+  })
+
+  it('offers the description disclosure when a description is provided', () => {
+    render(<HeatingDashboard {...baseProps} />)
+    expect(screen.getByText('controlCenter.heating.showDescription')).toBeInTheDocument()
+  })
+
+  it('omits the description disclosure when no description is provided', () => {
+    render(<HeatingDashboard {...baseProps} description={undefined} />)
+    expect(screen.queryByText('controlCenter.heating.showDescription')).not.toBeInTheDocument()
   })
 })

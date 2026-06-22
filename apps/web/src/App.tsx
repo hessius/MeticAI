@@ -143,6 +143,7 @@ function App() {
 
   // Live profile breakdown data (fetched when in live-shot view)
   const [liveProfileData, setLiveProfileData] = useState<ProfileData | null>(null)
+  const [liveProfileDescription, setLiveProfileDescription] = useState<string>('')
   const liveProfileFetchedRef = useRef<string | null>(null)
 
   // Resolve profile image for the desktop right-column header
@@ -155,6 +156,7 @@ function App() {
       liveProfileFetchedRef.current = null
       // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state on view change
       setLiveProfileData(null)
+      setLiveProfileDescription('')
       return
     }
     const profileName = machineState.active_profile
@@ -170,6 +172,17 @@ function App() {
         const data = await r.json()
         if (data?.profile) {
           setLiveProfileData(data.profile as ProfileData)
+          // Resolve a profile description for the heating-view disclosure:
+          // prefer a cached AI description, otherwise build a static one.
+          try {
+            const descCache = (window as unknown as Record<string, unknown>).__meticaiDescriptionCache as Map<string, string> | undefined
+            let desc = descCache?.get(profileName) ?? ''
+            if (!desc) {
+              const { buildStaticProfileDescription } = await import('@/lib/staticProfileDescription')
+              desc = buildStaticProfileDescription(data.profile)
+            }
+            setLiveProfileDescription(desc)
+          } catch { /* description is optional */ }
         }
       } catch { /* non-critical */ }
     })()
@@ -1582,6 +1595,7 @@ function App() {
                     machineState={machineState}
                     onBack={handleBackToStart}
                     profileData={liveProfileData}
+                    profileDescription={liveProfileDescription}
                     onAnalyzeShot={(profileName) => {
                       setShotHistoryProfileName(profileName)
                       setShotHistoryInitialDate(undefined)

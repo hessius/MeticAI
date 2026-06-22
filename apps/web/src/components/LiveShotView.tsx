@@ -67,6 +67,8 @@ interface LiveShotViewProps {
   onAnalyzeShot?: (profileName: string) => void
   /** Full active-profile data (stages/variables) for the heating breakdown */
   profileData?: ProfileData | null
+  /** Optional profile description for the heating-view collapsible disclosure */
+  profileDescription?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +113,7 @@ interface ProfileStageInfo {
  */
 export const TEMP_ON_TARGET_THRESHOLD = 2.3
 
-export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData }: LiveShotViewProps) {
+export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData, profileDescription }: LiveShotViewProps) {
   const { t } = useTranslation()
   const chartDataRef = useRef<ChartDataPoint[]>([])
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
@@ -273,6 +275,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData 
   const stateLC = (ms.state ?? '').toLowerCase()
   const isHeatingPhase = !ms.brewing && chartData.length === 0
   const isReadyState = stateLC === 'click to start'
+  const isActivelyHeating = stateLC === 'heating' || stateLC === 'preheating'
   const headTempVal = ms.brew_head_temperature
   const chamberTempVal = ms.boiler_temperature
   const targetTempVal = ms.target_temperature
@@ -421,6 +424,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData 
           {isHeatingPhase && (
             <HeatingDashboard
               isReady={isReadyState}
+              isHeating={isActivelyHeating}
               lancesStandard={isLancesStandard}
               profileName={ms.active_profile ?? ''}
               setTemp={targetTempVal ?? 0}
@@ -430,6 +434,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData 
               preheatCountdown={ms.preheat_countdown ?? null}
               samples={heatingSamples}
               profile={profileData ?? null}
+              description={profileDescription}
               startDisabled={!ms.connected}
               onStart={() => cmd(() => machine.continueShot(), 'startingShot')}
               onAbort={() => { cmd(() => machine.abortShot(), 'warmupCancelled'); onBack() }}
