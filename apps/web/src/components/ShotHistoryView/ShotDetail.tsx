@@ -59,6 +59,7 @@ import {
   formatShotTime,
 } from './shotDataTransforms'
 import { useReplayAnimation } from './useReplayAnimation'
+import { ReplayScrubber } from './ReplayScrubber'
 
 // ---------------------------------------------------------------------------
 // Comparison StatCard — extracted from inline IIFE for clarity
@@ -184,6 +185,10 @@ export function ShotDetail({
 
   const mainReplay = useReplayAnimation({ maxTime: mainMaxTime })
   const compReplay = useReplayAnimation({ maxTime: comparisonMaxTime })
+  // Shared by both tabs: safe because only one scrubber is interactive at a
+  // time and the ref is written at scrub-start and read at scrub-end within a
+  // single synchronous gesture before any tab switch can occur.
+  const wasPlayingBeforeScrubRef = useRef(false)
 
   // ---- Reset replay on shot change ----------------------------------------
   useEffect(() => {
@@ -773,29 +778,18 @@ export function ShotDetail({
 
                     {/* Progress Bar */}
                     {mainMaxTime > 0 && (
-                      <div className="space-y-2">
-                        <div
-                          className="h-2 bg-secondary/60 rounded-full overflow-hidden cursor-pointer relative group"
-                          onClick={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            const x = e.clientX - rect.left
-                            const percent = x / rect.width
-                            mainReplay.setCurrentTime(percent * mainMaxTime)
-                          }}
-                        >
-                          <motion.div
-                            className="h-full bg-primary rounded-full"
-                            initial={false}
-                            animate={{ width: `${(mainReplay.currentTime / mainMaxTime) * 100}%` }}
-                            transition={{ duration: 0.05 }}
-                          />
-                          <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground font-mono">
-                          <span>{mainReplay.currentTime.toFixed(1)}s</span>
-                          <span>{mainMaxTime.toFixed(1)}s</span>
-                        </div>
-                      </div>
+                      <ReplayScrubber
+                        value={mainReplay.currentTime}
+                        max={mainMaxTime}
+                        onChange={(time) => mainReplay.setCurrentTime(time)}
+                        onScrubStart={() => {
+                          wasPlayingBeforeScrubRef.current = mainReplay.isPlaying
+                          mainReplay.setIsPlaying(false)
+                        }}
+                        onScrubEnd={() => {
+                          if (wasPlayingBeforeScrubRef.current) mainReplay.setIsPlaying(true)
+                        }}
+                      />
                     )}
 
                     {/* Playback Controls */}
@@ -914,29 +908,18 @@ export function ShotDetail({
                         {/* Replay Controls */}
                         <div className="space-y-3 pt-2 border-t border-border/20">
                           {comparisonMaxTime > 0 && (
-                            <div className="space-y-1.5">
-                              <div
-                                className="h-2 bg-secondary/60 rounded-full overflow-hidden cursor-pointer relative group"
-                                onClick={(e) => {
-                                  const rect = e.currentTarget.getBoundingClientRect()
-                                  const x = e.clientX - rect.left
-                                  const percent = x / rect.width
-                                  compReplay.setCurrentTime(percent * comparisonMaxTime)
-                                }}
-                              >
-                                <motion.div
-                                  className="h-full bg-primary rounded-full"
-                                  initial={false}
-                                  animate={{ width: `${(compReplay.currentTime / comparisonMaxTime) * 100}%` }}
-                                  transition={{ duration: 0.05 }}
-                                />
-                                <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                              </div>
-                              <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-                                <span>{compReplay.currentTime.toFixed(1)}s</span>
-                                <span>{comparisonMaxTime.toFixed(1)}s</span>
-                              </div>
-                            </div>
+                            <ReplayScrubber
+                              value={compReplay.currentTime}
+                              max={comparisonMaxTime}
+                              onChange={(time) => compReplay.setCurrentTime(time)}
+                              onScrubStart={() => {
+                                wasPlayingBeforeScrubRef.current = compReplay.isPlaying
+                                compReplay.setIsPlaying(false)
+                              }}
+                              onScrubEnd={() => {
+                                if (wasPlayingBeforeScrubRef.current) compReplay.setIsPlaying(true)
+                              }}
+                            />
                           )}
 
                           <div className="flex items-center justify-center gap-2">
