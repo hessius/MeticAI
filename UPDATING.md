@@ -106,7 +106,7 @@ docker compose down -v
 cd ~ && rm -rf MeticAI
 
 # 3. Fresh install
-curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/refs/heads/main/scripts/install.sh | bash
 
 # 4. Or clone and start manually
 git clone https://github.com/hessius/MeticAI.git
