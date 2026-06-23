@@ -758,6 +758,8 @@
     "heating": {
       "statusHeating": "Calentando",
       "statusReady": "Listo",
+      "statusReadyToBrew": "Listo para preparar",
+      "statusStable": "Temperatura estable",
       "timeToReady": "hasta estabilidad térmica",
       "estimatePrefix": "~",
       "estimating": "Estimando…",
@@ -818,7 +820,7 @@
       "continue": "Continuar",
       "preheat": "Precalentar",
       "tare": "Tarar",
-      "home": "Inicio",
+      "raise": "Elevar",
       "purge": "Purgar",
       "live": "En vivo",
       "abortPreheat": "Cancelar"
@@ -832,7 +834,7 @@
       "preheatCancelled": "Precalentamiento cancelado",
       "warmupCancelled": "Calentamiento cancelado",
       "tared": "Báscula tarada",
-      "homed": "Émbolo retornando…",
+      "homed": "Elevando el émbolo...",
       "purging": "Purgando…",
       "soundsOn": "Sonidos activados",
       "soundsOff": "Sonidos desactivados",

@@ -758,6 +758,8 @@
     "heating": {
       "statusHeating": "Riscaldamento",
       "statusReady": "Pronto",
+      "statusReadyToBrew": "Pronto per l'estrazione",
+      "statusStable": "Temperatura stabile",
       "timeToReady": "alla stabilità termica",
       "estimatePrefix": "~",
       "estimating": "Stima…",
@@ -818,7 +820,7 @@
       "continue": "Continua",
       "preheat": "Preriscalda",
       "tare": "Tara",
-      "home": "Posizione iniziale",
+      "raise": "Solleva",
       "purge": "Spurgo",
       "live": "Live",
       "abortPreheat": "Annulla"
@@ -832,7 +834,7 @@
       "preheatCancelled": "Preriscaldamento annullato",
       "warmupCancelled": "Riscaldamento annullato",
       "tared": "Bilancia tarata",
-      "homed": "Pistone in rientro…",
+      "homed": "Sollevamento del pistone...",
       "purging": "Spurgo in corso…",
       "soundsOn": "Suoni attivati",
       "soundsOff": "Suoni disattivati",

@@ -435,7 +435,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
               chamberTemp={chamberTempVal ?? 0}
               headTemp={headTempVal ?? 0}
               lanceReadyCutoff={lanceReadyCutoff}
-              preheatCountdown={ms.preheat_countdown ?? null}
               samples={heatingSamples}
               profile={profileData ?? null}
               description={profileDescription}

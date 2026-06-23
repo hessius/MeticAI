@@ -20,8 +20,6 @@ export interface HeatingDashboardProps {
   chamberTemp: number
   headTemp: number
   lanceReadyCutoff: number
-  /** Machine's own countdown (seconds) when provided; preferred over our model. */
-  preheatCountdown: number | null
   samples: TempSample[]
   profile: ProfileData | null
   /** Auto-generated one-line summary of what this shot will do. */
@@ -43,20 +41,35 @@ interface HeroTone {
   accent: string
 }
 
-function heroTone(isReady: boolean, isHeating: boolean, lancesStandard: boolean): HeroTone {
-  if (lancesStandard) {
+interface HeroState {
+  tempStable: boolean
+  readyToBrew: boolean
+  isHeating: boolean
+  lancesStandard: boolean
+}
+
+function heroTone(state: HeroState): HeroTone {
+  if (state.lancesStandard) {
     return {
       container: 'border-emerald-500/60 bg-emerald-500/15',
       accent: 'text-emerald-600 dark:text-emerald-400',
     }
   }
-  if (isReady) {
+  if (state.tempStable) {
     return {
       container: 'border-success/50 bg-success/10',
       accent: 'text-success',
     }
   }
-  if (isHeating) {
+  if (state.readyToBrew) {
+    // Intermediate "almost there" state: brewable now, but still climbing to
+    // full thermal stability. Lime sits between heating-orange and ready-green.
+    return {
+      container: 'border-lime-500/50 bg-lime-500/10',
+      accent: 'text-lime-600 dark:text-lime-500',
+    }
+  }
+  if (state.isHeating) {
     return {
       container: 'border-orange-500/50 bg-orange-500/10',
       accent: 'text-orange-600 dark:text-orange-400',
@@ -69,26 +82,41 @@ export function HeatingDashboard(props: HeatingDashboardProps) {
   const { t } = useTranslation()
 
   const isHeating = props.isHeating ?? false
+  const cutoff = props.lanceReadyCutoff
+  // Our own temperature-stability goal: the readiness sensor (brew head) has
+  // reached the ready band (target − threshold). This is reached *after* the
+  // machine first reports "ready to brew", so it — not the machine signal —
+  // gates the full-green stable state.
+  const tempStable = Number.isFinite(props.headTemp) && props.headTemp >= cutoff
+  // Machine reports brewing is possible, but full thermal stability isn't here yet.
+  const readyToBrew = props.isReady && !tempStable
+
   const modelEta = estimateTimeToReady({
     current: props.headTemp,
     target: props.setTemp,
-    cutoff: props.lanceReadyCutoff,
+    cutoff,
   })
-  const etaSeconds =
-    props.preheatCountdown != null && props.preheatCountdown > 0
-      ? props.preheatCountdown
-      : modelEta
-  // Once the machine reports ready, the hero shows 0:00 rather than an estimate.
-  const heroEta = props.isReady ? 0 : etaSeconds
+  // Drive the hero from the temperature model rather than the machine's
+  // brew-ready countdown (which fires early): the model returns 0 *exactly* when
+  // tempStable, so the countdown and the green state flip together and the timer
+  // never zeroes out before real stability is reached.
+  const heroEta = tempStable ? 0 : modelEta
   const showCountdown = props.isReady || isHeating
 
-  const statusLabel = props.isReady
-    ? t('controlCenter.heating.statusReady')
-    : isHeating
-      ? t('controlCenter.heating.statusHeating')
-      : t('controlCenter.states.idle')
+  const statusLabel = tempStable
+    ? t('controlCenter.heating.statusStable')
+    : readyToBrew
+      ? t('controlCenter.heating.statusReadyToBrew')
+      : isHeating
+        ? t('controlCenter.heating.statusHeating')
+        : t('controlCenter.states.idle')
 
-  const tone = heroTone(props.isReady, isHeating, props.lancesStandard ?? false)
+  const tone = heroTone({
+    tempStable,
+    readyToBrew,
+    isHeating,
+    lancesStandard: props.lancesStandard ?? false,
+  })
 
   return (
     <div className="flex flex-col gap-4 pb-28">
@@ -121,18 +149,18 @@ export function HeatingDashboard(props: HeatingDashboardProps) {
               ) : (
                 <motion.span
                   key="eta"
-                  className={`mt-2 text-6xl font-bold tabular-nums tracking-tight ${props.isReady ? tone.accent : 'text-foreground'}`}
+                  className={`mt-2 text-6xl font-bold tabular-nums tracking-tight ${tempStable ? tone.accent : 'text-foreground'}`}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
                 >
-                  {!props.isReady && t('controlCenter.heating.estimatePrefix')}
+                  {!tempStable && t('controlCenter.heating.estimatePrefix')}
                   {formatMmSs(heroEta)}
                 </motion.span>
               )}
             </AnimatePresence>
             <span className="mt-2 text-sm text-muted-foreground">
-              {props.isReady
+              {tempStable
                 ? t('controlCenter.heating.stabilityReached')
                 : t('controlCenter.heating.timeToReady')}
             </span>

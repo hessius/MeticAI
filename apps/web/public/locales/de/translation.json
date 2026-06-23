@@ -758,6 +758,8 @@
     "heating": {
       "statusHeating": "Aufheizen",
       "statusReady": "Bereit",
+      "statusReadyToBrew": "Brühbereit",
+      "statusStable": "Temperatur stabil",
       "timeToReady": "bis Temperaturstabilität",
       "estimatePrefix": "~",
       "estimating": "Schätzung…",
@@ -818,7 +820,7 @@
       "continue": "Fortsetzen",
       "preheat": "Vorheizen",
       "tare": "Tarieren",
-      "home": "Ausgangsposition",
+      "raise": "Anheben",
       "purge": "Spülen",
       "live": "Live",
       "abortPreheat": "Abbrechen"
@@ -832,7 +834,7 @@
       "preheatCancelled": "Vorheizen abgebrochen",
       "warmupCancelled": "Aufheizen abgebrochen",
       "tared": "Waage tariert",
-      "homed": "Kolben fährt zurück…",
+      "homed": "Kolben wird angehoben...",
       "purging": "Spült…",
       "soundsOn": "Töne aktiviert",
       "soundsOff": "Töne deaktiviert",

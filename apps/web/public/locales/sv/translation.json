@@ -763,6 +763,8 @@
     "heating": {
       "statusHeating": "Värmer upp",
       "statusReady": "Redo",
+      "statusReadyToBrew": "Redo att brygga",
+      "statusStable": "Temperaturen stabil",
       "timeToReady": "till temperaturstabilitet",
       "estimatePrefix": "~",
       "estimating": "Beräknar…",
@@ -823,7 +825,7 @@
       "continue": "Fortsätt",
       "preheat": "Förvärm",
       "tare": "Tarera",
-      "home": "Hem",
+      "raise": "Höj",
       "purge": "Spola",
       "live": "Live",
       "abortPreheat": "Avbryt"
@@ -837,7 +839,7 @@
       "preheatCancelled": "Förvärmning avbruten",
       "warmupCancelled": "Uppvärmning avbruten",
       "tared": "Våg tarerad",
-      "homed": "Kolv återställs…",
+      "homed": "Höjer kolven...",
       "purging": "Spolar…",
       "soundsOn": "Ljud aktiverat",
       "soundsOff": "Ljud inaktiverat",

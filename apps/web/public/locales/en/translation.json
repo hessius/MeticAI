@@ -770,6 +770,8 @@
     "heating": {
       "statusHeating": "Heating",
       "statusReady": "Ready",
+      "statusReadyToBrew": "Ready to brew",
+      "statusStable": "Temperature stable",
       "timeToReady": "until temperature stability",
       "estimatePrefix": "~",
       "estimating": "Estimating…",
@@ -830,7 +832,7 @@
       "continue": "Continue",
       "preheat": "Preheat",
       "tare": "Tare",
-      "home": "Home",
+      "raise": "Raise",
       "purge": "Purge",
       "live": "Live",
       "abortPreheat": "Cancel"
@@ -845,7 +847,7 @@
       "preheatCancelled": "Preheat cancelled",
       "warmupCancelled": "Warmup cancelled",
       "tared": "Scale tared",
-      "homed": "Plunger homing...",
+      "homed": "Raising plunger...",
       "purging": "Purging...",
       "soundsOn": "Sounds enabled",
       "soundsOff": "Sounds disabled",

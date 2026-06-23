@@ -34,7 +34,6 @@ const baseProps = {
   chamberTemp: 70,
   headTemp: 68,
   lanceReadyCutoff: 92,
-  preheatCountdown: null as number | null,
   samples: [] as TempSample[],
   profile: { temperature: 93 } as ProfileData,
   description: 'A gentle blooming profile.',
@@ -65,13 +64,24 @@ describe('HeatingDashboard', () => {
     expect(screen.getByTestId('profile-breakdown')).toBeInTheDocument()
   })
 
-  it('shows "ready" status when isReady', () => {
-    render(<HeatingDashboard {...baseProps} isReady isHeating={false} />)
-    expect(screen.getByText('controlCenter.heating.statusReady')).toBeInTheDocument()
+  it('shows "ready to brew" status when the machine is ready but the head is still below the stability cutoff', () => {
+    render(<HeatingDashboard {...baseProps} isReady isHeating={false} headTemp={68} lanceReadyCutoff={92} />)
+    expect(screen.getByText('controlCenter.heating.statusReadyToBrew')).toBeInTheDocument()
   })
 
-  it('shows a 0:00 hero (not "estimating") when ready', () => {
-    render(<HeatingDashboard {...baseProps} isReady isHeating={false} />)
+  it('keeps the countdown running (not 0:00) while only ready-to-brew', () => {
+    render(<HeatingDashboard {...baseProps} isReady isHeating={false} headTemp={68} lanceReadyCutoff={92} />)
+    expect(screen.queryByText(/0:00/)).not.toBeInTheDocument()
+    expect(screen.getByText('controlCenter.heating.timeToReady')).toBeInTheDocument()
+  })
+
+  it('shows the temperature-stable status once the head reaches the cutoff', () => {
+    render(<HeatingDashboard {...baseProps} isReady isHeating={false} headTemp={92} lanceReadyCutoff={92} />)
+    expect(screen.getByText('controlCenter.heating.statusStable')).toBeInTheDocument()
+  })
+
+  it('shows a 0:00 hero (not "estimating") once temperature is stable', () => {
+    render(<HeatingDashboard {...baseProps} isReady isHeating={false} headTemp={92} lanceReadyCutoff={92} />)
     expect(screen.getByText(/0:00/)).toBeInTheDocument()
     expect(screen.queryByText('controlCenter.heating.estimating')).not.toBeInTheDocument()
   })

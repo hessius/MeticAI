@@ -21,9 +21,33 @@ const TARGET_COLOR = 'var(--destructive)'
 // The x-axis starts at 6 minutes so a typical heat-up fits without rescaling,
 // and extends only when a heat-up runs longer.
 const MIN_X_SECONDS = 360
-// Fixed 0–100°C y-axis keeps the curve shape stable across shots.
-const Y_MIN = 0
-const Y_MAX = 100
+// The y-axis uses a rolling window fitted to the visible data (sensor temps +
+// the target line) rather than a fixed 0–100°C range, so the sensor curves stay
+// readable as they converge near the target. A minimum span keeps the window
+// from over-zooming when the readings are close together.
+const MIN_Y_SPAN = 20
+const Y_PADDING = 3
+const Y_FLOOR = 0
+const Y_CEIL = 120
+
+function computeYDomain(samples: TempSample[], setTemp: number): [number, number] {
+  const temps: number[] = []
+  for (const s of samples) {
+    if (Number.isFinite(s.temp)) temps.push(s.temp)
+    if (s.chamber != null && Number.isFinite(s.chamber)) temps.push(s.chamber)
+  }
+  if (Number.isFinite(setTemp)) temps.push(setTemp)
+  if (temps.length === 0) return [Y_FLOOR, MIN_Y_SPAN]
+
+  let lo = Math.min(...temps) - Y_PADDING
+  let hi = Math.max(...temps) + Y_PADDING
+  if (hi - lo < MIN_Y_SPAN) {
+    const mid = (lo + hi) / 2
+    lo = mid - MIN_Y_SPAN / 2
+    hi = mid + MIN_Y_SPAN / 2
+  }
+  return [Math.max(Y_FLOOR, Math.floor(lo)), Math.min(Y_CEIL, Math.ceil(hi))]
+}
 
 interface HeatingTempChartProps {
   samples: TempSample[]
@@ -37,6 +61,7 @@ export function HeatingTempChart({ samples, setTemp }: HeatingTempChartProps) {
 
   const lastT = samples.length > 0 ? samples[samples.length - 1].t : 0
   const xMax = Math.max(MIN_X_SECONDS, Math.ceil(lastT))
+  const yDomain = computeYDomain(samples, setTemp)
 
   return (
     <div
@@ -68,7 +93,7 @@ export function HeatingTempChart({ samples, setTemp }: HeatingTempChartProps) {
             axisLine={{ stroke: theme.axisLineStroke }}
             tickLine={{ stroke: theme.axisLineStroke }}
             width={35}
-            domain={[Y_MIN, Y_MAX]}
+            domain={yDomain}
             allowDataOverflow={false}
           />
           <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }} iconType="circle" iconSize={8} />
