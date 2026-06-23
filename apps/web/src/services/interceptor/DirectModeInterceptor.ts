@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from '@/lib/constants'
-import { createBrowserAIService, generateTextWithRetry } from '@/services/ai/BrowserAIService'
+import { createBrowserAIService } from '@/services/ai/BrowserAIService'
+import { getActiveProvider } from '@/services/ai/providers'
 import { retryWithBackoff, formatGeminiError } from '@/services/ai/retryUtils'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { CapacitorHttp } from '@capacitor/core'
@@ -3163,15 +3164,12 @@ Rules for recommendations:
 - If no recommendations apply, output an empty array: RECOMMENDATIONS_JSON:\n[]\nEND_RECOMMENDATIONS_JSON
 `
 
-          // 6. Call Gemini (with retry on transient errors)
-          const { GoogleGenAI: GenAI } = await import('@google/genai')
-          const apiKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) ?? ''
-          if (!apiKey) return jsonResponse({ status: 'error', message: 'Gemini API key not configured.' })
-          const client = new GenAI({ apiKey })
-          const modelId = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
-
+          // 6. Call the active AI provider (with retry on transient errors)
+          if (!getActiveProvider().isConfigured()) {
+            return jsonResponse({ status: 'error', message: 'AI provider API key not configured.' })
+          }
           const response = await retryWithBackoff(() =>
-            generateTextWithRetry(client as never, modelId, {
+            getActiveProvider().generateText({
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
             })
           ) as { text?: string }
@@ -3618,14 +3616,9 @@ Rules for recommendations:
           const aiService = createBrowserAIService()
           if (aiService.isConfigured()) {
             try {
-              const { GoogleGenAI } = await import('@google/genai')
-              const key = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
-              if (!key) throw new Error('No API key')
-              const client = new GoogleGenAI({ apiKey: key })
               const resolvedName = (profileJson as {name?: string}).name || profileName || 'Unknown Profile'
               const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]`
-              const configuredModel = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
-              const response = await generateTextWithRetry(client as never, configuredModel, {
+              const response = await getActiveProvider().generateText({
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
               }) as { text?: string }
               const description = response.text?.trim()
@@ -3684,19 +3677,13 @@ Rules for recommendations:
 
     // GET /api/available-models → live discovery in direct mode, static fallback offline
     if (url.match(/\/api\/available-models$/)) {
-      const currentModel = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
       return (async () => {
+        const provider = getActiveProvider()
+        const { getProviderModel } = await import('../ai/providers')
+        const currentModel = getProviderModel()
         try {
-          const apiKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
-          if (apiKey) {
-            const [{ listAvailableModels }, { GoogleGenAI }] = await Promise.all([
-              import('../ai/modelResolver'),
-              import('@google/genai'),
-            ])
-            const client = new GoogleGenAI({ apiKey })
-            const models = await listAvailableModels(
-              client as unknown as import('../ai/modelResolver').ModelClient,
-            )
+          if (provider.isConfigured()) {
+            const models = await provider.listModels()
             if (models.length) return jsonResponse({ models, current: currentModel })
           }
         } catch {
