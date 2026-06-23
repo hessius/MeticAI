@@ -12,6 +12,12 @@ export const STORAGE_KEYS = {
   GEMINI_MODEL: 'meticai-gemini-model',
   AUTHOR_NAME: 'meticai-author-name',
 
+  // -- AI provider selection (#491). Gemini keeps its legacy keys above for
+  // backward compatibility; other providers use namespaced key/model entries. --
+  AI_PROVIDER: 'meticai-ai-provider',
+  AI_KEY_PREFIX: 'meticai-ai-key-',
+  AI_MODEL_PREFIX: 'meticai-ai-model-',
+
   // -- Direct mode caches --
   PROFILE_LIST_CACHE: 'meticai-direct-profile-list',
   DESCRIPTION_CACHE: 'meticai-direct-desc-cache',
