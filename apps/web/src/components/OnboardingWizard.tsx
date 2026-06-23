@@ -34,6 +34,11 @@ import {
 } from '@phosphor-icons/react'
 import { MeticLogo } from '@/components/MeticLogo'
 import { STORAGE_KEYS } from '@/lib/constants'
+import {
+  detectProviderFromKey,
+  setActiveProviderId,
+  apiKeyStorageKey,
+} from '@/services/ai/providers'
 import { isDemoMode, isNativePlatform, setMachineUrl } from '@/lib/machineMode'
 import { persistMachineUrl } from '@/services/machine/machineUrl'
 import { parseMachineInput, testMachineConnection, discoverMachines, type DiscoveredMachine } from '@/services/machine/discovery'
@@ -276,9 +281,14 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, authorName.trim())
     }
     if (geminiKey.trim()) {
+      const key = geminiKey.trim()
+      // Auto-detect the provider from the key shape and persist under its slot.
+      const provider = detectProviderFromKey(key) ?? 'gemini'
+      setActiveProviderId(provider)
+      const slot = apiKeyStorageKey(provider)
       // Write to both localStorage (immediate) and secure storage (Keychain on native)
-      localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, geminiKey.trim())
-      secureSetItem(STORAGE_KEYS.GEMINI_API_KEY, geminiKey.trim())
+      localStorage.setItem(slot, key)
+      secureSetItem(slot, key)
     }
     // Language already applied via i18n.changeLanguage
     // Theme already applied via useThemePreference
