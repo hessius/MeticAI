@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # On manual dispatch with a tag, build that release's source so the
           # APK matches the published code (not the workflow's default ref).
@@ -47,7 +47,7 @@ jobs:
           echo "🏷️ Release tag: $TAG"
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -103,7 +103,7 @@ jobs:
           ls -lh "$DEST"
 
       - name: Upload signed APK as workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: metic-android-release-apk
           path: ${{ env.apk }}
