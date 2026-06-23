@@ -17055,3 +17055,79 @@ class TestLiveModelListing:
         assert best, "rank_models should select a model from the live list"
         # The selected model must actually validate against the API.
         assert asyncio.run(gs.validate_model(best)) is True
+
+
+class TestAITags:
+    """AI-generated sensory tags during description generation (#400)."""
+
+    def test_parse_ai_tags_extracts_valid_labels(self):
+        from services.analysis_service import parse_ai_tags
+
+        text = "Some description.\n\nTags: Chocolate, Creamy, Sweet"
+        assert parse_ai_tags(text) == ["Chocolate", "Creamy", "Sweet"]
+
+    def test_parse_ai_tags_validates_against_vocabulary(self):
+        from services.analysis_service import parse_ai_tags
+
+        text = "Body text\nTags: Chocolate, Spaceship, Nutty"
+        assert parse_ai_tags(text) == ["Chocolate", "Nutty"]
+
+    def test_parse_ai_tags_is_case_insensitive_and_dedupes(self):
+        from services.analysis_service import parse_ai_tags
+
+        text = "Tags: chocolate, CHOCOLATE, creamy."
+        assert parse_ai_tags(text) == ["Chocolate", "Creamy"]
+
+    def test_parse_ai_tags_empty_when_absent(self):
+        from services.analysis_service import parse_ai_tags
+
+        assert parse_ai_tags("No tags line here") == []
+        assert parse_ai_tags(None) == []
+        assert parse_ai_tags("Tags:") == []
+
+    def test_strip_tags_line_removes_trailing_line(self):
+        from services.analysis_service import strip_tags_line
+
+        text = "Profile Created: X\n\nDescription:\nGreat coffee.\n\nTags: Sweet, Berry"
+        stripped = strip_tags_line(text)
+        assert "Tags:" not in stripped
+        assert stripped.endswith("Great coffee.")
+
+    def test_description_result_carries_tags(self):
+        from services.analysis_service import DescriptionResult
+
+        result = DescriptionResult("hello", ["Sweet"])
+        assert result == "hello"
+        assert isinstance(result, str)
+        assert result.ai_tags == ["Sweet"]
+        assert DescriptionResult("x").ai_tags == []
+
+    def test_regenerate_persists_ai_tags(self):
+        from services.analysis_service import DescriptionResult
+
+        history = [
+            {
+                "id": "entry-1",
+                "profile_name": "Test Profile",
+                "profile_json": {"name": "Test Profile"},
+                "reply": "old static description",
+            }
+        ]
+
+        with patch(
+            "api.routes.profiles._generate_profile_description",
+            new_callable=AsyncMock,
+        ) as mock_gen, patch(
+            "api.routes.profiles.load_history", return_value=history
+        ), patch(
+            "api.routes.profiles.save_history"
+        ):
+            mock_gen.return_value = DescriptionResult(
+                "A fresh AI description.", ["Chocolate", "Creamy"]
+            )
+            client = TestClient(app)
+            resp = client.post("/api/profile/entry-1/regenerate-description")
+
+        assert resp.status_code == 200
+        assert history[0]["ai_tags"] == ["Chocolate", "Creamy"]
+        assert history[0]["reply"] == "A fresh AI description."

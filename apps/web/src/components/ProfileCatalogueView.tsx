@@ -50,6 +50,7 @@ interface MachineProfile {
   has_description: boolean
   user_preferences?: string | null
   derived_tags?: string[]
+  ai_tags?: string[]
   display?: {
     description?: string
     shortDescription?: string
@@ -437,6 +438,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
       const prefTags = extractTagsFromPreferences(profile.user_preferences ?? null)
       for (const tag of prefTags) allTags.add(tag)
       for (const tag of profile.derived_tags ?? []) allTags.add(tag)
+      for (const tag of profile.ai_tags ?? []) allTags.add(tag)
     }
     return Array.from(allTags).sort()
   }, [profiles])
@@ -446,7 +448,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
 
     return profiles.filter((profile) => {
       const prefTags = extractTagsFromPreferences(profile.user_preferences ?? null)
-      const merged = new Set([...prefTags, ...(profile.derived_tags ?? [])])
+      const merged = new Set([...prefTags, ...(profile.derived_tags ?? []), ...(profile.ai_tags ?? [])])
       if (filterMode === 'AND') {
         return selectedFilterTags.every((tag) => merged.has(tag))
       }
@@ -858,7 +860,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
                             </div>
                             {(() => {
                               const prefTags = extractTagsFromPreferences(profile.user_preferences ?? null)
-                              const allTags = [...new Set([...prefTags, ...(profile.derived_tags ?? [])])].sort()
+                              const allTags = [...new Set([...prefTags, ...(profile.derived_tags ?? []), ...(profile.ai_tags ?? [])])].sort()
                               return allTags.length > 0 ? (
                                 <div className="flex flex-wrap gap-1 mt-2">
                                   {allTags.slice(0, 4).map((tag) => (

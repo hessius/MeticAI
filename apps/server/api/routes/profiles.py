@@ -2100,6 +2100,8 @@ async def list_machine_profiles(request: Request):
                                 )
                                 if entry.get("reply"):
                                     profile_dict["has_description"] = True
+                                if entry.get("ai_tags"):
+                                    profile_dict["ai_tags"] = entry.get("ai_tags")
                                 break
                     except Exception:
                         pass
@@ -2165,6 +2167,7 @@ async def list_machine_profiles(request: Request):
                         "derived_tags": _derive_structural_tags_from_dict(pj)
                         if pj
                         else [],
+                        "ai_tags": entry.get("ai_tags", []),
                     }
                 )
             return {
@@ -4178,6 +4181,9 @@ async def regenerate_profile_description(entry_id: str, request: Request):
             )
 
         target_entry["reply"] = new_description
+        ai_tags = getattr(new_description, "ai_tags", [])
+        if ai_tags:
+            target_entry["ai_tags"] = ai_tags
         save_history(history)
 
         logger.info(

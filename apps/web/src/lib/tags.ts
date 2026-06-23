@@ -120,13 +120,54 @@ export function extractTagsFromPreferences(preferences: string | null): string[]
 // Get all unique tags from history entries
 export function getAllTagsFromEntries(entries: Array<{ user_preferences: string | null }>): string[] {
   const allTags = new Set<string>()
-  
+
   entries.forEach(entry => {
     const tags = extractTagsFromPreferences(entry.user_preferences)
     tags.forEach(tag => allTags.add(tag))
   })
-  
+
   return Array.from(allTags).sort()
+}
+
+// Sensory tag vocabulary the AI may infer during description generation (#400).
+// Mirrors the flavor / mouthfeel / roast / body / characteristic categories;
+// structural / temperature / weight / pressure tags are derived deterministically.
+export const AI_TAG_LABELS: string[] = PRESET_TAGS.filter(t =>
+  (['body', 'flavor', 'mouthfeel', 'roast', 'characteristic'] as TagCategory[]).includes(t.category)
+).map(t => t.label)
+
+const AI_TAG_LOOKUP = new Map(AI_TAG_LABELS.map(label => [label.toLowerCase(), label]))
+
+// Instruction appended to AI description prompts to request sensory tags (#400).
+export const AI_TAGS_PROMPT =
+  '\n\nFinally, on a separate last line, output:\n' +
+  'Tags: [comma-separated subset of EXACTLY these labels that match the ' +
+  "coffee's likely sensory profile, or leave empty if unsure: " +
+  AI_TAG_LABELS.join(', ') +
+  ']\nOnly use labels from that list; do not invent new ones.'
+
+// Extract and validate sensory tags from a generated description's `Tags:` line.
+export function parseAiTags(text: string | null | undefined): string[] {
+  if (!text) return []
+  const match = text.match(/^[ \t]*Tags:[ \t]*(.*)$/im)
+  if (!match) return []
+  const result: string[] = []
+  const seen = new Set<string>()
+  for (const raw of match[1].split(',')) {
+    const candidate = raw.trim().replace(/\.+$/, '').trim()
+    const canonical = AI_TAG_LOOKUP.get(candidate.toLowerCase())
+    if (canonical && !seen.has(canonical)) {
+      seen.add(canonical)
+      result.push(canonical)
+    }
+  }
+  return result
+}
+
+// Remove the trailing `Tags:` line from a generated description body.
+export function stripTagsLine(text: string): string {
+  if (!text) return text
+  return text.replace(/^[ \t]*Tags:[ \t]*.*$/gim, '').replace(/\s+$/, '')
 }
 
 // Map a match reason string from the recommendation engine to a tag color class.

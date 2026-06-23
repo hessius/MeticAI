@@ -7,6 +7,7 @@ import { CapacitorHttp } from '@capacitor/core'
 import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './directModeHttp'
 import { deriveStructuralTags } from '@/lib/profileAnalysis'
 import type { AnalyzableProfile } from '@/lib/profileAnalysis'
+import { AI_TAGS_PROMPT, parseAiTags, stripTagsLine } from '@/lib/tags'
 import {
   addDirectDialInIteration,
   clearDirectHistory,
@@ -907,6 +908,7 @@ export function installDirectModeInterceptor(): void {
         in_history: true,
         has_description: !!(p.display?.description || p.display?.shortDescription),
         derived_tags: deriveStructuralTags(p as AnalyzableProfile),
+        ai_tags: _aiTagsCache.get(p.name) ?? [],
       }))
     }
     try { localStorage.setItem(PROFILE_LIST_CACHE_KEY, JSON.stringify(result)) } catch { /* ignore */ }
@@ -952,6 +954,29 @@ export function installDirectModeInterceptor(): void {
       const obj: Record<string, string> = {}
       _descriptionCache.forEach((v, k) => { obj[k] = v })
       localStorage.setItem(DESC_CACHE_KEY, JSON.stringify(obj))
+    } catch { /* ignore */ }
+  }
+
+  // ── AI sensory-tag overlay cache (#400) ───────────────────────────────────
+  // Stores AI-inferred sensory tags keyed by profile, persisted alongside the
+  // description overlay and surfaced in the catalogue next to derived_tags.
+  const AI_TAGS_CACHE_KEY = STORAGE_KEYS.AI_TAGS_CACHE
+  const _aiTagsCache = new Map<string, string[]>()
+  try {
+    const stored = localStorage.getItem(AI_TAGS_CACHE_KEY)
+    if (stored) {
+      const parsed: Record<string, string[]> = JSON.parse(stored)
+      for (const [k, v] of Object.entries(parsed)) {
+        if (Array.isArray(v)) _aiTagsCache.set(k, v)
+      }
+    }
+  } catch { /* ignore */ }
+
+  function _persistAiTagsCache() {
+    try {
+      const obj: Record<string, string[]> = {}
+      _aiTagsCache.forEach((v, k) => { obj[k] = v })
+      localStorage.setItem(AI_TAGS_CACHE_KEY, JSON.stringify(obj))
     } catch { /* ignore */ }
   }
 
@@ -3617,14 +3642,20 @@ Rules for recommendations:
           if (aiService.isConfigured()) {
             try {
               const resolvedName = (profileJson as {name?: string}).name || profileName || 'Unknown Profile'
-              const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]`
+              const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]${AI_TAGS_PROMPT}`
               const response = await getActiveProvider().generateText({
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
               }) as { text?: string }
-              const description = response.text?.trim()
-              if (description && !description.includes('generated without AI')) {
+              const rawText = response.text?.trim()
+              if (rawText && !rawText.includes('generated without AI')) {
+                const aiTags = parseAiTags(rawText)
+                const description = stripTagsLine(rawText)
                 _descriptionCache.set(profileName, description)
                 _persistDescriptionCache()
+                if (aiTags.length) {
+                  _aiTagsCache.set(profileName, aiTags)
+                  _persistAiTagsCache()
+                }
                 return jsonResponse({ status: 'success', description })
               }
             } catch { /* AI generation failed — fall back to static */ }

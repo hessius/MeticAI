@@ -9,12 +9,97 @@ This module provides shot analysis functionality including:
 """
 
 import json
+import re
 from typing import Any, Optional
 
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
 from logging_config import get_logger
 
 logger = get_logger()
+
+# Sensory tag vocabulary the AI may infer during description generation (#400).
+# Mirrors apps/web/src/lib/tags.ts AI_TAG_LABELS (body / flavor / mouthfeel /
+# roast / characteristic categories). Structural / temperature / weight /
+# pressure tags are derived deterministically elsewhere, not requested here.
+AI_TAG_LABELS = [
+    "Light Body",
+    "Medium Body",
+    "Heavy Body",
+    "Florals",
+    "Acidity",
+    "Fruitiness",
+    "Chocolate",
+    "Nutty",
+    "Caramel",
+    "Berry",
+    "Citrus",
+    "Funky",
+    "Thin",
+    "Mouthfeel",
+    "Creamy",
+    "Syrupy",
+    "Light Roast",
+    "Medium Roast",
+    "Dark Roast",
+    "Sweet",
+    "Balanced",
+]
+
+_AI_TAG_LOOKUP = {label.lower(): label for label in AI_TAG_LABELS}
+
+# Instruction appended to AI description prompts to request sensory tags (#400).
+_AI_TAGS_PROMPT = (
+    "\n\nFinally, on a separate last line, output:\n"
+    "Tags: [comma-separated subset of EXACTLY these labels that match the "
+    "coffee's likely sensory profile, or leave empty if unsure: "
+    + ", ".join(AI_TAG_LABELS)
+    + "]\nOnly use labels from that list; do not invent new ones."
+)
+
+_TAGS_LINE_RE = re.compile(r"^[ \t]*Tags:[ \t]*(.*)$", re.IGNORECASE | re.MULTILINE)
+
+
+def parse_ai_tags(text: Optional[str]) -> list[str]:
+    """Extract and validate sensory tags from a description's ``Tags:`` line."""
+    if not text:
+        return []
+    match = _TAGS_LINE_RE.search(text)
+    if not match:
+        return []
+    result: list[str] = []
+    seen: set[str] = set()
+    for raw in match.group(1).split(","):
+        candidate = raw.strip().rstrip(".").strip()
+        canonical = _AI_TAG_LOOKUP.get(candidate.lower())
+        if canonical and canonical not in seen:
+            seen.add(canonical)
+            result.append(canonical)
+    return result
+
+
+def strip_tags_line(text: str) -> str:
+    """Remove the trailing ``Tags:`` line from a generated description body."""
+    if not text:
+        return text
+    return re.sub(r"[ \t]*$", "", _TAGS_LINE_RE.sub("", text)).rstrip()
+
+
+class DescriptionResult(str):
+    """A profile description string that also carries inferred AI sensory tags.
+
+    Subclassing ``str`` keeps the existing call sites (which treat the return
+    value as a plain description and JSON-serialize it) working unchanged, while
+    exposing parsed tags via ``.ai_tags`` for the regenerate endpoint that
+    persists them. Static fallbacks return a plain ``str``, so consumers that
+    need the tags must use ``getattr(value, "ai_tags", [])``.
+    """
+
+    ai_tags: list[str]
+
+    def __new__(cls, value: str, ai_tags: Optional[list[str]] = None):
+        obj = super().__new__(cls, value)
+        obj.ai_tags = ai_tags or []
+        return obj
 
 # Constants
 STAGE_STATUS_RETRACTING = "retracting"
@@ -1491,12 +1576,14 @@ Special Notes:
 
 Be concise but informative. Focus on actionable barista guidance."""
 
+    prompt += _AI_TAGS_PROMPT
+
     try:
         model = get_vision_model()
         response = await model.async_generate_content(prompt)
         text = getattr(response, "text", "") if response else ""
         if text and text.strip():
-            return text.strip()
+            return DescriptionResult(strip_tags_line(text.strip()), parse_ai_tags(text))
     except ValueError:
         logger.info(
             "Gemini API key not configured, using static profile description fallback",

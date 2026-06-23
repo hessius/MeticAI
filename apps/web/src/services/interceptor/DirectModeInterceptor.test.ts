@@ -950,6 +950,23 @@ describe('DirectModeInterceptor regression harness', () => {
       expect(body.profiles[0]).not.toHaveProperty('profile')
     })
 
+    it('surfaces cached AI sensory tags on /api/machine/profiles (#400)', async () => {
+      localStorage.setItem(
+        STORAGE_KEYS.AI_TAGS_CACHE,
+        JSON.stringify({ 'Turbo Bloom': ['Chocolate', 'Sweet'] }),
+      )
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': nestedMachineProfiles(),
+      }))
+
+      const response = await window.fetch('/api/machine/profiles')
+      const body = await readJson<{ profiles: Array<{ name: string; ai_tags?: string[] }> }>(response)
+      const turbo = body.profiles.find((p) => p.name === 'Turbo Bloom')
+      const choco = body.profiles.find((p) => p.name === 'Chocolate Cruise')
+      expect(turbo?.ai_tags).toEqual(['Chocolate', 'Sweet'])
+      expect(choco?.ai_tags).toEqual([])
+    })
+
     it('applies variable overrides and runs the profile via ephemeral load', async () => {
       const profileData = nestedMachineProfiles()[0].profile
       installInterceptor(createMachineFetch({
