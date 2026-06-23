@@ -1246,6 +1246,65 @@ describe('DirectModeInterceptor regression harness', () => {
       )
     })
 
+    it('fetches full stages + variables by id when the profile list omits them', async () => {
+      // Real machines return profile/list entries without full stage data, so
+      // the pre-shot breakdown and auto-generated description must fall back to
+      // the get-by-id endpoint. The list here intentionally has empty stages.
+      const listWithoutStages = [
+        {
+          change_id: 'change-1',
+          profile: {
+            id: 'profile-1',
+            name: 'Turbo Bloom',
+            author: 'MeticAI',
+            author_id: 'author-1',
+            previous_authors: [],
+            display: { description: 'Bright fruit profile' },
+            temperature: 93,
+            final_weight: 36,
+            variables: [],
+            stages: [],
+          },
+        },
+      ] as unknown as ProfileIdent[]
+
+      const fullProfile = {
+        id: 'profile-1',
+        name: 'Turbo Bloom',
+        temperature: 93,
+        final_weight: 36,
+        variables: [{ name: 'dose', key: 'dose', value: 18 }],
+        stages: [
+          {
+            name: 'Bloom',
+            type: 'flow',
+            key: 'flow_bloom',
+            dynamics: { points: [[0, 2.1]], over: 'time', interpolation: 'linear' },
+            exit_triggers: [],
+            limits: [],
+          },
+        ],
+      }
+
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': listWithoutStages,
+        'GET /api/v1/profile/get/profile-1': fullProfile,
+      }))
+
+      const response = await window.fetch('/api/profile/Turbo%20Bloom?include_stages=true')
+      expect(response.status).toBe(200)
+      const body = await readJson<{
+        status: string
+        profile: { stages: Array<Record<string, unknown>>; variables: Array<Record<string, unknown>> }
+      }>(response)
+      expect(body.profile.stages).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: 'Bloom' })]),
+      )
+      expect(body.profile.variables).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: 'dose' })]),
+      )
+    })
+
     it('renders a short dynamics ramp over real time instead of compressing it to instant (#483)', async () => {
       const rampProfile = [
         {

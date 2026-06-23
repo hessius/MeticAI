@@ -2176,8 +2176,25 @@ export function installDirectModeInterceptor(): void {
           display: profile.display,
         }
         if (includeStages) {
-          responseProfile.stages = profile.stages ?? []
-          responseProfile.variables = profile.variables ?? []
+          // The list cache (_findProfileByName) frequently omits stages and
+          // variables, which left the pre-shot breakdown empty and forced the
+          // auto-description to a generic fallback. Fetch the full profile by id
+          // when the cached copy lacks stages so the breakdown + summary match
+          // the server runtime.
+          let stages = Array.isArray(profile.stages) ? profile.stages : []
+          let variables = Array.isArray(profile.variables) ? profile.variables : []
+          if (stages.length === 0) {
+            try {
+              const fullResp = await _fetch(`/api/v1/profile/get/${profile.id}`)
+              if (fullResp.ok) {
+                const full = await fullResp.json() as CachedProfile
+                if (Array.isArray(full?.stages)) stages = full.stages
+                if (Array.isArray(full?.variables)) variables = full.variables
+              }
+            } catch { /* fall back to the cached profile */ }
+          }
+          responseProfile.stages = stages
+          responseProfile.variables = variables
         }
         return jsonResponse({ status: 'success', profile: responseProfile })
       })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to get profile info' }, 500))

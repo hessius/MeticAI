@@ -59,6 +59,25 @@ describe('ReplayScrubber', () => {
     expect(onScrubEnd).toHaveBeenCalled()
   })
 
+  it('does not start a scrub (pause playback) on non-scrubbing keys like Tab', () => {
+    const onScrubStart = vi.fn()
+    const onScrubEnd = vi.fn()
+    render(
+      <ReplayScrubber
+        value={2}
+        max={10}
+        onChange={() => {}}
+        onScrubStart={onScrubStart}
+        onScrubEnd={onScrubEnd}
+      />
+    )
+    const slider = screen.getByRole('slider')
+    fireEvent.keyDown(slider, { key: 'Tab' })
+    fireEvent.keyDown(slider, { key: 'Shift' })
+    expect(onScrubStart).not.toHaveBeenCalled()
+    expect(onScrubEnd).not.toHaveBeenCalled()
+  })
+
   it('fires onScrubStart once across a single pointer interaction', () => {
     const onScrubStart = vi.fn()
     const onChange = vi.fn()

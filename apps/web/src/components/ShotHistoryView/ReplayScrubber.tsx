@@ -74,7 +74,15 @@ export function ReplayScrubber({
           startInteraction()
         }}
         onPointerUp={() => endInteraction(true)}
-        onKeyDown={startInteraction}
+        onKeyDown={(e) => {
+          // Only treat value-changing keys as a scrub; plain Tab/Shift/etc.
+          // must not pause playback (they never emit a matching commit).
+          const scrubKeys = [
+            'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+            'Home', 'End', 'PageUp', 'PageDown',
+          ]
+          if (scrubKeys.includes(e.key)) startInteraction()
+        }}
         onValueChange={(values) => {
           onChange(Math.min(Math.max(values[0], 0), max))
         }}

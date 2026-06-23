@@ -288,13 +288,14 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
     headTempVal != null &&
     targetTempVal != null &&
     Math.abs(headTempVal - targetTempVal) <= TEMP_ON_TARGET_THRESHOLD
-  // Accumulate a rolling temperature window only while actively heating. The
+  // Accumulate a rolling temperature window throughout the heating *and* ready
+  // phases so the temperature chart stays populated once target is reached. The
   // machine's preheat countdown (when present) drives sampling through plateaus
   // where the head temp briefly stops changing near target.
   const heatingSamples = useHeatingSamples({
     temp: headTempVal ?? 0,
     chamber: chamberTempVal ?? undefined,
-    active: isHeatingPhase && !isReadyState,
+    active: isHeatingPhase,
     // Treat a 0 countdown as absent so temperature changes still drive sampling
     // near end-of-heat (0 would otherwise pin the hook's effect dependency).
     tick: ms.preheat_countdown || undefined,
