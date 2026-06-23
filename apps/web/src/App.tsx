@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, Suspense, lazy } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, Suspense, lazy } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,8 @@ import { cleanProfileName } from '@/components/MarkdownText'
 import { domToPng } from 'modern-screenshot'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
+import { notify, setHomeActive, isHomeActive } from '@/lib/notify'
+import { subscribeIslandNotifications, type IslandNotification } from '@/lib/islandNotifications'
 import { QRCodeDialog } from '@/components/QRCodeDialog'
 import { useIsDesktop } from '@/hooks/use-desktop'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -299,7 +301,7 @@ function App() {
         const data = await response.json()
         const total = (data.imported_count || 0) + (data.updated_count || 0)
         if (total > 0) {
-          toast.success(
+          notify.success(
             t('profileCatalogue.sync.autoSyncComplete', {
               imported: data.imported_count || 0,
               updated: data.updated_count || 0,
@@ -360,8 +362,12 @@ function App() {
     ) {
       notifyPreheatComplete()
       playMachineReady()
+      // Surface an in-app Dynamic Island notification when the machine becomes
+      // ready while the user is watching the home screen (#439). Off-home this
+      // is skipped — the sound + backgrounded OS notification already cover it.
+      if (isHomeActive()) notify.success(t('notifications.machineReady'))
     }
-  }, [machineState.state, notifyPreheatComplete, playMachineReady])
+  }, [machineState.state, notifyPreheatComplete, playMachineReady, t])
 
   // WKWebView layout fix: force reflow when app resumes from background.
   // iPadOS WKWebView can fail to recompute CSS grid after backgrounding.
@@ -392,8 +398,24 @@ function App() {
   const playIslandExpandRef = useRef(playIslandExpand)
   useEffect(() => { playIslandExpandRef.current = playIslandExpand }, [playIslandExpand])
 
+  // In-app Dynamic Island notification (#439): when active, the island shows the
+  // notification (tinted by tone) instead of the smart greeting, then restores
+  // the greeting once it dismisses.
+  const [islandNote, setIslandNote] = useState<IslandNotification | null>(null)
+  useEffect(() => subscribeIslandNotifications(setIslandNote), [])
+
+  // Keep the notification router aware of whether the home screen is active so
+  // it can route toasts into the island vs. the standard toast system.
+  useEffect(() => { setHomeActive(isHome) }, [isHome])
+
   useEffect(() => {
-    if (isHome && smartGreeting) {
+    if (islandNote) {
+      // A notification takes over the island immediately, fully expanded.
+      if (islandTimerRef.current) { clearTimeout(islandTimerRef.current); islandTimerRef.current = null }
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- expand to show notification
+      setIslandExpanded(true)
+      playIslandExpandRef.current()
+    } else if (isHome && smartGreeting) {
       islandTimerRef.current = setTimeout(() => { setIslandExpanded(true); playIslandExpandRef.current() }, 3000)
     } else {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset when leaving home
@@ -401,7 +423,7 @@ function App() {
     }
     return () => { if (islandTimerRef.current) clearTimeout(islandTimerRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHome, smartGreeting])
+  }, [isHome, smartGreeting, islandNote])
 
   // Detect vertical text overflow and enable scroll animation
   useEffect(() => {
@@ -437,7 +459,7 @@ function App() {
       clearTimeout(timer)
       observer.disconnect()
     }
-  }, [islandExpanded, smartGreeting])
+  }, [islandExpanded, smartGreeting, islandNote])
 
   const toggleIsland = useCallback(() => {
     if (islandTimerRef.current) { clearTimeout(islandTimerRef.current); islandTimerRef.current = null }
@@ -446,6 +468,23 @@ function App() {
       return !prev
     })
   }, [playIslandExpand, playIslandContract])
+
+  // Derived island display: a notification (#439) takes precedence over the
+  // smart greeting. Notifications are non-interactive (auto-dismiss) and carry
+  // no action chevron; the greeting remains tappable to toggle.
+  const islandMessage = islandNote?.message ?? smartGreeting?.message
+  const islandAction = islandNote ? undefined : smartGreeting?.action
+  const islandHasContent = !!(islandNote || smartGreeting)
+  const islandToggleable = !islandNote && !!smartGreeting
+  const islandTint = useMemo(() => {
+    if (!islandNote) return null
+    switch (islandNote.tone) {
+      case 'success': return { bg: 'rgba(16,185,129,0.20)', border: 'rgba(16,185,129,0.45)' }
+      case 'warning': return { bg: 'rgba(245,158,11,0.20)', border: 'rgba(245,158,11,0.45)' }
+      case 'error': return { bg: 'rgba(239,68,68,0.20)', border: 'rgba(239,68,68,0.45)' }
+      default: return { bg: 'rgba(59,130,246,0.18)', border: 'rgba(59,130,246,0.45)' }
+    }
+  }, [islandNote])
 
   // Check for existing profiles on mount
   useEffect(() => {
@@ -1299,23 +1338,23 @@ function App() {
             <div className="flex items-center justify-center">
               {/* Dynamic Island — circle→pill CSS transition */}
               <div
-                  className={`inline-flex items-center select-none${!islandExpanded && smartGreeting ? ' cursor-pointer' : ''}`}
+                  className={`inline-flex items-center select-none${!islandExpanded && islandToggleable ? ' cursor-pointer' : ''}`}
                   data-sound="none"
-                  onClick={!islandExpanded && smartGreeting ? toggleIsland : undefined}
-                  role={!islandExpanded && smartGreeting ? 'button' : undefined}
-                  tabIndex={!islandExpanded && smartGreeting ? 0 : undefined}
-                  onKeyDown={!islandExpanded && smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
+                  onClick={!islandExpanded && islandToggleable ? toggleIsland : undefined}
+                  role={!islandExpanded && islandToggleable ? 'button' : undefined}
+                  tabIndex={!islandExpanded && islandToggleable ? 0 : undefined}
+                  onKeyDown={!islandExpanded && islandToggleable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
                   style={{
                     height: islandExpanded ? 48 : 40,
                     width: islandExpanded ? 'min(20rem, calc(100vw - 7rem))' : 40,
                     background: islandExpanded
-                      ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.75)')
+                      ? (islandTint ? islandTint.bg : (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.75)'))
                       : 'transparent',
                     backdropFilter: islandExpanded ? (isDark ? 'none' : 'blur(16px) saturate(1.4)') : 'none',
                     WebkitBackdropFilter: islandExpanded ? (isDark ? 'none' : 'blur(16px) saturate(1.4)') : 'none',
                     borderRadius: 9999,
                     border: islandExpanded
-                      ? (isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.08)')
+                      ? (islandTint ? `1px solid ${islandTint.border}` : (isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.08)'))
                       : '1px solid transparent',
                     padding: islandExpanded ? '4px 4px 4px 4px' : '0',
                     overflow: 'hidden',
@@ -1328,14 +1367,14 @@ function App() {
                     type="button"
                     data-sound="none"
                     className="shrink-0 flex items-center justify-center bg-transparent border-none p-0"
-                    onClick={islandExpanded ? (e) => { e.stopPropagation(); toggleIsland() } : undefined}
-                    tabIndex={islandExpanded ? 0 : -1}
-                    aria-label={islandExpanded ? t('a11y.collapseGreeting', 'Collapse greeting') : t('a11y.appLogo', 'Metic logo')}
-                    aria-hidden={islandExpanded ? undefined : true}
+                    onClick={islandExpanded && islandToggleable ? (e) => { e.stopPropagation(); toggleIsland() } : undefined}
+                    tabIndex={islandExpanded && islandToggleable ? 0 : -1}
+                    aria-label={islandExpanded && islandToggleable ? t('a11y.collapseGreeting', 'Collapse greeting') : t('a11y.appLogo', 'Metic logo')}
+                    aria-hidden={islandExpanded && islandToggleable ? undefined : true}
                     style={{
                       width: 32,
                       height: 32,
-                      cursor: islandExpanded ? 'pointer' : 'default',
+                      cursor: islandExpanded && islandToggleable ? 'pointer' : 'default',
                       transition: 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
                       transform: islandExpanded ? 'scale(0.85)' : 'scale(1)',
                     }}
@@ -1352,8 +1391,8 @@ function App() {
                     />
                   </button>
 
-                  {/* Greeting text — always in DOM for smooth animation, zero-width when collapsed */}
-                  {smartGreeting && (
+                  {/* Greeting / notification text — always in DOM for smooth animation, zero-width when collapsed */}
+                  {islandHasContent && (
                     <div
                       className="min-w-0 overflow-hidden"
                       style={{
@@ -1363,26 +1402,28 @@ function App() {
                         opacity: islandExpanded ? 1 : 0,
                         transition: 'flex 0.45s cubic-bezier(0.32, 0.72, 0, 1), width 0.45s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.35s ease 0.25s, margin-left 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
                         pointerEvents: islandExpanded ? 'auto' : 'none',
-                        maskImage: islandExpanded && !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
-                        WebkitMaskImage: islandExpanded && !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
+                        maskImage: islandExpanded && !islandAction ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
+                        WebkitMaskImage: islandExpanded && !islandAction ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
                       }}
                     >
                       <div
                         ref={greetingTextRef as React.RefObject<HTMLDivElement>}
                         className={`text-xs island-greeting-text${isScrollActive ? ' island-scroll-active' : ''} ${isDark ? 'text-white/85' : 'text-foreground/80'}`}
+                        role={islandNote ? 'status' : undefined}
+                        aria-live={islandNote ? 'polite' : undefined}
                       >
-                        <span ref={greetingInnerRef as React.RefObject<HTMLSpanElement>} className="island-marquee-inner">{smartGreeting.message}</span>
+                        <span ref={greetingInnerRef as React.RefObject<HTMLSpanElement>} className="island-marquee-inner">{islandMessage}</span>
                       </div>
                     </div>
                   )}
 
                   {/* Action button — circular chevron on the right */}
-                  {smartGreeting?.action && islandExpanded && (
+                  {islandAction && islandExpanded && (
                     <button
                       type="button"
                       className={`shrink-0 flex items-center justify-center rounded-full transition-all ${isDark ? 'bg-white/10 hover:bg-white/20 text-white/80' : 'bg-black/5 hover:bg-black/10 text-foreground/60'}`}
-                      onClick={(e) => { e.stopPropagation(); handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context) }}
-                      aria-label={smartGreeting.action.label}
+                      onClick={(e) => { e.stopPropagation(); handleGreetingAction(islandAction.target, islandAction.context) }}
+                      aria-label={islandAction.label}
                       style={{
                         width: 32,
                         height: 32,
