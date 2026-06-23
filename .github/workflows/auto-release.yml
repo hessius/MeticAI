@@ -134,5 +134,13 @@ jobs:
           done
           
           gh workflow run build-publish.yml --ref "$VERSION"
+
+          # The release was published with the default GITHUB_TOKEN, which by
+          # design does NOT trigger the `release: published` event on other
+          # workflows. Dispatch the Android release build explicitly (same
+          # workaround used for build-publish above) so the signed APK is
+          # built and uploaded automatically.
+          echo "🤖 Triggering release-android workflow for tag $VERSION"
+          gh workflow run release-android.yml --ref "$VERSION" -f tag="$VERSION"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
