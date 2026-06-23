@@ -428,6 +428,8 @@
     "configuration": "Configuration",
     "loadingSettings": "Loading settings...",
     "geminiApiKey": "Gemini API Key",
+    "aiProvider": "AI Provider",
+    "aiProviderImageHint": "This provider supports text features only. Image generation requires a Gemini key.",
     "configured": "Configured",
     "apiKeyPlaceholder": "Enter your Gemini API key",
     "apiKeyPlaceholderNew": "Enter new key to change",

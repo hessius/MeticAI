@@ -421,6 +421,8 @@
     "configuration": "Configuration",
     "loadingSettings": "Chargement des paramètres...",
     "geminiApiKey": "Clé API Gemini",
+    "aiProvider": "Fournisseur d'IA",
+    "aiProviderImageHint": "Ce fournisseur ne prend en charge que les fonctions de texte. La génération d'images nécessite une clé Gemini.",
     "configured": "Configurée",
     "apiKeyPlaceholder": "Entrez votre clé API Gemini",
     "apiKeyPlaceholderNew": "Entrez une nouvelle clé pour modifier",

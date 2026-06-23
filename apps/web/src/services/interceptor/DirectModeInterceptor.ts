@@ -1,6 +1,6 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
-import { getActiveProvider } from '@/services/ai/providers'
+import { getActiveProvider, getProviderModel } from '@/services/ai/providers'
 import { retryWithBackoff, formatGeminiError } from '@/services/ai/retryUtils'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { CapacitorHttp } from '@capacitor/core'
@@ -3679,7 +3679,6 @@ Rules for recommendations:
     if (url.match(/\/api\/available-models$/)) {
       return (async () => {
         const provider = getActiveProvider()
-        const { getProviderModel } = await import('../ai/providers')
         const currentModel = getProviderModel()
         try {
           if (provider.isConfigured()) {

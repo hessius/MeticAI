@@ -421,6 +421,8 @@
     "configuration": "Konfiguration",
     "loadingSettings": "Laddar inställningar...",
     "geminiApiKey": "Gemini API-nyckel",
+    "aiProvider": "AI-leverantör",
+    "aiProviderImageHint": "Den här leverantören stöder endast textfunktioner. Bildgenerering kräver en Gemini-nyckel.",
     "configured": "Konfigurerad",
     "apiKeyPlaceholder": "Ange din Gemini API-nyckel",
     "apiKeyPlaceholderNew": "Ange ny nyckel för att ändra",

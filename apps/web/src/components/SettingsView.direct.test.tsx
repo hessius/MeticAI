@@ -332,4 +332,66 @@ describe('SettingsView direct-mode backend guards', () => {
     await waitFor(() => expect(screen.queryByText('settings.loadingSettings')).not.toBeInTheDocument())
     expect(await screen.findByLabelText('settings.meticulousIp')).toHaveValue('meticulous.local')
   })
+
+  it('switches AI provider and stores the key under the provider-scoped slot', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ models: [] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await act(async () => {
+      render(<SettingsView onBack={() => {}} />)
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'settings.aiSettings' }))
+    })
+
+    const providerSelect = await screen.findByLabelText('settings.aiProvider')
+    expect(providerSelect).toHaveValue('gemini')
+
+    await act(async () => {
+      fireEvent.change(providerSelect, { target: { value: 'deepseek' } })
+    })
+    expect(localStorage.getItem(STORAGE_KEYS.AI_PROVIDER)).toBe('deepseek')
+    // DeepSeek is text-only → the image-capability hint is shown.
+    expect(screen.getByText('settings.aiProviderImageHint')).toBeInTheDocument()
+
+    const keyInput = await screen.findByLabelText('settings.geminiApiKey')
+    fireEvent.change(keyInput, { target: { value: 'sk-deepseek-test' } })
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 850))
+    })
+
+    expect(localStorage.getItem(`${STORAGE_KEYS.AI_KEY_PREFIX}deepseek`)).toBe('sk-deepseek-test')
+    expect(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)).toBeNull()
+  })
+
+  it('auto-detects the provider from a pasted key prefix', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ models: [] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await act(async () => {
+      render(<SettingsView onBack={() => {}} />)
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'settings.aiSettings' }))
+    })
+
+    const keyInput = await screen.findByLabelText('settings.geminiApiKey')
+    await act(async () => {
+      fireEvent.change(keyInput, { target: { value: 'sk-or-v1-routerkey' } })
+    })
+
+    expect(localStorage.getItem(STORAGE_KEYS.AI_PROVIDER)).toBe('openrouter')
+    expect(await screen.findByLabelText('settings.aiProvider')).toHaveValue('openrouter')
+  })
 })
