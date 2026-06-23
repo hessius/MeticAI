@@ -7,6 +7,9 @@ export type AIErrorCode =
   | 'SERVICE_UNAVAILABLE'
   | 'IMAGE_GENERATION_FAILED'
   | 'IMAGE_NO_DATA'
+  | 'LOCAL_UNAVAILABLE'
+  | 'LOCAL_VISION_UNSUPPORTED'
+  | 'LOCAL_TIMEOUT'
   | 'UNKNOWN'
 
 export class AIServiceError extends Error {

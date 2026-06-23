@@ -10,8 +10,9 @@
 
 import { STORAGE_KEYS } from '@/lib/constants'
 import type { ProviderCapabilities } from './AIProvider'
+import { isLocalLLMSupported } from './localLLM'
 
-export type ProviderId = 'gemini' | 'openai' | 'deepseek' | 'kimi' | 'openrouter'
+export type ProviderId = 'gemini' | 'openai' | 'deepseek' | 'kimi' | 'openrouter' | 'local'
 
 export interface ProviderDescriptor {
   id: ProviderId
@@ -94,13 +95,38 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
       { id: 'anthropic/claude-3.5-sonnet', display_name: 'Claude 3.5 Sonnet', description: 'Anthropic' },
     ],
   },
+  // On-device AI (#373). No API key, no network; availability is gated by
+  // platform support (iOS 26+ / Apple Intelligence) rather than a stored key.
+  local: {
+    id: 'local',
+    label: 'On-device (Apple Intelligence)',
+    keyPrefixes: [],
+    capabilities: { text: true, vision: false, imageGen: false, jsonMode: false },
+    defaultModel: 'apple-intelligence',
+    staticModels: [
+      {
+        id: 'apple-intelligence',
+        display_name: 'Apple Intelligence',
+        description: 'On-device, private, no API key',
+      },
+    ],
+  },
 }
 
-export const PROVIDER_IDS = Object.keys(PROVIDERS) as ProviderId[]
+/** All registered provider ids (includes on-device `local`). */
+export const ALL_PROVIDER_IDS = Object.keys(PROVIDERS) as ProviderId[]
+/** Hosted (BYO-key) providers only — used for key-based detection/iteration. */
+export const HOSTED_PROVIDER_IDS = ALL_PROVIDER_IDS.filter(id => id !== 'local')
+export const PROVIDER_IDS = HOSTED_PROVIDER_IDS
 export const DEFAULT_PROVIDER: ProviderId = 'gemini'
 
+/** Provider ids the user can actually pick on this platform. */
+export function getSelectableProviderIds(): ProviderId[] {
+  return ALL_PROVIDER_IDS.filter(id => id !== 'local' || isLocalLLMSupported())
+}
+
 function isProviderId(value: string | null): value is ProviderId {
-  return !!value && (PROVIDER_IDS as string[]).includes(value)
+  return !!value && (ALL_PROVIDER_IDS as string[]).includes(value)
 }
 
 /**
@@ -122,7 +148,11 @@ export function detectProviderFromKey(key: string): ProviderId | null {
 export function getActiveProviderId(): ProviderId {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.AI_PROVIDER)
-    if (isProviderId(stored)) return stored
+    if (isProviderId(stored)) {
+      // A stored on-device selection is only honoured where supported.
+      if (stored === 'local' && !isLocalLLMSupported()) return DEFAULT_PROVIDER
+      return stored
+    }
   } catch {
     /* ignore */
   }

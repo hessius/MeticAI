@@ -9,6 +9,8 @@ import {
   detectProviderFromKey,
   getActiveProviderId,
   getProviderApiKey,
+  getSelectableProviderIds,
+  HOSTED_PROVIDER_IDS,
   setActiveProviderId,
   setProviderApiKey,
   setProviderModel,
@@ -50,6 +52,36 @@ describe('provider config storage', () => {
     setProviderApiKey('openai', 'sk-openai')
     expect(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)).toBeNull()
     expect(getProviderApiKey('openai')).toBe('sk-openai')
+  })
+
+  it('falls back from a stored on-device selection on unsupported platforms', () => {
+    // jsdom is not native iOS → local is unsupported.
+    setActiveProviderId('local')
+    expect(getActiveProviderId()).toBe('gemini')
+  })
+})
+
+describe('getSelectableProviderIds', () => {
+  it('excludes on-device local where unsupported (web/jsdom)', () => {
+    expect(getSelectableProviderIds()).not.toContain('local')
+    expect(getSelectableProviderIds()).toContain('gemini')
+  })
+})
+
+describe('local provider registry entry', () => {
+  it('registers a text-only, keyless on-device descriptor', () => {
+    expect(PROVIDERS.local.capabilities).toEqual({
+      text: true,
+      vision: false,
+      imageGen: false,
+      jsonMode: false,
+    })
+    expect(PROVIDERS.local.keyPrefixes).toEqual([])
+    expect(HOSTED_PROVIDER_IDS).not.toContain('local')
+  })
+
+  it('resolves the LocalLLMProvider implementation for id "local"', () => {
+    expect(getProvider('local').id).toBe('local')
   })
 })
 

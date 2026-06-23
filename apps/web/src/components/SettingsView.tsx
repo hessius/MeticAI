@@ -39,12 +39,13 @@ import { isDirectMode, isDemoMode, isNativePlatform, getDefaultMachineUrl } from
 import { STORAGE_KEYS } from '@/lib/constants'
 import {
   PROVIDERS,
-  PROVIDER_IDS,
+  getSelectableProviderIds,
   getActiveProviderId,
   setActiveProviderId,
   apiKeyStorageKey,
   modelStorageKey,
   detectProviderFromKey,
+  refreshLocalReadiness,
   type ProviderId,
 } from '@/services/ai/providers'
 import { persistMachineUrl } from '@/services/machine/machineUrl'
@@ -156,6 +157,8 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     mqttEnabled: true
   })
   const [aiProvider, setAiProviderState] = useState<ProviderId>(getActiveProviderId())
+  const [localReadiness, setLocalReadiness] = useState<{ ready: boolean; readiness: string } | null>(null)
+  const [localChecking, setLocalChecking] = useState(false)
   const [isRestarting, setIsRestarting] = useState(false)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
   const [restartStatus, setRestartStatus] = useState<'idle' | 'success' | 'error'>('idle')
@@ -627,6 +630,24 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     })()
     return () => { cancelled = true }
   }, [aiProvider])
+
+  const checkLocalReadiness = useCallback(async () => {
+    setLocalChecking(true)
+    try {
+      const result = await refreshLocalReadiness()
+      setLocalReadiness(result)
+    } finally {
+      setLocalChecking(false)
+    }
+  }, [])
+
+  // Probe on-device AI availability whenever the on-device provider is active.
+  useEffect(() => {
+    if (aiProvider !== 'local') return
+    void (async () => {
+      await checkLocalReadiness()
+    })()
+  }, [aiProvider, checkLocalReadiness])
 
   const handleDetectMachine = async () => {
     setIsDetecting(true)
@@ -1228,17 +1249,52 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                   onChange={(e) => handleProviderChange(e.target.value as ProviderId)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
-                  {PROVIDER_IDS.map((id) => (
-                    <option key={id} value={id}>{PROVIDERS[id].label}</option>
+                  {getSelectableProviderIds().map((id) => (
+                    <option key={id} value={id}>
+                      {id === 'local' ? t('settings.aiProviderLocal') : PROVIDERS[id].label}
+                    </option>
                   ))}
                 </select>
-                {!PROVIDERS[aiProvider].capabilities.imageGen && (
+                {aiProvider !== 'local' && !PROVIDERS[aiProvider].capabilities.imageGen && (
                   <p className="text-xs text-muted-foreground">
                     {t('settings.aiProviderImageHint')}
                   </p>
                 )}
               </div>
 
+              {aiProvider === 'local' ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">{t('settings.localModelStatus')}</Label>
+                    <button
+                      type="button"
+                      onClick={() => void checkLocalReadiness()}
+                      disabled={localChecking}
+                      className="text-xs text-primary hover:underline flex items-center gap-1 disabled:opacity-50"
+                    >
+                      <ArrowsClockwise size={12} className={localChecking ? 'animate-spin' : ''} />
+                      {t('settings.localModelRecheck')}
+                    </button>
+                  </div>
+                  <div className="rounded-md border border-input bg-background px-3 py-2 text-sm flex items-center gap-2">
+                    {localChecking ? (
+                      <span className="text-muted-foreground">{t('settings.localModelChecking')}</span>
+                    ) : localReadiness?.ready ? (
+                      <span className="text-success flex items-center gap-1">
+                        <CheckCircle size={14} weight="fill" />
+                        {t('settings.localModelReady')}
+                      </span>
+                    ) : (
+                      <span className="text-amber-500 flex items-center gap-1">
+                        <Warning size={14} weight="fill" />
+                        {t('settings.localModelUnavailable')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('settings.localModelDescription')}</p>
+                </div>
+              ) : (
+              <>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="apiKey" className="text-sm font-medium">
@@ -1331,6 +1387,8 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                       : t('settings.geminiModelDescription')}
                 </p>
               </div>
+              </>
+              )}
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">

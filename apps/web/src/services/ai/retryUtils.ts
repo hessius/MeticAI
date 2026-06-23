@@ -44,6 +44,11 @@ export async function retryWithBackoff<T>(
 
 /** Map a raw Gemini error to a user-friendly message */
 export function formatGeminiError(err: unknown): string {
+  if (err instanceof AIServiceError) {
+    if (err.code === 'LOCAL_VISION_UNSUPPORTED') return i18n.t('error.localVisionUnsupported')
+    if (err.code === 'LOCAL_UNAVAILABLE') return i18n.t('error.localUnavailable')
+    if (err.code === 'LOCAL_TIMEOUT') return i18n.t('error.localTimeout')
+  }
   const raw = err instanceof Error ? err.message : String(err)
   if (raw.includes('503') || raw.includes('UNAVAILABLE') || raw.includes('overloaded'))
     return i18n.t('error.aiModelUnavailable')
