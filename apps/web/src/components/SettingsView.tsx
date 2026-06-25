@@ -141,7 +141,7 @@ function normalizeMachineUrl(value: string): string | null {
 
 export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem, onNavigateToStatus }: SettingsViewProps) {
   const { t } = useTranslation()
-  const { getItem: secureGetItem, setItem: secureSetItem } = useSecureStorage()
+  const { getItem: secureGetItem, setItem: secureSetItem, removeItem: secureRemoveItem } = useSecureStorage()
   const { authenticate: biometricAuth } = useBiometrics()
   const { copyToClipboard } = useClipboard()
   const { toggleOn: playToggleOn, toggleOff: playToggleOff, confirmSoundToggle } = useSoundEffects()
@@ -580,6 +580,15 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           setAiProviderState(detected)
         }
       }
+      // Clearing the key field must delete the stored key from both the
+      // localStorage mirror and the secure store; otherwise debouncedSave skips
+      // the empty value and the old key reappears when switching providers back.
+      if (field === 'geminiApiKey' && value === '' && isLocalMode()) {
+        const keyStorageKey = apiKeyStorageKey(aiProvider)
+        try { localStorage.removeItem(keyStorageKey) } catch { /* non-critical */ }
+        void Promise.resolve(secureRemoveItem(keyStorageKey)).catch(() => {})
+        window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { apiKeyChanged: true } }))
+      }
       debouncedSave(next)
       return next
     })
@@ -611,6 +620,10 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     let cancelled = false
     ;(async () => {
       setModelsLoading(true)
+      // Clear any models carried over from the previous provider so the picker
+      // never shows a stale cross-provider entry (e.g. "Apple Intelligence")
+      // while the new provider's models are loading.
+      setAvailableModels([])
       try {
         const serverUrl = await getServerUrl()
         const response = await fetch(`${serverUrl}/api/available-models`)
@@ -1255,7 +1268,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     </option>
                   ))}
                 </select>
-                {aiProvider !== 'local' && !PROVIDERS[aiProvider].capabilities.imageGen && (
+                {!PROVIDERS[aiProvider].capabilities.imageGen && (
                   <p className="text-xs text-muted-foreground">
                     {t('settings.aiProviderImageHint')}
                   </p>
@@ -1357,7 +1370,11 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     disabled={modelsLoading}
                   >
-                    {availableModels.length > 0 ? (
+                    {modelsLoading ? (
+                      <option value={settings.geminiModel || 'gemini-2.5-flash'}>
+                        {t('settings.modelsLoading')}
+                      </option>
+                    ) : availableModels.length > 0 ? (
                       availableModels.map((model) => (
                         <option key={model.id} value={model.id}>
                           {model.display_name}

@@ -6,19 +6,19 @@ const TARGET = 93
 const CUTOFF = TARGET - 2.3
 
 describe('estimateTimeToReady', () => {
-  it('predicts ~3 minutes to ready from a cold (room-temp) start', () => {
+  it('predicts ~3.5 minutes to ready from a cold (room-temp) start', () => {
     const eta = estimateTimeToReady({ current: 20, target: TARGET, cutoff: CUTOFF })
     expect(eta).not.toBeNull()
-    // Calibrated so ambient → cutoff ≈ 180s.
-    expect(eta!).toBeCloseTo(180, 0)
+    // Calibrated so ambient → cutoff ≈ 210s.
+    expect(eta!).toBeCloseTo(210, 0)
   })
 
   it('predicts a much faster ready time for a hot (kettle-filled) start', () => {
     const eta = estimateTimeToReady({ current: 80, target: TARGET, cutoff: CUTOFF })
     expect(eta).not.toBeNull()
-    // ~90s faster than a cold start, matching observed boil-fill behaviour.
-    expect(eta!).toBeGreaterThan(60)
-    expect(eta!).toBeLessThan(110)
+    // Proportionally faster than a cold start, matching observed boil-fill behaviour.
+    expect(eta!).toBeGreaterThan(70)
+    expect(eta!).toBeLessThan(130)
   })
 
   it('decreases monotonically as the current temperature rises', () => {

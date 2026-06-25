@@ -146,4 +146,28 @@ describe('SettingsView native-mode API key save', () => {
       )
     })
   })
+
+  it('removes the stored key from localStorage and the Keychain when the field is cleared', async () => {
+    secureStorageMock.setItem.mockImplementation(async () => {})
+    await act(async () => {
+      render(<SettingsView onBack={() => {}} />)
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+
+    const aiSection = await screen.findByText('settings.aiSettings')
+    fireEvent.click(aiSection)
+    const input = await screen.findByLabelText('settings.geminiApiKey')
+
+    fireEvent.change(input, { target: { value: 'AIzaNATIVEKEY' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 850)) })
+    expect(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)).toBe('AIzaNATIVEKEY')
+
+    // Clearing the field must delete the stored key so it does not reappear when
+    // switching providers back and forth.
+    fireEvent.change(input, { target: { value: '' } })
+    await waitFor(() => {
+      expect(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)).toBeNull()
+    })
+    expect(secureStorageMock.removeItem).toHaveBeenCalled()
+  })
 })

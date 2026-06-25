@@ -17,8 +17,8 @@ export interface EstimateOptions {
   /** Ambient/room baseline (°C) used as the cold-start reference. Default 20. */
   ambient?: number
   /**
-   * Empirical seconds to reach `cutoff` from a cold (ambient) start. Default 180
-   * (~3 min with room-temperature water, matching observed behaviour). A hot
+   * Empirical seconds to reach `cutoff` from a cold (ambient) start. Default 210
+   * (~3.5 min with room-temperature water, matching observed behaviour). A hot
    * (kettle-filled) start lands ~90s automatically because the model is driven
    * by the current temperature, not the clock.
    */
@@ -35,7 +35,7 @@ export interface EstimateOptions {
  *   T(t) = target − (target − T0) · e^(−k·t)
  *
  * We pin k so that heating from `ambient` to `cutoff` takes `coldStartSeconds`
- * (≈180s from room temperature). The remaining time is then computed purely
+ * (≈210s from room temperature). The remaining time is then computed purely
  * from the *current* temperature's gap to target:
  *
  *   remaining = ln((target − current) / (target − cutoff)) / k
@@ -51,7 +51,7 @@ export interface EstimateOptions {
 export function estimateTimeToReady(opts: EstimateOptions): number | null {
   const { current, target, cutoff } = opts
   const ambient = opts.ambient ?? 20
-  const coldStartSeconds = opts.coldStartSeconds ?? 180
+  const coldStartSeconds = opts.coldStartSeconds ?? 210
   const maxSeconds = opts.maxSeconds ?? 900
 
   if (

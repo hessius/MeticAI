@@ -30,6 +30,7 @@ import { retryWithBackoff } from './retryUtils'
 import i18n from 'i18next'
 
 import { STORAGE_KEYS } from '@/lib/constants'
+import { lintShotAnalysis, repairShotAnalysis } from '@/lib/analysisLint'
 import { safeRandomUUID } from '@/lib/uuid'
 import { AIServiceError, type AIErrorCode as AIErrorCodeBase } from './aiErrors'
 import { getActiveProvider } from './providers'
@@ -130,15 +131,29 @@ export function createBrowserAIService(): AIService {
         request.profileDescription,
       )
 
-      const response = await retryWithBackoff(() =>
-        provider.generateText({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        })
-      )
+      const runAnalysis = () =>
+        retryWithBackoff(() =>
+          provider.generateText({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          })
+        )
+
+      // Validate the model output the same way profile generation is validated:
+      // on-device models occasionally loop a sentence dozens of times while
+      // dropping other sections. Regenerate once on malformed output, then fall
+      // back to a best-effort repair so the user still gets usable analysis.
+      const response = await runAnalysis()
+      let text = response.text
+      if (!lintShotAnalysis(text).valid) {
+        const retry = await runAnalysis()
+        text = lintShotAnalysis(retry.text).valid
+          ? retry.text
+          : repairShotAnalysis(retry.text.length >= text.length ? retry.text : text)
+      }
 
       return {
         status: 'success',
-        llm_analysis: response.text,
+        llm_analysis: text,
         cached: false,
       }
     },
