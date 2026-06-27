@@ -112,7 +112,23 @@ async function runGeneration(prompt: string, opts: GenerateOptions): Promise<str
   })
 
   const textSub = await CapgoLLM.addListener('textFromAi', (event) => {
-    if (event.chatId === chatId) text += event.text
+    if (event.chatId !== chatId) return
+    const incoming = event.text ?? ''
+    if (!incoming) return
+    // Apple Intelligence's streamResponse yields a growing *snapshot* of the
+    // full text so far on each chunk (the capgo plugin forwards Snapshot.content
+    // verbatim), whereas other engines (MediaPipe) emit incremental deltas.
+    // Detect which by prefix relationship instead of blindly appending, so
+    // cumulative snapshots don't pile up into "repeating, slowly growing" output.
+    if (incoming.length >= text.length && incoming.startsWith(text)) {
+      // Cumulative snapshot (or first chunk): replace with the fuller text.
+      text = incoming
+    } else if (text.startsWith(incoming)) {
+      // Stale/duplicate shorter snapshot — ignore.
+    } else {
+      // True incremental delta — append.
+      text += incoming
+    }
   })
   const finishSub = await CapgoLLM.addListener('aiFinished', (event) => {
     if (event.chatId === chatId) resolveDone()

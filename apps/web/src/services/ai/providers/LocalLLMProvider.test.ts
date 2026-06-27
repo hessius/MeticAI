@@ -109,6 +109,38 @@ describe('generateLocalText', () => {
       expect.objectContaining({ path: 'Apple Intelligence', engine: 'apple' }),
     )
   })
+
+  it('reconstructs cumulative snapshot streams without duplication (Apple Intelligence)', async () => {
+    // Apple Intelligence's `streamResponse` yields a growing *snapshot* of the
+    // full text so far on every chunk (not deltas). The capgo plugin forwards
+    // each snapshot's `.content` verbatim as a `textFromAi` event, so naive
+    // `+=` concatenation produces the beta-reported "repeating but slowly
+    // building up" output. The bridge must collapse snapshots to the final one.
+    const snapshots = [
+      '## 1. Shot Performance\nThe shot looks',
+      '## 1. Shot Performance\nThe shot looks balanced and well extracted.',
+      '## 1. Shot Performance\nThe shot looks balanced and well extracted.\n\n## 2. Recommendations\nTry a slightly finer grind.',
+    ]
+    CapgoLLM.sendMessage.mockImplementationOnce(async ({ chatId }: { chatId: string }) => {
+      for (const s of snapshots) {
+        listeners.textFromAi.forEach(fn => fn({ chatId, text: s, isChunk: true }))
+      }
+      listeners.aiFinished.forEach(fn => fn({ chatId }))
+    })
+    const text = await generateLocalText('Analyze this shot')
+    expect(text).toBe(snapshots[snapshots.length - 1])
+  })
+
+  it('ignores a stale shorter snapshot arriving after a longer one', async () => {
+    CapgoLLM.sendMessage.mockImplementationOnce(async ({ chatId }: { chatId: string }) => {
+      listeners.textFromAi.forEach(fn => fn({ chatId, text: 'Full answer here.' }))
+      listeners.textFromAi.forEach(fn => fn({ chatId, text: 'Full answer' }))
+      listeners.aiFinished.forEach(fn => fn({ chatId }))
+    })
+    const text = await generateLocalText('x')
+    expect(text).toBe('Full answer here.')
+  })
+
   it('removes its listeners after completion', async () => {
     await generateLocalText('Say hi')
     expect(listeners.textFromAi).toHaveLength(0)
