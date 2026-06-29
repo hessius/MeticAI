@@ -235,6 +235,51 @@ interface CombinedDataPoint {
   weightB?: number
 }
 
+// Fixed A/B values readout rendered outside the comparison plot during replay,
+// so the floating tooltip never covers the curves/legend (issue #493 follow-up).
+function CompareValuesReadout({
+  point,
+  currentTime,
+}: {
+  point?: CombinedDataPoint
+  currentTime: number
+}) {
+  const { t } = useTranslation()
+  const fmt = (v?: number) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(1) : '–')
+  const metric = (label: string, value?: number, color?: string) => (
+    <span className="flex items-center gap-1 font-medium" style={{ color }}>
+      <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+      {label}: {fmt(value)}
+    </span>
+  )
+  return (
+    <div
+      className="space-y-1 pt-1 text-xs tabular-nums"
+      role="status"
+      aria-live="polite"
+      aria-label={t('shotCharts.currentValues')}
+    >
+      <div className="flex items-center justify-center">
+        <span className="font-semibold text-foreground">
+          {t('shotCharts.tooltipTime')}: {currentTime.toFixed(1)}s
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+        <span className="font-semibold text-foreground">{t('shotCharts.shotASolid')}:</span>
+        {metric(t('shotCharts.pressure'), point?.pressureA, COMPARISON_COLORS.pressure)}
+        {metric(t('shotCharts.flow'), point?.flowA, COMPARISON_COLORS.flow)}
+        {metric(t('shotCharts.weight'), point?.weightA, COMPARISON_COLORS.weight)}
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 opacity-70">
+        <span className="font-semibold text-foreground">{t('shotCharts.shotBDashed')}:</span>
+        {metric(t('shotCharts.pressure'), point?.pressureB, COMPARISON_COLORS.pressure)}
+        {metric(t('shotCharts.flow'), point?.flowB, COMPARISON_COLORS.flow)}
+        {metric(t('shotCharts.weight'), point?.weightB, COMPARISON_COLORS.weight)}
+      </div>
+    </div>
+  )
+}
+
 interface CompareChartProps {
   combinedData: CombinedDataPoint[]
   dataMaxTime: number
@@ -290,7 +335,7 @@ export function CompareChart({
               <XAxis dataKey="time" stroke={theme.axisStroke} fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
               <YAxis yAxisId="left" stroke={theme.axisStroke} fontSize={10} domain={[0, leftDomain]} width={30} allowDataOverflow={true} />
               <YAxis yAxisId="right" orientation="right" stroke={theme.axisStroke} fontSize={10} domain={[0, rightDomain]} width={30} allowDataOverflow={true} />
-              <Tooltip content={<CustomTooltip />} />
+              {!isShowingReplay && <Tooltip content={<CustomTooltip />} />}
               <Legend wrapperStyle={{ fontSize: '9px', paddingTop: '4px' }} iconSize={7} />
               <Line yAxisId="left" type="monotone" dataKey="pressureA" stroke={COMPARISON_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure A" isAnimationActive={false} />
               <Line yAxisId="left" type="monotone" dataKey="flowA" stroke={COMPARISON_COLORS.flow} strokeWidth={2} dot={false} name="Flow A" isAnimationActive={false} />
@@ -302,6 +347,13 @@ export function CompareChart({
           </ResponsiveContainer>
         </div>
       </div>
+      {/* Live A/B values readout — outside the plot so it never covers the curves */}
+      {isShowingReplay && (
+        <CompareValuesReadout
+          point={displayData[displayData.length - 1]}
+          currentTime={comparisonCurrentTime}
+        />
+      )}
       <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary rounded" /> {t('shotCharts.shotASolid')}</span>
         <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary/50 rounded border-dashed" /> {t('shotCharts.shotBDashed')}</span>

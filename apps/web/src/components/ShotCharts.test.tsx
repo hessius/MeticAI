@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { ReplayChart } from './ShotCharts'
+import { ReplayChart, CompareChart } from './ShotCharts'
 import type { ChartDataPoint, StageRange } from '@/components/charts/chartConstants'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }))
@@ -66,5 +66,49 @@ describe('ReplayChart values readout', () => {
     render(<ReplayChart {...baseProps} isShowingReplay={false} currentTime={0} />)
     expect(tooltipRenders).toBe(1)
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+})
+
+const compareData = [
+  { time: 0, pressureA: 0, flowA: 0, weightA: 0, pressureB: 0, flowB: 0, weightB: 0 },
+  { time: 5, pressureA: 8, flowA: 2.1, weightA: 20, pressureB: 6, flowB: 1.4, weightB: 15 },
+]
+
+const compareBaseProps = {
+  combinedData: compareData,
+  dataMaxTime: 30,
+  leftDomain: 12,
+  rightDomain: 50,
+  comparisonIsPlaying: false,
+  comparisonPlaybackSpeed: 1,
+  isDark: false,
+  variant: 'mobile' as const,
+}
+
+describe('CompareChart values readout', () => {
+  beforeEach(() => { tooltipRenders = 0 })
+
+  it('shows an A/B current-values readout outside the plot during replay', () => {
+    render(<CompareChart {...compareBaseProps} isShowingReplay comparisonCurrentTime={5} />)
+    const readout = screen.getByRole('status')
+    expect(readout).toHaveAttribute('aria-label', 'shotCharts.currentValues')
+    // Shot A values
+    expect(readout).toHaveTextContent('shotCharts.shotASolid')
+    expect(readout).toHaveTextContent('shotCharts.pressure: 8.0')
+    expect(readout).toHaveTextContent('shotCharts.weight: 20.0')
+    // Shot B values
+    expect(readout).toHaveTextContent('shotCharts.shotBDashed')
+    expect(readout).toHaveTextContent('shotCharts.pressure: 6.0')
+    expect(readout).toHaveTextContent('shotCharts.weight: 15.0')
+  })
+
+  it('suppresses the floating tooltip during replay and shows it otherwise', () => {
+    render(<CompareChart {...compareBaseProps} isShowingReplay comparisonCurrentTime={5} />)
+    expect(tooltipRenders).toBe(0)
+    expect(screen.queryByRole('status')).toBeInTheDocument()
+
+    tooltipRenders = 0
+    render(<CompareChart {...compareBaseProps} isShowingReplay={false} comparisonCurrentTime={0} />)
+    expect(tooltipRenders).toBe(1)
   })
 })
