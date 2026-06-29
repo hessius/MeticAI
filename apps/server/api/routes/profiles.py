@@ -33,6 +33,7 @@ from services.meticulous_service import (
     async_load_profile_by_id,
     async_execute_action,
     async_delete_profile,
+    async_session_post,
     MachineUnreachableError,
     invalidate_profile_list_cache,
     fetch_machine_profile_dict,
@@ -2187,6 +2188,72 @@ async def list_machine_profiles(request: Request):
     except Exception as e:
         logger.error(
             f"Failed to list machine profiles: {str(e)}",
+            exc_info=True,
+            extra={"request_id": request_id, "error_type": type(e).__name__},
+        )
+        raise HTTPException(
+            status_code=500, detail={"status": "error", "error": str(e)}
+        )
+
+
+@router.post("/machine/profiles/order")
+@router.post("/api/machine/profiles/order")
+async def reorder_machine_profiles(request: Request):
+    """Persist a new profile display order on the Meticulous machine.
+
+    The machine keeps profile ordering in the ``profile_order`` user setting — a
+    list of profile IDs. The Meticulous backend serves ``/api/v1/profile/list``
+    in that order, so persisting a new order is a matter of POSTing the reordered
+    ID list to ``/api/v1/settings``.
+    """
+    request_id = request.state.request_id
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    order = body.get("order") if isinstance(body, dict) else None
+    if not isinstance(order, list) or not order:
+        raise HTTPException(
+            status_code=400, detail="'order' must be a non-empty list of profile IDs"
+        )
+    if not all(isinstance(pid, str) and pid for pid in order):
+        raise HTTPException(
+            status_code=400, detail="'order' must contain only non-empty profile IDs"
+        )
+
+    try:
+        # The list cache reflects the old order — drop it so the next fetch
+        # returns the machine's freshly persisted ordering.
+        try:
+            invalidate_profile_list_cache()
+        except Exception:
+            pass
+
+        response = await async_session_post(
+            "/api/v1/settings", {"profile_order": order}
+        )
+        status = getattr(response, "status_code", 200)
+        if status >= 400:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Machine rejected profile order update (HTTP {status})",
+            )
+
+        logger.info(
+            "Persisted new profile order",
+            extra={"request_id": request_id, "profile_count": len(order)},
+        )
+        return {"status": "success", "order": order}
+
+    except MachineUnreachableError as exc:
+        raise HTTPException(status_code=503, detail="Machine unreachable") from exc
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to reorder machine profiles: {str(e)}",
             exc_info=True,
             extra={"request_id": request_id, "error_type": type(e).__name__},
         )

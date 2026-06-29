@@ -4595,6 +4595,78 @@ class TestMachineProfilesEndpoint:
         assert data["total"] == 0
         assert len(data["profiles"]) == 0
 
+    @patch("api.routes.profiles.invalidate_profile_list_cache")
+    @patch("api.routes.profiles.async_session_post", new_callable=AsyncMock)
+    def test_reorder_profiles_success(
+        self, mock_session_post, mock_invalidate, client
+    ):
+        """Reordering forwards the new ID list to the machine settings endpoint."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_session_post.return_value = mock_response
+
+        order = ["profile-b", "profile-a", "profile-c"]
+        response = client.post("/api/machine/profiles/order", json={"order": order})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["order"] == order
+        mock_session_post.assert_awaited_once_with(
+            "/api/v1/settings", {"profile_order": order}
+        )
+        mock_invalidate.assert_called_once()
+
+    @patch("api.routes.profiles.async_session_post", new_callable=AsyncMock)
+    def test_reorder_profiles_rejects_empty_list(self, mock_session_post, client):
+        """An empty order list is a client error and never reaches the machine."""
+        response = client.post("/api/machine/profiles/order", json={"order": []})
+
+        assert response.status_code == 400
+        mock_session_post.assert_not_called()
+
+    @patch("api.routes.profiles.async_session_post", new_callable=AsyncMock)
+    def test_reorder_profiles_rejects_non_string_ids(self, mock_session_post, client):
+        """Order entries must be non-empty strings."""
+        response = client.post(
+            "/api/machine/profiles/order", json={"order": ["ok", 42, ""]}
+        )
+
+        assert response.status_code == 400
+        mock_session_post.assert_not_called()
+
+    @patch("api.routes.profiles.invalidate_profile_list_cache")
+    @patch("api.routes.profiles.async_session_post", new_callable=AsyncMock)
+    def test_reorder_profiles_machine_unreachable(
+        self, mock_session_post, mock_invalidate, client
+    ):
+        """A MachineUnreachableError surfaces as a 503."""
+        from services.meticulous_service import MachineUnreachableError
+
+        mock_session_post.side_effect = MachineUnreachableError(ConnectionError("offline"))
+
+        response = client.post(
+            "/api/machine/profiles/order", json={"order": ["a", "b"]}
+        )
+
+        assert response.status_code == 503
+
+    @patch("api.routes.profiles.invalidate_profile_list_cache")
+    @patch("api.routes.profiles.async_session_post", new_callable=AsyncMock)
+    def test_reorder_profiles_machine_rejects(
+        self, mock_session_post, mock_invalidate, client
+    ):
+        """A non-2xx machine response surfaces as a 502."""
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_session_post.return_value = mock_response
+
+        response = client.post(
+            "/api/machine/profiles/order", json={"order": ["a", "b"]}
+        )
+
+        assert response.status_code == 502
+
     @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
     @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
     @patch("api.routes.profiles.load_history", return_value=[])

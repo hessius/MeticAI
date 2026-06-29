@@ -1090,6 +1090,63 @@ describe('DirectModeInterceptor regression harness', () => {
       expect(secondBody.profiles.map((p) => p.name)).toEqual(['Turbo Bloom', 'Imported Joy'])
     })
 
+    it('persists a new profile order via the machine settings endpoint', async () => {
+      let savedSettings: Record<string, unknown> | null = null
+      installInterceptor(createMachineFetch({
+        'POST /api/v1/settings': ({ init }: FetchCall) => {
+          savedSettings = JSON.parse(String(init?.body))
+          return jsonResponse({ ok: true })
+        },
+      }))
+
+      const response = await window.fetch('/api/machine/profiles/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: ['profile-2', 'profile-1'] }),
+      })
+
+      expect(response.status).toBe(200)
+      await expect(readJson(response)).resolves.toEqual({
+        status: 'success',
+        order: ['profile-2', 'profile-1'],
+      })
+      expect(savedSettings).toEqual({ profile_order: ['profile-2', 'profile-1'] })
+    })
+
+    it('invalidates the profile list cache after reordering', async () => {
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': () => jsonResponse(nestedMachineProfiles()),
+        'POST /api/v1/settings': () => jsonResponse({ ok: true }),
+      }))
+
+      await window.fetch('/api/machine/profiles')
+      expect(localStorage.getItem(STORAGE_KEYS.PROFILE_LIST_CACHE)).not.toBeNull()
+
+      await window.fetch('/api/machine/profiles/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: ['profile-2', 'profile-1'] }),
+      })
+
+      expect(localStorage.getItem(STORAGE_KEYS.PROFILE_LIST_CACHE)).toBeNull()
+    })
+
+    it('rejects an empty reorder request before contacting the machine', async () => {
+      const settingsRoute = vi.fn(() => jsonResponse({ ok: true }))
+      installInterceptor(createMachineFetch({
+        'POST /api/v1/settings': settingsRoute,
+      }))
+
+      const response = await window.fetch('/api/machine/profiles/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: [] }),
+      })
+
+      expect(response.status).toBe(400)
+      expect(settingsRoute).not.toHaveBeenCalled()
+    })
+
     it('rejects empty direct machine profile rename requests before saving', async () => {
       const saveRoute = vi.fn(() => jsonResponse({ ok: true }))
       installInterceptor(createMachineFetch({

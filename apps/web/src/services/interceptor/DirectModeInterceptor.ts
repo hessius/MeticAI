@@ -1762,6 +1762,30 @@ export function installDirectModeInterceptor(): void {
       })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to rename profile' }, 500))
     }
 
+    // POST /api/machine/profiles/order → persist new order via machine settings
+    // The machine stores profile ordering in the `profile_order` user setting
+    // (a list of IDs); /api/v1/profile/list is served in that order.
+    if (url.match(/\/api\/machine\/profiles\/order$/) && method === 'POST') {
+      return (async () => {
+        try {
+          const { order } = await new Response(init?.body || '{}').json() as { order?: unknown }
+          if (!Array.isArray(order) || order.length === 0 || !order.every((id) => typeof id === 'string' && id)) {
+            return jsonResponse({ status: 'error', error: 'order must be a non-empty list of profile IDs' }, 400)
+          }
+          const resp = await _fetch('/api/v1/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile_order: order }),
+          })
+          if (!resp.ok) return jsonResponse({ status: 'error', error: `Machine rejected order (HTTP ${resp.status})` }, 502)
+          _invalidateProfileListCache()
+          return jsonResponse({ status: 'success', order })
+        } catch (err) {
+          return jsonResponse({ status: 'error', error: err instanceof Error ? err.message : 'Failed to reorder profiles' }, 500)
+        }
+      })()
+    }
+
     // DELETE /api/machine/profile/:id → DELETE /api/v1/profile/delete/:id
     const deleteMatch = url.match(/\/api\/machine\/profile\/([^/?]+)$/)
     if (deleteMatch && method === 'DELETE') {
