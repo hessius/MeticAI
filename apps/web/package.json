@@ -30,7 +30,7 @@
     "@babel/plugin-transform-modules-systemjs": "^7.29.4",
     "@capacitor-community/keep-awake": "^8.0.0",
     "@capacitor/action-sheet": "^8.1.1",
-    "@capacitor/android": "^8.3.0",
+    "@capacitor/android": "^8.4.1",
     "@capacitor/app": "^8.0.0",
     "@capacitor/browser": "^8.0.3",
     "@capacitor/clipboard": "^8.0.1",
