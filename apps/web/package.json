@@ -44,7 +44,7 @@
     "@capacitor/share": "^8.0.1",
     "@google/genai": "^1.46.0",
     "@heroicons/react": "^2.2.0",
-    "@hookform/resolvers": "^5.2.2",
+    "@hookform/resolvers": "^5.4.0",
     "@meticulous-home/espresso-api": "^0.10.11",
     "@meticulous-home/espresso-profile": "^0.4.2",
     "@octokit/core": "^7.0.6",
