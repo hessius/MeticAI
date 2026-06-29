@@ -7926,8 +7926,8 @@ class TestSettingsManagement:
         assert settings["authorName"] == "Test Author"
 
 
-class TestHelperFunctions:
-    """Tests for various helper functions."""
+class TestSanitizationHelpers:
+    """Tests for profile-name sanitization helpers."""
 
     def test_sanitize_profile_name(self):
         """Test profile name sanitization for filenames."""
@@ -7939,9 +7939,6 @@ class TestHelperFunctions:
         assert sanitize_profile_name_for_filename("Test:Profile") == "test_profile"
         assert sanitize_profile_name_for_filename("Normal_Name") == "normal_name"
         assert sanitize_profile_name_for_filename("Test Profile") == "test_profile"
-
-    def test_extract_profile_name_from_reply(self):
-        """Test extracting profile name from LLM reply."""
 
 
 class TestHealthEndpoint:
