@@ -59,6 +59,57 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
+// Fixed current-values readout rendered *outside* the plot area during replay,
+// so users can read live values without the floating tooltip covering the
+// curves/legend (issue #493 follow-up).
+function ReplayValuesReadout({
+  point,
+  currentTime,
+  hasGravFlow,
+}: {
+  point?: ChartDataPoint
+  currentTime: number
+  hasGravFlow: boolean
+}) {
+  const { t } = useTranslation()
+  const fmt = (v?: number) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(1) : '–')
+  return (
+    <div
+      className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-1 text-xs tabular-nums"
+      role="status"
+      aria-live="polite"
+      aria-label={t('shotCharts.currentValues')}
+    >
+      <span className="font-semibold text-foreground">
+        {t('shotCharts.tooltipTime')}: {currentTime.toFixed(1)}s
+      </span>
+      {point?.stage && typeof point.stage === 'string' && (
+        <span className="font-medium text-primary">
+          {t('shotCharts.tooltipStage')}: {point.stage}
+        </span>
+      )}
+      <span className="flex items-center gap-1 font-medium" style={{ color: CHART_COLORS.pressure }}>
+        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.pressure }} />
+        {t('shotCharts.pressure')}: {fmt(point?.pressure)}
+      </span>
+      <span className="flex items-center gap-1 font-medium" style={{ color: CHART_COLORS.flow }}>
+        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.flow }} />
+        {t('shotCharts.flow')}: {fmt(point?.flow)}
+      </span>
+      <span className="flex items-center gap-1 font-medium" style={{ color: CHART_COLORS.weight }}>
+        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.weight }} />
+        {t('shotCharts.weight')}: {fmt(point?.weight)}
+      </span>
+      {hasGravFlow && (
+        <span className="flex items-center gap-1 font-medium" style={{ color: CHART_COLORS.gravimetricFlow }}>
+          <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.gravimetricFlow }} />
+          Grav. Flow: {fmt(point?.gravimetricFlow)}
+        </span>
+      )}
+    </div>
+  )
+}
+
 interface ReplayChartProps {
   displayData: ChartDataPoint[]
   displayStageRanges: StageRange[]
@@ -123,7 +174,7 @@ export function ReplayChart({
               <XAxis dataKey="time" stroke={theme.axisStroke} fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
               <YAxis yAxisId="left" stroke={theme.axisStroke} fontSize={10} domain={[0, maxLeftAxis]} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} width={35} allowDataOverflow={true} />
               <YAxis yAxisId="right" orientation="right" stroke={theme.axisStroke} fontSize={10} domain={[0, maxRightAxis]} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} width={35} allowDataOverflow={true} />
-              <Tooltip content={<CustomTooltip />} />
+              {!isShowingReplay && <Tooltip content={<CustomTooltip />} />}
               <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" legendType="none" isAnimationActive={false} />
               <Line yAxisId="left" type="monotone" dataKey="flow" stroke={CHART_COLORS.flow} strokeWidth={2} dot={false} name="Flow (ml/s)" legendType="none" isAnimationActive={false} />
               <Line yAxisId="right" type="monotone" dataKey="weight" stroke={CHART_COLORS.weight} strokeWidth={2} dot={false} name="Weight (g)" legendType="none" isAnimationActive={false} />
@@ -132,6 +183,14 @@ export function ReplayChart({
           </ResponsiveContainer>
         </div>
       </div>
+      {/* Live values readout — outside the plot so it never covers the curves */}
+      {isShowingReplay && (
+        <ReplayValuesReadout
+          point={displayData[displayData.length - 1]}
+          currentTime={currentTime}
+          hasGravFlow={hasGravFlow}
+        />
+      )}
       {/* Grouped Legend: Shot + Stages */}
       <div className="space-y-1.5 pt-1">
         {/* Shot lines */}

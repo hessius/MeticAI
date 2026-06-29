@@ -961,6 +961,7 @@
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
     "tooltipStage": "Stage",
+    "currentValues": "Current values",
     "targets": "Targets",
     "shotLabel": "Shot",
     "targetsLabel": "Targets",

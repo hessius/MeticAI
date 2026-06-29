@@ -949,6 +949,7 @@
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
     "tooltipStage": "Stage",
+    "currentValues": "Valores actuales",
     "targets": "Objetivos",
     "shotLabel": "Extracción",
     "targetsLabel": "Objetivos",
