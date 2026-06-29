@@ -1,6 +1,6 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
-import { getActiveProvider, getProviderModel } from '@/services/ai/providers'
+import { getActiveProvider, getActiveProviderId, getProviderModel, PROVIDERS } from '@/services/ai/providers'
 import { retryWithBackoff, formatGeminiError } from '@/services/ai/retryUtils'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { CapacitorHttp } from '@capacitor/core'
@@ -59,6 +59,17 @@ interface MachineHistoryEntry {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * Provider-aware "not configured" message. The single API-key field auto-detects
+ * the provider, so the error must name the *active* provider (e.g. OpenAI) rather
+ * than always blaming Gemini. On-device AI has no key, so it gets its own copy.
+ */
+function aiNotConfiguredMessage(): string {
+  const id = getActiveProviderId()
+  if (id === 'local') return 'On-device AI is not available on this device.'
+  return `${PROVIDERS[id].label} API key not configured. Please set your API key in Settings.`
 }
 
 function normalizeProfileIdent(value: unknown): CachedProfile | null {
@@ -2920,7 +2931,7 @@ export function installDirectModeInterceptor(): void {
         try {
           const aiService = createBrowserAIService()
           if (!aiService.isConfigured()) {
-            return jsonResponse({ status: 'error', message: 'Gemini API key not configured.' })
+            return jsonResponse({ status: 'error', message: aiNotConfiguredMessage() })
           }
           const body = init?.body as FormData
           const pName = (body.get('profile_name') as string) || 'Unknown'
@@ -3191,7 +3202,7 @@ Rules for recommendations:
 
           // 6. Call the active AI provider (with retry on transient errors)
           if (!getActiveProvider().isConfigured()) {
-            return jsonResponse({ status: 'error', message: 'AI provider API key not configured.' })
+            return jsonResponse({ status: 'error', message: aiNotConfiguredMessage() })
           }
           const response = await retryWithBackoff(() =>
             getActiveProvider().generateText({
@@ -3254,7 +3265,7 @@ Rules for recommendations:
         try {
           const aiService = createBrowserAIService()
           if (!aiService.isConfigured()) {
-            return jsonResponse({ status: 'error', reply: 'Gemini API key not configured. Please set your API key in Settings.', analysis: '' })
+            return jsonResponse({ status: 'error', reply: aiNotConfiguredMessage(), analysis: '' })
           }
 
           const body = init?.body as FormData

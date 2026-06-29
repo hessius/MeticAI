@@ -126,7 +126,7 @@ describe('SettingsView native-mode API key save', () => {
 
     const aiSection = await screen.findByText('settings.aiSettings')
     fireEvent.click(aiSection)
-    const input = await screen.findByLabelText('settings.geminiApiKey')
+    const input = await screen.findByLabelText('settings.providerApiKey')
 
     const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent')
     fireEvent.change(input, { target: { value: 'AIzaNATIVEKEY' } })
@@ -156,7 +156,7 @@ describe('SettingsView native-mode API key save', () => {
 
     const aiSection = await screen.findByText('settings.aiSettings')
     fireEvent.click(aiSection)
-    const input = await screen.findByLabelText('settings.geminiApiKey')
+    const input = await screen.findByLabelText('settings.providerApiKey')
 
     fireEvent.change(input, { target: { value: 'AIzaNATIVEKEY' } })
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 850)) })

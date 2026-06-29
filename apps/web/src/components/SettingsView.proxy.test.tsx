@@ -80,7 +80,7 @@ describe('SettingsView proxy-mode AI key save', () => {
     const aiSection = await screen.findByText('settings.aiSettings')
     fireEvent.click(aiSection)
 
-    const input = await screen.findByLabelText('settings.geminiApiKey')
+    const input = await screen.findByLabelText('settings.providerApiKey')
     const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent')
 
     fireEvent.change(input, { target: { value: 'AIzaNEWKEY123' } })

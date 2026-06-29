@@ -359,7 +359,7 @@ describe('SettingsView direct-mode backend guards', () => {
     // DeepSeek is text-only → the image-capability hint is shown.
     expect(screen.getByText('settings.aiProviderImageHint')).toBeInTheDocument()
 
-    const keyInput = await screen.findByLabelText('settings.geminiApiKey')
+    const keyInput = await screen.findByLabelText('settings.providerApiKey')
     fireEvent.change(keyInput, { target: { value: 'sk-deepseek-test' } })
 
     await act(async () => {
@@ -386,7 +386,7 @@ describe('SettingsView direct-mode backend guards', () => {
       fireEvent.click(screen.getByRole('button', { name: 'settings.aiSettings' }))
     })
 
-    const keyInput = await screen.findByLabelText('settings.geminiApiKey')
+    const keyInput = await screen.findByLabelText('settings.providerApiKey')
     await act(async () => {
       fireEvent.change(keyInput, { target: { value: 'sk-or-v1-routerkey' } })
     })

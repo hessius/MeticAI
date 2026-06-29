@@ -1311,7 +1311,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="apiKey" className="text-sm font-medium">
-                    {t('settings.geminiApiKey')}
+                    {t('settings.providerApiKey', { provider: PROVIDERS[aiProvider].label })}
                   </Label>
                   {hasGeminiKey && (
                     <span className="text-xs text-success flex items-center gap-1">
@@ -1326,7 +1326,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     type="password"
                     value={settings.geminiApiKey}
                     onChange={(e) => handleChange('geminiApiKey', e.target.value)}
-                    placeholder={hasGeminiKey ? t('settings.apiKeyPlaceholderNew') : t('settings.apiKeyPlaceholder')}
+                    placeholder={hasGeminiKey ? t('settings.apiKeyPlaceholderNew') : t('settings.providerApiKeyPlaceholder', { provider: PROVIDERS[aiProvider].label })}
                     className="pr-10"
                     readOnly={settings.geminiApiKeyMasked && settings.geminiApiKey.startsWith('*')}
                     onClick={async () => {
