@@ -430,7 +430,7 @@
     "localModelReady": "Apple Intelligence redo",
     "localModelUnavailable": "Apple Intelligence är inte tillgängligt på den här enheten",
     "localModelDescription": "Kör AI privat på din enhet – ingen API-nyckel, inget internet. Kräver iPhone 15 Pro eller senare med Apple Intelligence aktiverat.",
-    "aiProviderImageHint": "Endast textfunktioner. Bildgenerering kräver för närvarande Gemini.",
+    "aiProviderImageHint": "Endast textfunktioner. Bildgenerering kräver Gemini, OpenAI eller OpenRouter.",
     "configured": "Konfigurerad",
     "apiKeyPlaceholder": "Ange din Gemini API-nyckel",
     "providerApiKeyPlaceholder": "Ange din {{provider}} API-nyckel",

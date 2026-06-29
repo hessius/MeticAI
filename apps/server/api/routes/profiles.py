@@ -581,10 +581,11 @@ async def generate_profile_image(
     preview: bool = False,
     count: int = Query(default=1, ge=1, le=4),
 ):
-    """Generate an AI image for a profile using Google's Imagen model.
+    """Generate an AI image for a profile using the active AI provider.
 
-    Uses the google-genai SDK with the imagen-4.0-fast-generate-001 model
-    to generate a square image based on the profile name and optional tags.
+    Gemini uses the google-genai SDK (imagen-4.0-fast-generate-001); OpenAI and
+    OpenRouter use their OpenAI-compatible image endpoints (#505). Generates a
+    square image based on the profile name and optional tags.
 
     Args:
         profile_name: Name of the profile
@@ -648,40 +649,67 @@ async def generate_profile_image(
             },
         )
 
-        # Generate image using Imagen via google-genai SDK
-        from google.genai import types as genai_types
-        from services.gemini_service import get_gemini_client
+        # Resolve the active provider. Gemini uses the native SDK; OpenAI and
+        # OpenRouter generate via their OpenAI-compatible image endpoints (#505).
+        from services.ai_providers import (
+            generate_image_bytes,
+            get_active_provider_id,
+            provider_supports_image,
+        )
 
-        try:
-            client = get_gemini_client()
-        except ValueError:
+        provider_id = get_active_provider_id()
+        if not provider_supports_image(provider_id):
             raise HTTPException(
                 status_code=503,
-                detail="AI features are unavailable. Please configure a Gemini API key in Settings.",
+                detail=(
+                    "The selected AI provider does not support image generation. "
+                    "Switch to Gemini, OpenAI, or OpenRouter in Settings."
+                ),
             )
+
+        gemini_client = None
+        genai_types = None
+        if provider_id == "gemini":
+            from google.genai import types as genai_types
+            from services.gemini_service import get_gemini_client
+
+            try:
+                gemini_client = get_gemini_client()
+            except ValueError:
+                raise HTTPException(
+                    status_code=503,
+                    detail="AI features are unavailable. Please configure a Gemini API key in Settings.",
+                )
 
         async def _generate_single(index: int) -> dict:
             """Generate and process a single image. Returns result dict."""
             try:
-                gen_response = await asyncio.to_thread(
-                    client.models.generate_images,
-                    model="imagen-4.0-fast-generate-001",
-                    prompt=full_prompt,
-                    config=genai_types.GenerateImagesConfig(
-                        number_of_images=1,
-                        aspect_ratio="1:1",
-                        output_mime_type="image/png",
-                    ),
-                )
+                if provider_id == "gemini":
+                    gen_response = await asyncio.to_thread(
+                        gemini_client.models.generate_images,
+                        model="imagen-4.0-fast-generate-001",
+                        prompt=full_prompt,
+                        config=genai_types.GenerateImagesConfig(
+                            number_of_images=1,
+                            aspect_ratio="1:1",
+                            output_mime_type="image/png",
+                        ),
+                    )
 
-                if (
-                    not gen_response.generated_images
-                    or len(gen_response.generated_images) == 0
-                ):
-                    return {"index": index, "image": None, "error": "No image returned by model"}
+                    if (
+                        not gen_response.generated_images
+                        or len(gen_response.generated_images) == 0
+                    ):
+                        return {
+                            "index": index,
+                            "image": None,
+                            "error": "No image returned by model",
+                        }
 
-                generated = gen_response.generated_images[0]
-                raw_bytes = generated.image.image_bytes
+                    generated = gen_response.generated_images[0]
+                    raw_bytes = generated.image.image_bytes
+                else:
+                    raw_bytes = await generate_image_bytes(full_prompt, provider_id)
 
                 loop = asyncio.get_running_loop()
                 data_uri, png_bytes = await loop.run_in_executor(

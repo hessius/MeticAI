@@ -430,7 +430,7 @@
     "localModelReady": "Apple Intelligence pronto",
     "localModelUnavailable": "Apple Intelligence non disponibile su questo dispositivo",
     "localModelDescription": "Esegue l'IA in privato sul tuo dispositivo, senza chiave API né internet. Richiede iPhone 15 Pro o successivo con Apple Intelligence attivo.",
-    "aiProviderImageHint": "Solo funzioni di testo. La generazione di immagini richiede attualmente Gemini.",
+    "aiProviderImageHint": "Solo funzioni di testo. La generazione di immagini richiede Gemini, OpenAI o OpenRouter.",
     "configured": "Configurata",
     "apiKeyPlaceholder": "Inserisci la tua chiave API Gemini",
     "providerApiKeyPlaceholder": "Inserisci la tua chiave API {{provider}}",

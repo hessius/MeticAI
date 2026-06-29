@@ -102,6 +102,16 @@ function mapHttpError(status: number, body: string): never {
   throw new AIServiceError('UNKNOWN', new Error(`HTTP ${status}: ${body.slice(0, 200)}`))
 }
 
+/** Decode a base64 image payload into a Blob. */
+function b64ToBlob(b64: string, mime: string): Blob {
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return new Blob([bytes], { type: mime })
+}
+
 export class OpenAICompatProvider implements AIProvider {
   readonly id: ProviderId
   readonly label: string
@@ -176,6 +186,75 @@ export class OpenAICompatProvider implements AIProvider {
       }
       throw err
     }
+  }
+
+  /**
+   * Image generation (#505). OpenAI uses `POST /images/generations`; OpenRouter
+   * a dedicated `POST /images`. Both return base64 in `data[0].b64_json`. Models
+   * are tried in order so OpenAI can fall back from `gpt-image-1` (which requires
+   * a verified org) to `dall-e-3` on an auth/availability error.
+   */
+  async generateImage(prompt: string): Promise<Blob> {
+    const cfg = this.descriptor.imageGen
+    if (!cfg || cfg.models.length === 0) throw new AIServiceError('IMAGE_GENERATION_FAILED')
+    let lastErr: unknown
+    for (let i = 0; i < cfg.models.length; i++) {
+      try {
+        return await this.requestImage(cfg.endpoint, cfg.models[i], prompt)
+      } catch (err) {
+        lastErr = err
+        const isLast = i === cfg.models.length - 1
+        // Only fall through to the next model on availability/auth errors
+        // (e.g. gpt-image-1 → dall-e-3 when the org isn't verified).
+        const recoverable =
+          err instanceof AIServiceError &&
+          (err.code === 'MODEL_NOT_FOUND' || err.code === 'API_KEY_INVALID')
+        if (isLast || !recoverable) throw err
+      }
+    }
+    throw lastErr instanceof AIServiceError
+      ? lastErr
+      : new AIServiceError('IMAGE_GENERATION_FAILED', lastErr)
+  }
+
+  private async requestImage(
+    endpoint: 'openai-images' | 'openrouter-images',
+    model: string,
+    prompt: string,
+  ): Promise<Blob> {
+    const path = endpoint === 'openai-images' ? '/images/generations' : '/images'
+    const body: Record<string, unknown> =
+      endpoint === 'openai-images'
+        ? this.buildOpenAIImageBody(model, prompt)
+        : { model, prompt }
+    let res: Response
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, {
+        method: 'POST',
+        headers: this.headers(),
+        body: JSON.stringify(body),
+      })
+    } catch (err) {
+      throw new AIServiceError('NETWORK_ERROR', err)
+    }
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      mapHttpError(res.status, text)
+    }
+    const json = (await res.json().catch(() => null)) as {
+      data?: { b64_json?: string; media_type?: string }[]
+    } | null
+    const item = json?.data?.[0]
+    if (!item?.b64_json) throw new AIServiceError('IMAGE_NO_DATA')
+    return b64ToBlob(item.b64_json, item.media_type ?? 'image/png')
+  }
+
+  private buildOpenAIImageBody(model: string, prompt: string): Record<string, unknown> {
+    const body: Record<string, unknown> = { model, prompt, n: 1, size: '1024x1024' }
+    // gpt-image-1 always returns base64 and rejects `response_format`; the
+    // dall-e-* models default to a remote URL and need it to return base64.
+    if (!model.startsWith('gpt-image')) body.response_format = 'b64_json'
+    return body
   }
 
   async listModels(): Promise<AvailableModel[]> {

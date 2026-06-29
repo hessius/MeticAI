@@ -178,6 +178,57 @@ describe('OpenAICompatProvider', () => {
     const models = await provider().listModels()
     expect(models).toEqual(PROVIDERS.openai.staticModels)
   })
+
+  it('generates an image via OpenAI /images/generations (b64_json → PNG Blob)', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ b64_json: 'aGVsbG8=' }] }),
+    })
+    const blob = await provider().generateImage('a latte')
+    expect(blob).toBeInstanceOf(Blob)
+    expect(blob.type).toBe('image/png')
+    expect(await blob.text()).toBe('hello')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://api.openai.com/v1/images/generations')
+    const body = JSON.parse(init.body)
+    expect(body.model).toBe('gpt-image-1')
+    expect(body.prompt).toBe('a latte')
+    // gpt-image-1 rejects response_format.
+    expect(body.response_format).toBeUndefined()
+  })
+
+  it('falls back from gpt-image-1 to dall-e-3 on an org-verification (403) error', async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 403, text: async () => 'must be verified' })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ b64_json: 'aGVsbG8=' }] }) })
+    const blob = await provider().generateImage('a latte')
+    expect(await blob.text()).toBe('hello')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body)
+    expect(secondBody.model).toBe('dall-e-3')
+    // dall-e-* needs response_format to return base64.
+    expect(secondBody.response_format).toBe('b64_json')
+  })
+
+  it('surfaces IMAGE_NO_DATA when OpenAI returns no image payload', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ data: [] }) })
+    await expect(provider().generateImage('x')).rejects.toMatchObject({ code: 'IMAGE_NO_DATA' })
+  })
+
+  it('generates an image via OpenRouter POST /images', async () => {
+    setProviderApiKey('openrouter', 'sk-or-test')
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ b64_json: 'aGVsbG8=' }] }),
+    })
+    const blob = await new OpenAICompatProvider(PROVIDERS.openrouter).generateImage('a latte')
+    expect(await blob.text()).toBe('hello')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://openrouter.ai/api/v1/images')
+    const body = JSON.parse(init.body)
+    expect(body.model).toBe('google/gemini-2.5-flash-image')
+    expect(body.prompt).toBe('a latte')
+  })
 })
 
 describe('getActiveProvider', () => {

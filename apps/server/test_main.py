@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from fastapi import HTTPException
 from unittest.mock import Mock, patch, MagicMock, mock_open, AsyncMock
 from io import BytesIO
+import base64
 from PIL import Image
 from pathlib import Path
 import os
@@ -6733,6 +6734,133 @@ class TestGenerateProfileImageEndpoint:
             response = client.post("/api/profile/Test/generate-image")
 
         assert response.status_code == 500
+
+
+class TestProviderImageGeneration:
+    """Unit tests for OpenAI-compatible image generation in ai_providers (#505)."""
+
+    @staticmethod
+    def _mock_httpx(responses):
+        """Build a patch target for httpx.Client whose .post returns queued responses.
+
+        ``responses`` is a list of (status_code, json_body) tuples returned in
+        order across successive .post() calls.
+        """
+        calls = {"posts": []}
+        iterator = iter(responses)
+
+        def _post(url, headers=None, **kwargs):
+            body_in = kwargs.get("json")
+            calls["posts"].append({"url": url, "headers": headers, "json": body_in})
+            status, body = next(iterator)
+            resp = MagicMock()
+            resp.status_code = status
+            resp.json.return_value = body
+            resp.text = json.dumps(body)
+            return resp
+
+        client_cm = MagicMock()
+        inner = MagicMock()
+        inner.post.side_effect = _post
+        client_cm.return_value.__enter__.return_value = inner
+        return client_cm, calls
+
+    def test_provider_supports_image(self):
+        from services import ai_providers
+
+        assert ai_providers.provider_supports_image("gemini") is True
+        assert ai_providers.provider_supports_image("openai") is True
+        assert ai_providers.provider_supports_image("openrouter") is True
+        assert ai_providers.provider_supports_image("deepseek") is False
+        assert ai_providers.provider_supports_image("kimi") is False
+
+    def test_openai_image_success(self):
+        from services import ai_providers
+
+        b64 = base64.b64encode(b"hello").decode("ascii")
+        client_cm, calls = self._mock_httpx([(200, {"data": [{"b64_json": b64}]})])
+        with patch.dict(os.environ, {"AI_PROVIDER": "openai", "AI_API_KEY": "sk-x"}):
+            with patch("services.ai_providers.httpx.Client", client_cm):
+                data = asyncio.run(ai_providers.generate_image_bytes("a latte", "openai"))
+        assert data == b"hello"
+        post = calls["posts"][0]
+        assert post["url"] == "https://api.openai.com/v1/images/generations"
+        assert post["json"]["model"] == "gpt-image-1"
+        # gpt-image-1 must not send response_format.
+        assert "response_format" not in post["json"]
+
+    def test_openai_falls_back_to_dalle_on_403(self):
+        from services import ai_providers
+
+        b64 = base64.b64encode(b"hello").decode("ascii")
+        client_cm, calls = self._mock_httpx(
+            [(403, {"error": "must be verified"}), (200, {"data": [{"b64_json": b64}]})]
+        )
+        with patch.dict(os.environ, {"AI_PROVIDER": "openai", "AI_API_KEY": "sk-x"}):
+            with patch("services.ai_providers.httpx.Client", client_cm):
+                data = asyncio.run(ai_providers.generate_image_bytes("a latte", "openai"))
+        assert data == b"hello"
+        assert len(calls["posts"]) == 2
+        assert calls["posts"][1]["json"]["model"] == "dall-e-3"
+        # dall-e-* needs response_format to return base64.
+        assert calls["posts"][1]["json"]["response_format"] == "b64_json"
+
+    def test_openrouter_image_success(self):
+        from services import ai_providers
+
+        b64 = base64.b64encode(b"hello").decode("ascii")
+        client_cm, calls = self._mock_httpx([(200, {"data": [{"b64_json": b64}]})])
+        with patch.dict(os.environ, {"AI_PROVIDER": "openrouter", "AI_API_KEY": "sk-or-x"}):
+            with patch("services.ai_providers.httpx.Client", client_cm):
+                data = asyncio.run(
+                    ai_providers.generate_image_bytes("a latte", "openrouter")
+                )
+        assert data == b"hello"
+        post = calls["posts"][0]
+        assert post["url"] == "https://openrouter.ai/api/v1/images"
+        assert post["json"]["model"] == "google/gemini-2.5-flash-image"
+
+    def test_openai_no_data_raises(self):
+        from services import ai_providers
+
+        client_cm, _ = self._mock_httpx([(200, {"data": []})])
+        with patch.dict(os.environ, {"AI_PROVIDER": "openai", "AI_API_KEY": "sk-x"}):
+            with patch("services.ai_providers.httpx.Client", client_cm):
+                with pytest.raises(ai_providers.ProviderError):
+                    asyncio.run(ai_providers.generate_image_bytes("x", "openai"))
+
+    def test_text_only_provider_rejected(self):
+        from services import ai_providers
+
+        with pytest.raises(ai_providers.ProviderError):
+            asyncio.run(ai_providers.generate_image_bytes("x", "deepseek"))
+
+
+class TestGenerateProfileImageMultiProvider:
+    """Route-level tests that the image endpoint branches by active provider (#505)."""
+
+    @patch("api.routes.profiles._set_cached_image")
+    @patch("api.routes.profiles.process_image_for_profile")
+    def test_openai_provider_branch_preview(self, mock_process, mock_cache, client):
+        mock_process.return_value = ("data:image/png;base64,abc", b"png_bytes")
+        with patch.dict(os.environ, {"AI_PROVIDER": "openai", "AI_API_KEY": "sk-x"}):
+            with patch(
+                "services.ai_providers.generate_image_bytes",
+                new_callable=AsyncMock,
+                return_value=b"raw_png",
+            ) as mock_gen:
+                response = client.post(
+                    "/api/profile/Test/generate-image?preview=true&style=abstract"
+                )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "preview"
+        mock_gen.assert_awaited_once()
+
+    def test_text_only_provider_returns_503(self, client):
+        with patch.dict(os.environ, {"AI_PROVIDER": "deepseek", "AI_API_KEY": "sk-x"}):
+            response = client.post("/api/profile/Test/generate-image?preview=true")
+        assert response.status_code == 503
 
 
 class TestLLMShotAnalysisEndpoint:

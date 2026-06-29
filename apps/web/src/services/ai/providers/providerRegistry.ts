@@ -14,6 +14,18 @@ import { isLocalLLMSupported } from './localLLM'
 
 export type ProviderId = 'gemini' | 'openai' | 'deepseek' | 'kimi' | 'openrouter' | 'local'
 
+/**
+ * Image-generation wiring for OpenAI-compatible providers (#505). `endpoint`
+ * selects the HTTP shape: OpenAI exposes `POST /images/generations`, OpenRouter
+ * a dedicated `POST /images`. Both return base64 in `data[0].b64_json`. `models`
+ * is tried in order (primary → fallback) so e.g. OpenAI can fall back from
+ * `gpt-image-1` (org-verification gated) to `dall-e-3`.
+ */
+export interface ProviderImageGen {
+  endpoint: 'openai-images' | 'openrouter-images'
+  models: string[]
+}
+
 export interface ProviderDescriptor {
   id: ProviderId
   label: string
@@ -26,6 +38,8 @@ export interface ProviderDescriptor {
   defaultModel: string
   /** Offline / no-key fallback list for the picker. */
   staticModels: { id: string; display_name: string; description: string }[]
+  /** Image-generation config — present iff `capabilities.imageGen` is true (excl. native Gemini SDK). */
+  imageGen?: ProviderImageGen
 }
 
 const TEXT_ONLY: ProviderCapabilities = {
@@ -53,12 +67,13 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     label: 'OpenAI',
     baseUrl: 'https://api.openai.com/v1',
     keyPrefixes: ['sk-proj-', 'sk-'],
-    capabilities: { text: true, vision: true, imageGen: false, jsonMode: true },
+    capabilities: { text: true, vision: true, imageGen: true, jsonMode: true },
     defaultModel: 'gpt-4o-mini',
     staticModels: [
       { id: 'gpt-4o-mini', display_name: 'GPT-4o mini', description: 'Fast and affordable' },
       { id: 'gpt-4o', display_name: 'GPT-4o', description: 'Most capable' },
     ],
+    imageGen: { endpoint: 'openai-images', models: ['gpt-image-1', 'dall-e-3'] },
   },
   deepseek: {
     id: 'deepseek',
@@ -88,12 +103,13 @@ export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     label: 'OpenRouter',
     baseUrl: 'https://openrouter.ai/api/v1',
     keyPrefixes: ['sk-or-'],
-    capabilities: { text: true, vision: true, imageGen: false, jsonMode: true },
+    capabilities: { text: true, vision: true, imageGen: true, jsonMode: true },
     defaultModel: 'openai/gpt-4o-mini',
     staticModels: [
       { id: 'openai/gpt-4o-mini', display_name: 'GPT-4o mini', description: 'Affordable' },
       { id: 'anthropic/claude-3.5-sonnet', display_name: 'Claude 3.5 Sonnet', description: 'Anthropic' },
     ],
+    imageGen: { endpoint: 'openrouter-images', models: ['google/gemini-2.5-flash-image'] },
   },
   // On-device AI (#373). No API key, no network; availability is gated by
   // platform support (iOS 26+ / Apple Intelligence) rather than a stored key.

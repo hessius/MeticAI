@@ -47,6 +47,10 @@ PROVIDERS: dict[str, dict] = {
         "base_url": "https://api.openai.com/v1",
         "vision": True,
         "default_model": "gpt-4o-mini",
+        "image_gen": {
+            "endpoint": "openai-images",
+            "models": ["gpt-image-1", "dall-e-3"],
+        },
     },
     "deepseek": {
         "label": "DeepSeek",
@@ -65,6 +69,10 @@ PROVIDERS: dict[str, dict] = {
         "base_url": "https://openrouter.ai/api/v1",
         "vision": True,
         "default_model": "openai/gpt-4o-mini",
+        "image_gen": {
+            "endpoint": "openrouter-images",
+            "models": ["google/gemini-2.5-flash-image"],
+        },
     },
 }
 
@@ -74,6 +82,19 @@ _HTTP_TIMEOUT = 300.0
 
 class ProviderError(RuntimeError):
     """Raised when an OpenAI-compatible provider request fails."""
+
+
+class ProviderImageError(ProviderError):
+    """Raised when an OpenAI-compatible image-generation request fails.
+
+    Carries the HTTP ``status_code`` (when available) so the caller can decide
+    whether to fall back to the next configured image model (auth/availability
+    errors) or surface the failure immediately.
+    """
+
+    def __init__(self, status_code: Optional[int], message: str):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 def get_active_provider_id() -> str:
@@ -128,6 +149,120 @@ def get_provider_model(provider_id: Optional[str] = None) -> str:
 def is_provider_available(provider_id: Optional[str] = None) -> bool:
     """Return True when an API key is configured for the active provider."""
     return bool(get_provider_api_key(provider_id))
+
+
+def provider_supports_image(provider_id: Optional[str] = None) -> bool:
+    """Return True when the provider can generate images (#505).
+
+    Gemini generates via the native SDK (handled in the image route); the
+    OpenAI-compatible providers (OpenAI, OpenRouter) carry an ``image_gen``
+    descriptor. Text-only providers (DeepSeek, Kimi) return False.
+    """
+    pid = provider_id or get_active_provider_id()
+    if pid == "gemini":
+        return True
+    return "image_gen" in get_provider_descriptor(pid)
+
+
+def _image_headers(provider_id: str) -> dict[str, str]:
+    api_key = get_provider_api_key(provider_id)
+    if not api_key:
+        raise ProviderError(f"No API key configured for provider '{provider_id}'.")
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    if provider_id == "openrouter":
+        headers["HTTP-Referer"] = "https://github.com/hessius/MeticAI"
+        headers["X-Title"] = "Metic"
+    return headers
+
+
+def _request_image_sync(
+    provider_id: str, endpoint: str, model: str, prompt: str, base_url: str
+) -> bytes:
+    """Call a single OpenAI-compatible image endpoint and return raw bytes.
+
+    OpenAI uses ``POST /images/generations``; OpenRouter a dedicated
+    ``POST /images``. Both return base64 in ``data[0].b64_json``.
+    """
+    if endpoint == "openai-images":
+        path = "/images/generations"
+        payload: dict = {"model": model, "prompt": prompt, "n": 1, "size": "1024x1024"}
+        # gpt-image-1 always returns base64 and rejects response_format; the
+        # dall-e-* models default to a remote URL and need it to return base64.
+        if not model.startswith("gpt-image"):
+            payload["response_format"] = "b64_json"
+    else:
+        path = "/images"
+        payload = {"model": model, "prompt": prompt}
+
+    try:
+        with httpx.Client(timeout=_HTTP_TIMEOUT) as client:
+            resp = client.post(
+                f"{base_url}{path}",
+                headers=_image_headers(provider_id),
+                json=payload,
+            )
+    except httpx.HTTPError as exc:
+        raise ProviderImageError(
+            None, f"Request to {provider_id} failed: {exc}"
+        ) from exc
+
+    if resp.status_code >= 400:
+        raise ProviderImageError(
+            resp.status_code,
+            f"{provider_id} image gen returned {resp.status_code}: {resp.text[:500]}",
+        )
+
+    try:
+        data = resp.json()
+        item = (data.get("data") or [])[0]
+        b64 = item.get("b64_json")
+    except (KeyError, IndexError, TypeError, ValueError):
+        b64 = None
+    if not b64:
+        raise ProviderImageError(None, f"No image returned by {provider_id}")
+    return base64.b64decode(b64)
+
+
+def _generate_image_bytes_sync(prompt: str, provider_id: str) -> bytes:
+    descriptor = get_provider_descriptor(provider_id)
+    cfg = descriptor.get("image_gen")
+    if not cfg:
+        raise ProviderError(
+            f"Provider '{provider_id}' does not support image generation."
+        )
+    base_url = descriptor["base_url"]
+    models = cfg["models"]
+    last_exc: Optional[ProviderImageError] = None
+    for index, model in enumerate(models):
+        try:
+            return _request_image_sync(
+                provider_id, cfg["endpoint"], model, prompt, base_url
+            )
+        except ProviderImageError as exc:
+            last_exc = exc
+            is_last = index == len(models) - 1
+            # Only fall through to the next model on auth/availability errors
+            # (e.g. gpt-image-1 → dall-e-3 when the org isn't verified).
+            recoverable = exc.status_code in (401, 403, 404)
+            if is_last or not recoverable:
+                raise
+    if last_exc:
+        raise last_exc
+    raise ProviderError(f"Image generation failed for provider '{provider_id}'.")
+
+
+async def generate_image_bytes(prompt: str, provider_id: Optional[str] = None) -> bytes:
+    """Generate an image via an OpenAI-compatible provider (#505).
+
+    Returns raw image bytes (PNG/JPEG/WebP). Tries the provider's configured
+    image models in order so OpenAI can fall back from ``gpt-image-1`` to
+    ``dall-e-3``. Raises :class:`ProviderError` on failure.
+    """
+    pid = provider_id or get_active_provider_id()
+    return await asyncio.to_thread(_generate_image_bytes_sync, prompt, pid)
 
 
 def _image_to_data_url(image) -> str:
