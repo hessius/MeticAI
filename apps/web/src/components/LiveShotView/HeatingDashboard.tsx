@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { ProfileBreakdown } from '@/components/ProfileBreakdown'
@@ -122,48 +123,76 @@ export function HeatingDashboard(props: HeatingDashboardProps) {
     <div className="flex flex-col gap-4 pb-28">
       {/* Hero — color-coded status + time-to-stability countdown */}
       <div className={`flex flex-col items-center rounded-2xl border px-4 py-6 text-center transition-colors ${tone.container}`}>
-        <div className="flex items-center gap-2">
-          <span className={`text-sm font-semibold uppercase tracking-wide ${tone.accent}`}>
-            {statusLabel}
-          </span>
-          {props.lancesStandard && (
-            <span className="text-xs font-medium italic text-emerald-600 dark:text-emerald-400">
-              {t('controlCenter.states.lancesStandard')}
-            </span>
-          )}
-        </div>
-
-        {showCountdown && (
+        {readyToBrew ? (
+          // "Ready to brew" is the headline; the remaining time to peak thermal
+          // stability is demoted to a quiet secondary line so this state reads as
+          // ready (not as if it were still counting down to being usable).
           <>
-            <AnimatePresence mode="wait">
-              {heroEta == null ? (
-                <motion.span
-                  key="estimating"
-                  className="mt-2 text-2xl font-semibold tabular-nums text-muted-foreground"
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                >
-                  {t('controlCenter.heating.estimating')}
-                </motion.span>
-              ) : (
-                <motion.span
-                  key="eta"
-                  className={`mt-2 text-6xl font-bold tabular-nums tracking-tight ${tempStable ? tone.accent : 'text-foreground'}`}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                >
-                  {!tempStable && t('controlCenter.heating.estimatePrefix')}
-                  {formatMmSs(heroEta)}
-                </motion.span>
+            <div className="flex items-center gap-2">
+              <Check className={`h-7 w-7 ${tone.accent}`} aria-hidden="true" />
+              <span className={`text-3xl font-bold tracking-tight ${tone.accent}`}>
+                {t('controlCenter.heating.statusReadyToBrew')}
+              </span>
+            </div>
+            {heroEta != null && heroEta > 0 && (
+              <span className="mt-2 text-sm text-muted-foreground">
+                {t('controlCenter.heating.stillDialingIn', {
+                  time: `${t('controlCenter.heating.estimatePrefix')}${formatMmSs(heroEta)}`,
+                })}
+              </span>
+            )}
+            {props.lancesStandard && (
+              <span className="mt-1 text-xs font-medium italic text-emerald-600 dark:text-emerald-400">
+                {t('controlCenter.states.lancesStandard')}
+              </span>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-semibold uppercase tracking-wide ${tone.accent}`}>
+                {statusLabel}
+              </span>
+              {props.lancesStandard && (
+                <span className="text-xs font-medium italic text-emerald-600 dark:text-emerald-400">
+                  {t('controlCenter.states.lancesStandard')}
+                </span>
               )}
-            </AnimatePresence>
-            <span className="mt-2 text-sm text-muted-foreground">
-              {tempStable
-                ? t('controlCenter.heating.stabilityReached')
-                : t('controlCenter.heating.timeToReady')}
-            </span>
+            </div>
+
+            {showCountdown && (
+              <>
+                <AnimatePresence mode="wait">
+                  {heroEta == null ? (
+                    <motion.span
+                      key="estimating"
+                      className="mt-2 text-2xl font-semibold tabular-nums text-muted-foreground"
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                    >
+                      {t('controlCenter.heating.estimating')}
+                    </motion.span>
+                  ) : (
+                    <motion.span
+                      key="eta"
+                      className={`mt-2 text-6xl font-bold tabular-nums tracking-tight ${tempStable ? tone.accent : 'text-foreground'}`}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                    >
+                      {!tempStable && t('controlCenter.heating.estimatePrefix')}
+                      {formatMmSs(heroEta)}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+                <span className="mt-2 text-sm text-muted-foreground">
+                  {tempStable
+                    ? t('controlCenter.heating.stabilityReached')
+                    : t('controlCenter.heating.timeToReady')}
+                </span>
+              </>
+            )}
           </>
         )}
       </div>

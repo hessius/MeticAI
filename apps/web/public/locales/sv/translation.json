@@ -769,6 +769,7 @@
       "statusReadyToBrew": "Redo att brygga",
       "statusStable": "Temperaturen stabil",
       "timeToReady": "till temperaturstabilitet",
+      "stillDialingIn": "Finjusterar fortfarande · {{time}} till full stabilitet",
       "estimatePrefix": "~",
       "estimating": "Beräknar…",
       "brewChamber": "Bryggkammare",

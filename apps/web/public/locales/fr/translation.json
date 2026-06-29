@@ -764,6 +764,7 @@
       "statusReadyToBrew": "Prêt à infuser",
       "statusStable": "Température stable",
       "timeToReady": "avant stabilité thermique",
+      "stillDialingIn": "Réglage en cours · {{time}} avant stabilité maximale",
       "estimatePrefix": "~",
       "estimating": "Estimation…",
       "brewChamber": "Chambre d'infusion",

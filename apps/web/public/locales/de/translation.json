@@ -764,6 +764,7 @@
       "statusReadyToBrew": "Brühbereit",
       "statusStable": "Temperatur stabil",
       "timeToReady": "bis Temperaturstabilität",
+      "stillDialingIn": "Wird noch fein eingestellt · {{time}} bis zur vollen Stabilität",
       "estimatePrefix": "~",
       "estimating": "Schätzung…",
       "brewChamber": "Brühkammer",

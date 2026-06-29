@@ -776,6 +776,7 @@
       "statusReadyToBrew": "Ready to brew",
       "statusStable": "Temperature stable",
       "timeToReady": "until temperature stability",
+      "stillDialingIn": "Still dialing in · {{time}} to peak stability",
       "estimatePrefix": "~",
       "estimating": "Estimating…",
       "brewChamber": "Brew Chamber",

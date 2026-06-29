@@ -72,7 +72,7 @@ describe('HeatingDashboard', () => {
   it('keeps the countdown running (not 0:00) while only ready-to-brew', () => {
     render(<HeatingDashboard {...baseProps} isReady isHeating={false} headTemp={68} lanceReadyCutoff={92} />)
     expect(screen.queryByText(/0:00/)).not.toBeInTheDocument()
-    expect(screen.getByText('controlCenter.heating.timeToReady')).toBeInTheDocument()
+    expect(screen.getByText('controlCenter.heating.stillDialingIn')).toBeInTheDocument()
   })
 
   it('shows the temperature-stable status once the head reaches the cutoff', () => {
