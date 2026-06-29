@@ -765,6 +765,7 @@
       "statusStable": "Temperatura stabile",
       "timeToReady": "alla stabilità termica",
       "stillDialingIn": "Messa a punto in corso · {{time}} alla piena stabilità",
+      "almostStable": "Quasi pronto — in attesa della piena stabilità",
       "estimatePrefix": "~",
       "estimating": "Stima…",
       "brewChamber": "Camera di infusione",

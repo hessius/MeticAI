@@ -765,6 +765,7 @@
       "statusStable": "Temperatura estable",
       "timeToReady": "hasta estabilidad térmica",
       "stillDialingIn": "Afinando aún · {{time}} hasta estabilidad total",
+      "almostStable": "Casi listo — esperando estabilidad total",
       "estimatePrefix": "~",
       "estimating": "Estimando…",
       "brewChamber": "Cámara de preparación",

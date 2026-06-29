@@ -770,6 +770,7 @@
       "statusStable": "Temperaturen stabil",
       "timeToReady": "till temperaturstabilitet",
       "stillDialingIn": "Finjusterar fortfarande · {{time}} till full stabilitet",
+      "almostStable": "Nästan klar — inväntar full stabilitet",
       "estimatePrefix": "~",
       "estimating": "Beräknar…",
       "brewChamber": "Bryggkammare",

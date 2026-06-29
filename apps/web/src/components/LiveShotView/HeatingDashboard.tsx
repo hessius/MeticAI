@@ -134,11 +134,18 @@ export function HeatingDashboard(props: HeatingDashboardProps) {
                 {t('controlCenter.heating.statusReadyToBrew')}
               </span>
             </div>
-            {heroEta != null && heroEta > 0 && (
+            {heroEta != null && heroEta > 0 ? (
               <span className="mt-2 text-sm text-muted-foreground">
                 {t('controlCenter.heating.stillDialingIn', {
                   time: `${t('controlCenter.heating.estimatePrefix')}${formatMmSs(heroEta)}`,
                 })}
+              </span>
+            ) : (
+              // Estimate has run out but the head hasn't crossed the stability
+              // cutoff yet — hold an "almost there" line instead of vanishing, so
+              // the state never looks fully settled before it actually is.
+              <span className="mt-2 text-sm text-muted-foreground">
+                {t('controlCenter.heating.almostStable')}
               </span>
             )}
             {props.lancesStandard && (

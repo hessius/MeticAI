@@ -75,6 +75,15 @@ describe('HeatingDashboard', () => {
     expect(screen.getByText('controlCenter.heating.stillDialingIn')).toBeInTheDocument()
   })
 
+  it('holds an "almost there" line (not a bare status) when ready-to-brew but the estimate has run out', () => {
+    // target ≤ cutoff makes the estimate return 0 while the head is still below
+    // the stability cutoff, so the hero is ready-to-brew with no countdown left.
+    render(<HeatingDashboard {...baseProps} isReady isHeating={false} headTemp={68} setTemp={90} lanceReadyCutoff={92} />)
+    expect(screen.getByText('controlCenter.heating.statusReadyToBrew')).toBeInTheDocument()
+    expect(screen.getByText('controlCenter.heating.almostStable')).toBeInTheDocument()
+    expect(screen.queryByText('controlCenter.heating.stillDialingIn')).not.toBeInTheDocument()
+  })
+
   it('shows the temperature-stable status once the head reaches the cutoff', () => {
     render(<HeatingDashboard {...baseProps} isReady isHeating={false} headTemp={92} lanceReadyCutoff={92} />)
     expect(screen.getByText('controlCenter.heating.statusStable')).toBeInTheDocument()

@@ -59,6 +59,24 @@ describe('useHeatingSamples', () => {
     expect(result.current[result.current.length - 1].temp).toBe(90)
   })
 
+  it('retains the full heating history by default (no trailing-window trim) — #506', () => {
+    let now = 0
+    const nowFn = () => now
+    const { result, rerender } = renderHook(
+      ({ temp }) => useHeatingSamples({ temp, active: true, nowFn }),
+      { initialProps: { temp: 20 } }
+    )
+    // Simulate ~3 minutes of heat-up sampled every second.
+    for (let i = 1; i <= 180; i++) {
+      act(() => { now = i * 1000 })
+      rerender({ temp: 20 + i * 0.4 })
+    }
+    expect(result.current.length).toBe(181)
+    // The earliest rising-curve sample is still present (not scrolled off).
+    expect(result.current[0].t).toBeCloseTo(0, 1)
+    expect(result.current[0].temp).toBe(20)
+  })
+
   it('records chamber temperature when provided', () => {
     const { result } = renderHook(
       () => useHeatingSamples({ temp: 88, chamber: 91, active: true })

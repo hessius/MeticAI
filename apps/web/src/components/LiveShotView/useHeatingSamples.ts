@@ -8,7 +8,7 @@ interface UseHeatingSamplesOptions {
   chamber?: number
   /** True while the machine is heating (not yet ready / not brewing). */
   active: boolean
-  /** Rolling window length in seconds. Default 45. */
+  /** Rolling window length in seconds. Default keeps the full heating session. */
   maxWindow?: number
   /**
    * Monotonic per-telemetry-tick signal; when provided, drives sampling so
@@ -23,13 +23,16 @@ interface UseHeatingSamplesOptions {
 /**
  * Accumulates (elapsed-seconds, head temperature, optional chamber temperature)
  * samples while `active`, retaining a trailing window of `maxWindow` seconds.
- * Resets to empty when inactive so each heating cycle starts fresh.
+ * `maxWindow` defaults to Infinity so the entire heating session is kept — a
+ * finite window would scroll the rising heat-up curve off-screen as the head
+ * temp plateaus near target, making the chart look like it cleared on "ready"
+ * (#506). Resets to empty when inactive so each heating cycle starts fresh.
  */
 export function useHeatingSamples({
   temp,
   chamber,
   active,
-  maxWindow = 45,
+  maxWindow = Infinity,
   tick,
   nowFn = Date.now,
 }: UseHeatingSamplesOptions): TempSample[] {
@@ -48,6 +51,7 @@ export function useHeatingSamples({
     const t = (now - startRef.current) / 1000
     setSamples((prev) => {
       const next = [...prev, { t, temp, chamber }]
+      if (!Number.isFinite(maxWindow)) return next
       const cutoff = t - maxWindow
       return next.filter((s) => s.t >= cutoff)
     })
