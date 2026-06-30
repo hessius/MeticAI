@@ -9,6 +9,7 @@ import { deriveStructuralTags } from '@/lib/profileAnalysis'
 import type { AnalyzableProfile } from '@/lib/profileAnalysis'
 import { AI_TAGS_PROMPT, parseAiTags, stripTagsLine } from '@/lib/tags'
 import { buildShotFacts } from '@/lib/shotFacts'
+import { lintShotAnalysis, repairShotAnalysis, validateAgainstFacts } from '@/lib/analysisLint'
 import { buildAnalyzeLlmPrompt } from './analyzeLlmPrompt'
 import { buildTasteContext } from '../ai/prompts'
 import {
@@ -3031,6 +3032,7 @@ export function installDirectModeInterceptor(): void {
             ? buildTasteContext(tasteX, tasteY, tasteDescriptors)
             : ''
 
+          const facts = buildShotFacts(richAnalysis as Parameters<typeof buildShotFacts>[0])
           const prompt = buildAnalyzeLlmPrompt({
             profileName: pName,
             temperature: shotProfile?.temperature ?? null,
@@ -3038,7 +3040,7 @@ export function installDirectModeInterceptor(): void {
             profileDescription: profileDescription ?? '',
             profileVars,
             cleanStages,
-            facts: buildShotFacts(richAnalysis as Parameters<typeof buildShotFacts>[0]),
+            facts,
             tasteContext,
             graphSamples,
           })
@@ -3048,13 +3050,21 @@ export function installDirectModeInterceptor(): void {
             return jsonResponse({ status: 'error', message: aiNotConfiguredMessage() })
           }
           const analyzeProvider = getProviderForMethod('analyzeShot')
-          const response = await retryWithBackoff(() =>
-            analyzeProvider.generateText({
+          const gen = async () => {
+            const r = await retryWithBackoff(() => analyzeProvider.generateText({
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            })
-          ) as { text?: string }
-
-          const analysisText = response.text ?? ''
+            })) as { text?: string }
+            return r.text ?? ''
+          }
+          let analysisText = await gen()
+          let lint = lintShotAnalysis(analysisText)
+          let factCheck = validateAgainstFacts(analysisText, facts)
+          if (!lint.valid || !factCheck.valid) {
+            analysisText = await gen()  // one retry
+            lint = lintShotAnalysis(analysisText)
+            factCheck = validateAgainstFacts(analysisText, facts)
+          }
+          if (!lint.valid) analysisText = repairShotAnalysis(analysisText)
           return jsonResponse({
             status: 'success',
             llm_analysis: analysisText,

@@ -95,3 +95,39 @@ describe('repairShotAnalysis', () => {
     expect(repaired).not.toMatch(/\n{3,}/)
   })
 })
+
+import { validateAgainstFacts } from './analysisLint'
+import type { ShotFacts } from './shotFacts'
+
+const factsTargetedWeight: ShotFacts = {
+  stages: [{ stage_name: 'Hold', reached: true, control_mode: 'pressure', trigger_type: 'weight',
+    trigger_class: { kind: 'targeted', label: 'Targeted (yield reached)', reason: '' },
+    stall: { stalled: false, weight_gain: 30 },
+    channeling: { channeling: false, pressure_drop: 0, flow_rise: 0 },
+    curve_adherence: null }],
+  phases: [], weight: { actual: 36, target: 36, deviation_pct: 0 }, total_time_s: 28,
+}
+
+describe('validateAgainstFacts (K4)', () => {
+  it('flags a targeted weight exit described as early termination', () => {
+    const text = '## 1. Shot Performance\n- The hold stage terminated early before reaching its goal.'
+    const r = validateAgainstFacts(text, factsTargetedWeight)
+    expect(r.valid).toBe(false)
+    expect(r.issues).toContain('mischaracterized-targeted-exit')
+  })
+  it('accepts analysis that frames the targeted exit as success', () => {
+    const text = '## 1. Shot Performance\n- The hold stage ended exactly on the weight target, a correct finish.'
+    expect(validateAgainstFacts(text, factsTargetedWeight).valid).toBe(true)
+  })
+  it('flags channeling claimed when no stage channeled', () => {
+    const text = '## 2. Root Cause\n- Severe channeling caused the pressure to collapse.'
+    const r = validateAgainstFacts(text, factsTargetedWeight)
+    expect(r.issues).toContain('unsupported-channeling')
+  })
+  it('does not flag channeling when a stage actually channeled', () => {
+    const facts: ShotFacts = { ...factsTargetedWeight, stages: [{ ...factsTargetedWeight.stages[0],
+      channeling: { channeling: true, pressure_drop: 3, flow_rise: 2 } }] }
+    const text = '- Channeling is evident from the pressure drop.'
+    expect(validateAgainstFacts(text, facts).issues).not.toContain('unsupported-channeling')
+  })
+})
