@@ -9306,6 +9306,42 @@ class TestSettingsEndpoints:
         assert data["geminiApiKey"]
         assert "stored-key" not in data["geminiApiKey"]
 
+    def test_get_settings_never_leaks_raw_ai_provider_key(self, client, monkeypatch):
+        """The raw BYO provider key (aiApiKey) must never be returned (#491)."""
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+        import api.routes.system as system_module
+        import services.ai_providers as ai_providers_module
+
+        def mock_load_settings():
+            return {
+                "aiProvider": "openai",
+                "aiApiKey": "sk-secret-openai-key-1234567890",
+                "meticulousIp": "",
+                "serverIp": "",
+                "authorName": "",
+            }
+
+        monkeypatch.setattr(system_module, "load_settings", mock_load_settings)
+        monkeypatch.setattr(
+            ai_providers_module, "get_active_provider_id", lambda: "openai"
+        )
+        monkeypatch.setattr(
+            ai_providers_module,
+            "get_provider_api_key",
+            lambda _provider=None: "sk-secret-openai-key-1234567890",
+        )
+
+        response = client.get("/api/settings")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert "aiApiKey" not in data
+        assert "sk-secret-openai-key" not in json.dumps(data)
+        # Masked representation is still present and configured.
+        assert data["geminiApiKeyConfigured"] is True
+        assert data["geminiApiKeyMasked"] is True
+
     def test_get_settings_error_handling(self, client, monkeypatch):
         """Test get_settings handles errors."""
         import api.routes.system as system_module
@@ -17281,6 +17317,12 @@ class TestAITags:
         assert parse_ai_tags("No tags line here") == []
         assert parse_ai_tags(None) == []
         assert parse_ai_tags("Tags:") == []
+
+    def test_parse_ai_tags_tolerates_literal_brackets(self):
+        from services.analysis_service import parse_ai_tags
+
+        assert parse_ai_tags("Tags: [Chocolate, Sweet]") == ["Chocolate", "Sweet"]
+        assert parse_ai_tags("Tags: [Chocolate]") == ["Chocolate"]
 
     def test_strip_tags_line_removes_trailing_line(self):
         from services.analysis_service import strip_tags_line

@@ -69,7 +69,7 @@ def parse_ai_tags(text: Optional[str]) -> list[str]:
     result: list[str] = []
     seen: set[str] = set()
     for raw in match.group(1).split(","):
-        candidate = raw.strip().rstrip(".").strip()
+        candidate = raw.replace("[", "").replace("]", "").strip().rstrip(".").strip()
         canonical = _AI_TAG_LOOKUP.get(candidate.lower())
         if canonical and canonical not in seen:
             seen.add(canonical)

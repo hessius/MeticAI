@@ -2,6 +2,17 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { ProfileBreakdown } from '@/components/ProfileBreakdown'
 import type { ProfileData } from '@/components/ProfileBreakdown'
 import { estimateTimeToReady } from './estimateTimeToReady'
@@ -248,9 +259,23 @@ export function HeatingDashboard(props: HeatingDashboardProps) {
           <Button type="button" className="flex-1" onClick={props.onStart} disabled={props.startDisabled}>
             {t('controlCenter.actions.start')}
           </Button>
-          <Button type="button" variant="destructive" onClick={props.onAbort}>
-            {t('controlCenter.actions.abort')}
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button type="button" variant="destructive">
+                {t('controlCenter.actions.abort')}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('controlCenter.confirm.abortTitle')}</AlertDialogTitle>
+                <AlertDialogDescription>{t('controlCenter.confirm.abortDesc')}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                <AlertDialogAction onClick={props.onAbort}>{t('common.confirm')}</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
     </div>

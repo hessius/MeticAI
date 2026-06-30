@@ -83,6 +83,12 @@ export function ReplayScrubber({
           ]
           if (scrubKeys.includes(e.key)) startInteraction()
         }}
+        onKeyUp={() => {
+          // Safety net: a keypress at a slider boundary doesn't change the value,
+          // so Radix never emits `onValueCommit` and playback would stay paused.
+          // Resume on key release. If a commit already ran, this is a no-op.
+          endInteraction(true)
+        }}
         onValueChange={(values) => {
           onChange(Math.min(Math.max(values[0], 0), max))
         }}

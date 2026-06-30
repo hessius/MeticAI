@@ -154,7 +154,7 @@ export function parseAiTags(text: string | null | undefined): string[] {
   const result: string[] = []
   const seen = new Set<string>()
   for (const raw of match[1].split(',')) {
-    const candidate = raw.trim().replace(/\.+$/, '').trim()
+    const candidate = raw.replace(/[[\]]/g, '').trim().replace(/\.+$/, '').trim()
     const canonical = AI_TAG_LOOKUP.get(candidate.toLowerCase())
     if (canonical && !seen.has(canonical)) {
       seen.add(canonical)

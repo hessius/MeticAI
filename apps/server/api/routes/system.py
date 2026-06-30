@@ -1244,6 +1244,10 @@ async def get_settings(request: Request):
             settings["geminiApiKeyMasked"] = False
             settings["geminiApiKeyConfigured"] = False
 
+        # Never expose the raw BYO provider key (#491). The masked representation
+        # is already carried by geminiApiKey/geminiApiKeyMasked above.
+        settings.pop("aiApiKey", None)
+
         # Always show current IP values from environment (env takes precedence)
         if env_meticulous_ip:
             settings["meticulousIp"] = env_meticulous_ip

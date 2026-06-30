@@ -223,3 +223,173 @@ class TestGeminiServiceDelegation:
         assert isinstance(model, OpenAICompatModel)
         assert gemini_service.get_model_name() == "gpt-4o"
         assert gemini_service.is_ai_available() is True
+
+
+def _b64_png() -> str:
+    """A 1x1 PNG encoded as base64 (valid for base64.b64decode)."""
+    import base64
+    import io
+
+    buf = io.BytesIO()
+    Image.new("RGB", (1, 1), (10, 20, 30)).save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+class _ImgResp:
+    def __init__(self, status_code, payload=None, text=""):
+        self.status_code = status_code
+        self._payload = payload or {}
+        self.text = text
+
+    def json(self):
+        return self._payload
+
+
+def _img_client_factory(responses):
+    """Build a fake httpx.Client yielding queued responses per POST call."""
+    calls = {"posts": []}
+
+    class _Client:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def post(self, url, headers, json):
+            calls["posts"].append({"url": url, "model": json.get("model")})
+            return responses.pop(0)
+
+    return _Client, calls
+
+
+class TestImageGeneration:
+    @patch.dict(
+        os.environ,
+        {"AI_PROVIDER": "openai", "AI_API_KEY": "k"},
+        clear=True,
+    )
+    def test_openai_image_success_returns_bytes(self):
+        from services.ai_providers import _generate_image_bytes_sync
+
+        b64 = _b64_png()
+        client, calls = _img_client_factory(
+            [_ImgResp(200, {"data": [{"b64_json": b64}]})]
+        )
+        with patch.object(ai_providers.httpx, "Client", client):
+            data = _generate_image_bytes_sync("a cat", "openai")
+        assert isinstance(data, bytes) and len(data) > 0
+        # gpt-image-1 is tried first; no response_format fallback needed.
+        assert calls["posts"][0]["model"] == "gpt-image-1"
+
+    @patch.dict(
+        os.environ,
+        {"AI_PROVIDER": "openai", "AI_API_KEY": "k"},
+        clear=True,
+    )
+    def test_falls_back_to_next_model_on_403(self):
+        from services.ai_providers import _generate_image_bytes_sync
+
+        b64 = _b64_png()
+        # gpt-image-1 → 403 (org not verified), then dall-e-3 → success.
+        client, calls = _img_client_factory(
+            [
+                _ImgResp(403, text="org must be verified"),
+                _ImgResp(200, {"data": [{"b64_json": b64}]}),
+            ]
+        )
+        with patch.object(ai_providers.httpx, "Client", client):
+            data = _generate_image_bytes_sync("a cat", "openai")
+        assert isinstance(data, bytes) and len(data) > 0
+        assert [p["model"] for p in calls["posts"]] == ["gpt-image-1", "dall-e-3"]
+
+    @patch.dict(
+        os.environ,
+        {"AI_PROVIDER": "openai", "AI_API_KEY": "k"},
+        clear=True,
+    )
+    def test_non_recoverable_status_raises_without_fallback(self):
+        from services.ai_providers import ProviderImageError, _generate_image_bytes_sync
+
+        # 500 is not in the recoverable set → raise immediately, no fallback.
+        client, calls = _img_client_factory([_ImgResp(500, text="server error")])
+        with patch.object(ai_providers.httpx, "Client", client):
+            with pytest.raises(ProviderImageError):
+                _generate_image_bytes_sync("a cat", "openai")
+        assert len(calls["posts"]) == 1
+
+    @patch.dict(os.environ, {"AI_PROVIDER": "deepseek", "AI_API_KEY": "k"}, clear=True)
+    def test_unsupported_provider_raises(self):
+        from services.ai_providers import ProviderError, _generate_image_bytes_sync
+
+        with pytest.raises(ProviderError):
+            _generate_image_bytes_sync("a cat", "deepseek")
+
+
+class TestListProviderModels:
+    @patch.dict(os.environ, {"AI_PROVIDER": "openai", "AI_API_KEY": "k"}, clear=True)
+    async def test_parses_data_envelope(self):
+        from services.ai_providers import list_provider_models
+
+        class _Resp:
+            status_code = 200
+
+            @staticmethod
+            def raise_for_status():
+                return None
+
+            @staticmethod
+            def json():
+                return {"data": [{"id": "gpt-4o"}, {"id": "gpt-4o-mini"}, {"no": "id"}]}
+
+        class _Client:
+            def __init__(self, *a, **k):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def get(self, url, headers):
+                assert url.endswith("/models")
+                return _Resp()
+
+        with patch.object(ai_providers.httpx, "Client", _Client):
+            models = await list_provider_models("openai")
+        ids = [m["id"] for m in models]
+        assert ids == ["gpt-4o", "gpt-4o-mini"]
+
+    @patch.dict(os.environ, {"AI_PROVIDER": "openai", "AI_API_KEY": "k"}, clear=True)
+    async def test_falls_back_to_default_on_error(self):
+        from services.ai_providers import list_provider_models
+
+        class _Client:
+            def __init__(self, *a, **k):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def get(self, url, headers):
+                raise ai_providers.httpx.HTTPError("boom")
+
+        with patch.object(ai_providers.httpx, "Client", _Client):
+            models = await list_provider_models("openai")
+        assert models == [
+            {"id": "gpt-4o-mini", "display_name": "gpt-4o-mini", "description": ""}
+        ]
+
+    @patch.dict(os.environ, {"AI_PROVIDER": "openai"}, clear=True)
+    async def test_no_api_key_returns_fallback(self):
+        from services.ai_providers import list_provider_models
+
+        models = await list_provider_models("openai")
+        assert models[0]["id"] == "gpt-4o-mini"

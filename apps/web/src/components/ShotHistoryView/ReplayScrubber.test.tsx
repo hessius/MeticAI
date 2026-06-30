@@ -59,6 +59,29 @@ describe('ReplayScrubber', () => {
     expect(onScrubEnd).toHaveBeenCalled()
   })
 
+  it('resumes playback (onScrubEnd) on key release at a slider boundary', () => {
+    // At value=0, pressing ArrowLeft doesn't change the value, so Radix never
+    // emits onValueCommit. Without an onKeyUp safety net, onScrubStart would
+    // fire (pausing playback) with no matching onScrubEnd, leaving it stuck.
+    const onScrubStart = vi.fn()
+    const onScrubEnd = vi.fn()
+    render(
+      <ReplayScrubber
+        value={0}
+        max={10}
+        onChange={() => {}}
+        onScrubStart={onScrubStart}
+        onScrubEnd={onScrubEnd}
+      />
+    )
+    const slider = screen.getByRole('slider')
+    fireEvent.keyDown(slider, { key: 'ArrowLeft' })
+    expect(onScrubStart).toHaveBeenCalledTimes(1)
+    fireEvent.keyUp(slider, { key: 'ArrowLeft' })
+    expect(onScrubEnd).toHaveBeenCalledTimes(1)
+  })
+
+
   it('does not start a scrub (pause playback) on non-scrubbing keys like Tab', () => {
     const onScrubStart = vi.fn()
     const onScrubEnd = vi.fn()

@@ -279,6 +279,11 @@ describe('tags', () => {
       expect(parseAiTags('Tags:')).toEqual([])
       expect(parseAiTags('Tags:   ')).toEqual([])
     })
+
+    it('tolerates literal brackets emitted by the model', () => {
+      expect(parseAiTags('Tags: [Chocolate, Sweet]')).toEqual(['Chocolate', 'Sweet'])
+      expect(parseAiTags('Tags: [Chocolate]')).toEqual(['Chocolate'])
+    })
   })
 
   describe('stripTagsLine', () => {
