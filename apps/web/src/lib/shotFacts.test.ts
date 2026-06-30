@@ -74,4 +74,34 @@ describe('buildShotFacts', () => {
     expect(facts.stages[0].trigger_class?.kind).toBe('targeted')
     expect(facts.total_time_s).toBe(30)
   })
+
+  it('computes curve adherence from profile_target_value', () => {
+    const analysis = {
+      shot_summary: { total_time: 30 },
+      weight_analysis: { actual: 36, target: 36, deviation_percent: 0 },
+      stage_analyses: [{
+        stage_name: 'Ramp', stage_type: 'pressure', profile_target_value: 9,
+        exit_triggers: [{ type: 'pressure' }],
+        exit_trigger_result: { triggered: { type: 'pressure' } },
+        execution_data: { duration: 10, weight_gain: 2, end_weight: 8, start_pressure: 6, end_pressure: 9, avg_pressure: 8.5, max_pressure: 9, min_pressure: 6, start_flow: 2, end_flow: 2, avg_flow: 2, max_flow: 2 },
+      }],
+    }
+    const ca = buildShotFacts(analysis).stages[0].curve_adherence
+    expect(ca).not.toBeNull()
+    expect(ca?.target).toBe(9)
+    expect(ca?.measured).toBe(8.5)
+    expect(ca?.delta).toBe(-0.5)
+  })
+
+  it('curve adherence is null without a numeric target', () => {
+    const analysis = {
+      stage_analyses: [{
+        stage_name: 'Ramp', stage_type: 'pressure',
+        exit_triggers: [{ type: 'pressure' }],
+        exit_trigger_result: { triggered: { type: 'pressure' } },
+        execution_data: { duration: 10, weight_gain: 2, end_weight: 8, start_pressure: 6, end_pressure: 9, avg_pressure: 8.5, max_pressure: 9, min_pressure: 6, start_flow: 2, end_flow: 2, avg_flow: 2, max_flow: 2 },
+      }],
+    }
+    expect(buildShotFacts(analysis).stages[0].curve_adherence).toBeNull()
+  })
 })

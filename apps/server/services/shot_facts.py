@@ -153,13 +153,14 @@ def _build_phases(local_analysis: dict) -> list[dict]:
 
 
 def _curve_adherence(stage: dict) -> dict | None:
-    """Compare measured avg vs the stage's first target dynamics point, if numeric."""
-    points = (
-        (stage.get("profile_target") or {})
-        if isinstance(stage.get("profile_target"), dict)
-        else {}
-    )
-    target = points.get("target_value")
+    """Compare measured avg vs the stage's mean target setpoint, if numeric.
+
+    The numeric target is precomputed at stage-build time as
+    ``profile_target_value`` (mean of the resolved dynamics setpoints); see
+    analysis_service._mean_dynamics_target and its native mirror
+    DirectModeInterceptor.meanDynamicsTarget.
+    """
+    target = stage.get("profile_target_value")
     ed = stage.get("execution_data") or {}
     if target is None:
         return None
@@ -168,7 +169,7 @@ def _curve_adherence(stage: dict) -> dict | None:
     if measured is None:
         return None
     return {
-        "target": target,
+        "target": round(float(target), 2),
         "measured": measured,
         "delta": round(float(measured) - float(target), 2),
     }

@@ -24,6 +24,7 @@ interface StageAnalysis {
   exit_trigger_result?: { triggered?: { type?: string } | null } | null
   execution_data?: ExecutionData | null
   profile_target?: { target_value?: number } | unknown
+  profile_target_value?: number | null
 }
 export interface ShotFactStage {
   stage_name?: string
@@ -110,8 +111,7 @@ function buildPhases(stages: StageAnalysis[]): ShotFacts['phases'] {
 }
 
 function curveAdherence(stage: StageAnalysis): ShotFactStage['curve_adherence'] {
-  const pt = stage.profile_target as { target_value?: number } | undefined
-  const target = pt?.target_value
+  const target = typeof stage.profile_target_value === 'number' ? stage.profile_target_value : null
   if (target == null) return null
   const mode = resolveStageControlMode(stage)
   const measured = mode === 'pressure' ? stage.execution_data?.avg_pressure : stage.execution_data?.avg_flow

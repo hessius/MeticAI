@@ -17494,6 +17494,55 @@ class TestShotFacts:
         }
         assert build_shot_facts(local)["total_time_s"] == 28.5
 
+    def test_curve_adherence_uses_profile_target_value(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [
+                self._stage(
+                    stage_type="pressure",
+                    profile_target_value=9.0,
+                    execution_data={**self._stage()["execution_data"], "avg_pressure": 8.5},
+                ),
+            ],
+            "weight_analysis": {},
+            "shot_summary": {"total_time": 30.0},
+        }
+        ca = build_shot_facts(local)["stages"][0]["curve_adherence"]
+        assert ca is not None
+        assert ca["target"] == 9.0
+        assert ca["measured"] == 8.5
+        assert ca["delta"] == -0.5
+
+    def test_curve_adherence_none_without_target(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [self._stage(stage_type="pressure")],
+            "weight_analysis": {},
+            "shot_summary": {"total_time": 30.0},
+        }
+        assert build_shot_facts(local)["stages"][0]["curve_adherence"] is None
+
+
+class TestMeanDynamicsTarget:
+    def test_mean_of_pressure_setpoints(self):
+        from services.analysis_service import _mean_dynamics_target
+        stage = {"type": "pressure", "dynamics_points": [[0, 2.0], [10, 8.0]]}
+        assert _mean_dynamics_target(stage) == 5.0
+
+    def test_resolves_variable_references(self):
+        from services.analysis_service import _mean_dynamics_target
+        stage = {"type": "flow", "dynamics_points": [[0, "$f"], [5, 4.0]]}
+        variables = [{"key": "f", "name": "Flow", "value": 2.0}]
+        assert _mean_dynamics_target(stage, variables) == 3.0
+
+    def test_none_for_non_pressure_flow_stage(self):
+        from services.analysis_service import _mean_dynamics_target
+        assert _mean_dynamics_target({"type": "power", "dynamics_points": [[0, 5]]}) is None
+
+    def test_none_when_no_numeric_points(self):
+        from services.analysis_service import _mean_dynamics_target
+        assert _mean_dynamics_target({"type": "pressure", "dynamics_points": []}) is None
+
 
 class TestLocalAnalysisIncludesFacts:
     def test_local_analysis_attaches_shot_facts(self):
