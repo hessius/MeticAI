@@ -8,6 +8,7 @@ import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './
 import { deriveStructuralTags } from '@/lib/profileAnalysis'
 import type { AnalyzableProfile } from '@/lib/profileAnalysis'
 import { AI_TAGS_PROMPT, parseAiTags, stripTagsLine } from '@/lib/tags'
+import { buildShotFacts } from '@/lib/shotFacts'
 import {
   addDirectDialInIteration,
   clearDirectHistory,
@@ -2941,6 +2942,7 @@ export function installDirectModeInterceptor(): void {
               )
             })(),
           }
+          ;(analysis as Record<string, unknown>).shot_facts = buildShotFacts(analysis as Parameters<typeof buildShotFacts>[0])
           return jsonResponse({ status: 'success', analysis })
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Analysis failed'
