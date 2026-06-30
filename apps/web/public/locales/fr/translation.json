@@ -1852,6 +1852,12 @@
       "stalled": "Bloqué",
       "channeling": "Chenalisation possible",
       "curveDelta": "Courbe Δ {{delta}}"
+    },
+    "taste": {
+      "gateTitle": "Affiner avec le goût (facultatif)",
+      "gateBody": "Indiquez le goût de cette extraction pour des recommandations plus fines.",
+      "skip": "Ignorer",
+      "analyzeWithTaste": "Analyser avec le goût"
     }
   }
 }

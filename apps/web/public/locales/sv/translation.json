@@ -1852,6 +1852,12 @@
       "stalled": "Avstannade",
       "channeling": "Möjlig kanalbildning",
       "curveDelta": "Kurva Δ {{delta}}"
+    },
+    "taste": {
+      "gateTitle": "Förfina med smak (valfritt)",
+      "gateBody": "Berätta hur koppen smakade för smakmedvetna rekommendationer.",
+      "skip": "Hoppa över",
+      "analyzeWithTaste": "Analysera med smak"
     }
   }
 }

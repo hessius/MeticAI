@@ -1852,6 +1852,12 @@
       "stalled": "Stehengeblieben",
       "channeling": "Mögliches Channeling",
       "curveDelta": "Kurve Δ {{delta}}"
+    },
+    "taste": {
+      "gateTitle": "Mit Geschmack verfeinern (optional)",
+      "gateBody": "Teile mit, wie der Shot geschmeckt hat, für geschmacksbewusste Empfehlungen.",
+      "skip": "Überspringen",
+      "analyzeWithTaste": "Mit Geschmack analysieren"
     }
   }
 }

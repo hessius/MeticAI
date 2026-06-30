@@ -1852,6 +1852,12 @@
       "stalled": "Bloccato",
       "channeling": "Possibile canalizzazione",
       "curveDelta": "Curva Δ {{delta}}"
+    },
+    "taste": {
+      "gateTitle": "Affina con il gusto (facoltativo)",
+      "gateBody": "Indica com'era il gusto per consigli più mirati.",
+      "skip": "Salta",
+      "analyzeWithTaste": "Analizza con il gusto"
     }
   }
 }

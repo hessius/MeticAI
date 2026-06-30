@@ -1852,6 +1852,12 @@
       "stalled": "Stalled",
       "channeling": "Possible channeling",
       "curveDelta": "Curve Δ {{delta}}"
+    },
+    "taste": {
+      "gateTitle": "Refine with taste (optional)",
+      "gateBody": "Tell the analysis how this shot tasted for sharper, taste-aware recommendations.",
+      "skip": "Skip",
+      "analyzeWithTaste": "Analyze with taste"
     }
   }
 }
