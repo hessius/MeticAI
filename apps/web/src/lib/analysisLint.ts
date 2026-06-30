@@ -10,6 +10,7 @@
  */
 
 import type { ShotFacts } from './shotFacts'
+import { REQUIRED_ANALYSIS_SECTIONS } from './analysisSchema'
 
 export interface AnalysisLintResult {
   valid: boolean
@@ -140,4 +141,14 @@ export function validateAgainstFacts(text: string, facts: ShotFacts): AnalysisLi
   }
 
   return { valid: issues.length === 0, issues }
+}
+
+/**
+ * Verify the analysis contains each required section title (L1). Matches on the title text so
+ * it is robust to numbering/heading-level variations the model may introduce.
+ */
+export function checkStructure(text: string): AnalysisLintResult {
+  const body = (text ?? '').toLowerCase()
+  const missing = REQUIRED_ANALYSIS_SECTIONS.filter(s => !body.includes(s.toLowerCase()))
+  return { valid: missing.length === 0, issues: missing.length ? ['missing-sections'] : [] }
 }

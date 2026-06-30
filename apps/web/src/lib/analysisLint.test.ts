@@ -131,3 +131,22 @@ describe('validateAgainstFacts (K4)', () => {
     expect(validateAgainstFacts(text, facts).issues).not.toContain('unsupported-channeling')
   })
 })
+
+import { checkStructure } from './analysisLint'
+import { REQUIRED_ANALYSIS_SECTIONS } from './analysisSchema'
+
+describe('checkStructure (L1) + schema (L2)', () => {
+  it('schema lists the five core sections', () => {
+    expect(REQUIRED_ANALYSIS_SECTIONS).toContain('Shot Performance')
+    expect(REQUIRED_ANALYSIS_SECTIONS.length).toBeGreaterThanOrEqual(5)
+  })
+  it('flags missing required sections', () => {
+    const r = checkStructure('## 1. Shot Performance\n- ok')
+    expect(r.valid).toBe(false)
+    expect(r.issues).toContain('missing-sections')
+  })
+  it('accepts text containing all required section titles', () => {
+    const text = REQUIRED_ANALYSIS_SECTIONS.map((s, i) => `## ${i + 1}. ${s}\n- content line here`).join('\n')
+    expect(checkStructure(text).valid).toBe(true)
+  })
+})
