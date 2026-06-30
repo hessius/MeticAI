@@ -1,4 +1,5 @@
 import { ANALYSIS_KNOWLEDGE, FEW_SHOT_ANALYSIS_EXAMPLE, buildFactSheet } from '../ai/analysisKnowledge'
+import { PROFILING_KNOWLEDGE } from '../ai/profilePromptFull'
 import type { ShotFacts } from '../../lib/shotFacts'
 
 export interface AnalyzeLlmPromptInput {
@@ -19,6 +20,9 @@ export function buildAnalyzeLlmPrompt(input: AnalyzeLlmPromptInput): string {
     profileVars, cleanStages, facts, tasteContext, graphSamples = [],
   } = input
   return `You are an expert espresso barista and profiling specialist analyzing a shot from a Meticulous Espresso Machine.
+
+## Expert Knowledge
+${PROFILING_KNOWLEDGE}
 
 ## Analysis Framework
 ${ANALYSIS_KNOWLEDGE}
