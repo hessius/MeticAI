@@ -41,20 +41,14 @@ ${JSON.stringify(profileVars, null, 2)}
 ### Profile Stages
 ${JSON.stringify(cleanStages, null, 2)}
 
-## Full Local Analysis
-This is the complete algorithmic analysis of the shot. Use this data to inform your expert analysis.
+## Shot Facts (digested — authoritative; trust over raw telemetry)
+Each stage lists its exit classification. A Targeted exit means the stage reached its intended
+outcome (e.g. its weight target); a Failsafe exit means a backstop fired before the real target.
+A Targeted exit — including a short stage that hit its weight target — is NORMAL and CORRECT
+behavior; never describe it as "early termination". The final weight reflects the settled weight
+after the machine's piston retraction completes, so do NOT penalize weight deviation unless it
+exceeds ±5%.
 
-IMPORTANT: Each stage includes 'cumulative_weight_at_end' which shows the total weight when that stage ended.
-If a stage ended early but the cumulative weight was near the target weight, the shot likely terminated
-correctly due to reaching the final weight target - this is NORMAL and EXPECTED behavior.
-A stage that appears "short" may simply mean the target yield was reached, which is the correct outcome.
-
-IMPORTANT: The 'final_weight_g' in shot_summary is the actual settled weight AFTER the machine's piston retraction completes.
-The Meticulous machine issues a stop signal BEFORE the target weight is reached, accounting for residual flow that will drip
-into the cup during piston retraction. This means the final weight accurately reflects the total liquid in the cup.
-Do NOT penalize the shot for weight deviation unless 'weight_deviation_pct' exceeds ±5%.
-
-## Shot Facts (digested)
 ${buildFactSheet(facts)}
 
 ### Graph Sample Points
