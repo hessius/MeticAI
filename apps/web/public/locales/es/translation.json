@@ -1851,7 +1851,8 @@
       "title": "Señales de fase",
       "stalled": "Estancado",
       "channeling": "Posible canalización",
-      "curveDelta": "Curva Δ {{delta}}"
+      "curveDelta": "Curva Δ {{delta}}",
+      "adjustmentsTitle": "Ajustes sugeridos"
     },
     "taste": {
       "gateTitle": "Refinar con el sabor (opcional)",

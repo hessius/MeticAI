@@ -1,11 +1,14 @@
 import { useTranslation } from 'react-i18next'
 import type { ShotFacts } from '../../lib/shotFacts'
+import { compassAdjustments } from '../../lib/compassRules'
+import type { StoredTaste } from '../../lib/shotTasteStore'
 
 interface Props {
   facts: ShotFacts
+  taste?: StoredTaste | null
 }
 
-export function ShotFactsPanel({ facts }: Props) {
+export function ShotFactsPanel({ facts, taste }: Props) {
   const { t } = useTranslation()
   const reached = facts.stages.filter(s => s.reached)
   if (reached.length === 0) return null
@@ -49,6 +52,22 @@ export function ShotFactsPanel({ facts }: Props) {
           </li>
         ))}
       </ul>
+      {taste && (() => {
+        const adj = compassAdjustments(taste.x, taste.y)
+        if (adj.length === 0) return null
+        return (
+          <div className="space-y-1">
+            <h4 className="text-xs font-semibold text-foreground">{t('analysis.facts.adjustmentsTitle')}</h4>
+            <ul className="space-y-1">
+              {adj.map((a, i) => (
+                <li key={`${a.kind}-${i}`} className="text-xs text-muted-foreground">
+                  <span className="font-mono">{a.kind}</span> — {a.reason}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      })()}
     </div>
   )
 }

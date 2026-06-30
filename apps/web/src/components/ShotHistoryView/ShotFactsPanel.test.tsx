@@ -44,4 +44,9 @@ describe('ShotFactsPanel', () => {
     const { container } = render(<ShotFactsPanel facts={{ ...facts, stages: [] }} />)
     expect(container.firstChild).toBeNull()
   })
+  it('renders compass adjustments when taste is provided', () => {
+    render(<ShotFactsPanel facts={facts} taste={{ x: -0.8, y: -0.6, descriptors: [] }} />)
+    expect(screen.getByText('analysis.facts.adjustmentsTitle')).toBeInTheDocument()
+    expect(screen.getByText(/grind_finer/i)).toBeInTheDocument()
+  })
 })

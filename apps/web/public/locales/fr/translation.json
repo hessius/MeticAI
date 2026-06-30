@@ -1851,7 +1851,8 @@
       "title": "Signaux de phase",
       "stalled": "Bloqué",
       "channeling": "Chenalisation possible",
-      "curveDelta": "Courbe Δ {{delta}}"
+      "curveDelta": "Courbe Δ {{delta}}",
+      "adjustmentsTitle": "Ajustements suggérés"
     },
     "taste": {
       "gateTitle": "Affiner avec le goût (facultatif)",

@@ -1851,7 +1851,8 @@
       "title": "Phasensignale",
       "stalled": "Stehengeblieben",
       "channeling": "Mögliches Channeling",
-      "curveDelta": "Kurve Δ {{delta}}"
+      "curveDelta": "Kurve Δ {{delta}}",
+      "adjustmentsTitle": "Vorgeschlagene Anpassungen"
     },
     "taste": {
       "gateTitle": "Mit Geschmack verfeinern (optional)",

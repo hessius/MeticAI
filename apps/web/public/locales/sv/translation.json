@@ -1851,7 +1851,8 @@
       "title": "Stegsignaler",
       "stalled": "Avstannade",
       "channeling": "Möjlig kanalbildning",
-      "curveDelta": "Kurva Δ {{delta}}"
+      "curveDelta": "Kurva Δ {{delta}}",
+      "adjustmentsTitle": "Föreslagna justeringar"
     },
     "taste": {
       "gateTitle": "Förfina med smak (valfritt)",

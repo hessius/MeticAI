@@ -1851,7 +1851,8 @@
       "title": "Stage signals",
       "stalled": "Stalled",
       "channeling": "Possible channeling",
-      "curveDelta": "Curve Δ {{delta}}"
+      "curveDelta": "Curve Δ {{delta}}",
+      "adjustmentsTitle": "Suggested adjustments"
     },
     "taste": {
       "gateTitle": "Refine with taste (optional)",

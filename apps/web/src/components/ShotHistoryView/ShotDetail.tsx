@@ -61,6 +61,9 @@ import {
 import { useReplayAnimation } from './useReplayAnimation'
 import { ReplayScrubber } from './ReplayScrubber'
 import { ShotFactsPanel } from './ShotFactsPanel'
+import { AnalysisTasteGate } from './AnalysisTasteGate'
+import { saveShotTaste, loadShotTaste, type StoredTaste } from '../../lib/shotTasteStore'
+import type { TasteData } from '../TasteCompassInput'
 
 // ---------------------------------------------------------------------------
 // Comparison StatCard — extracted from inline IIFE for clarity
@@ -165,6 +168,8 @@ export function ShotDetail({
   const [llmAnalysisError, setLlmAnalysisError] = useState<string | null>(null)
   const [showLlmView, setShowLlmView] = useState(false)
   const [isLlmCached, setIsLlmCached] = useState(false)
+  const [showTasteGate, setShowTasteGate] = useState(false)
+  const [shotTaste, setShotTaste] = useState<StoredTaste | null>(null)
 
   useScrollToTop([showLlmView])
 
@@ -287,8 +292,13 @@ export function ShotDetail({
     return undefined
   }, [selectedShot, shotData]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load persisted taste on shot change
+    if (selectedShot) setShotTaste(loadShotTaste(profileName, selectedShot.date, selectedShot.filename))
+  }, [selectedShot, profileName])
+
   // ---- LLM analysis -------------------------------------------------------
-  const handleLlmAnalysis = async () => {
+  const handleLlmAnalysis = async (taste: StoredTaste | null) => {
     if (!selectedShot || !shotData) return
     setShowLlmView(true)
     setIsLlmAnalyzing(true)
@@ -302,6 +312,11 @@ export function ShotDetail({
       const profileData = shotData.profile as { description?: string; notes?: string } | undefined
       const profileDesc = profileData?.description || profileData?.notes
       if (profileDesc) formData.append('profile_description', profileDesc)
+      if (taste) {
+        formData.append('taste_x', String(taste.x))
+        formData.append('taste_y', String(taste.y))
+        if (taste.descriptors.length) formData.append('taste_descriptors', taste.descriptors.join(','))
+      }
       const response = await fetch(`${serverUrl}/api/shots/analyze-llm`, { method: 'POST', body: formData })
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'LLM Analysis failed' }))
@@ -361,6 +376,11 @@ export function ShotDetail({
       const profileData = shotData.profile as { description?: string; notes?: string } | undefined
       const profileDesc = profileData?.description || profileData?.notes
       if (profileDesc) formData.append('profile_description', profileDesc)
+      if (shotTaste) {
+        formData.append('taste_x', String(shotTaste.x))
+        formData.append('taste_y', String(shotTaste.y))
+        if (shotTaste.descriptors.length) formData.append('taste_descriptors', shotTaste.descriptors.join(','))
+      }
       const response = await fetch(`${serverUrl}/api/shots/analyze-llm`, { method: 'POST', body: formData })
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'LLM Analysis failed' }))
@@ -1030,7 +1050,7 @@ export function ShotDetail({
                     {analysisResult && (
                       <div className="space-y-4">
                         <div ref={analysisCardRef} className="space-y-4">
-                          {analysisResult.shot_facts && <ShotFactsPanel facts={analysisResult.shot_facts} />}
+                          {analysisResult.shot_facts && <ShotFactsPanel facts={analysisResult.shot_facts} taste={shotTaste} />}
                           {/* Shot Summary Card */}
                           <div className="p-4 bg-gradient-to-br from-primary/10 via-secondary/30 to-secondary/20 rounded-xl border border-primary/20">
                             <div className="flex items-center gap-2 mb-3">
@@ -1440,11 +1460,25 @@ export function ShotDetail({
                               {t('shotHistory.viewAiAnalysis')}
                             </Button>
                           ) : (
-                            <Button variant="default" size="sm" onClick={handleLlmAnalysis} disabled={isLlmAnalyzing || !aiConfigured} className="gap-1.5 w-full ai-shimmer-button border-0">
+                            <Button variant="default" size="sm" onClick={() => setShowTasteGate(true)} disabled={isLlmAnalyzing || !aiConfigured} className="gap-1.5 w-full ai-shimmer-button border-0">
                               <Brain size={14} weight="fill" />
                               {t('shotHistory.getAiAnalysis')}
                             </Button>
                           ))}
+
+                          {showTasteGate && (
+                            <AnalysisTasteGate
+                              initialTaste={shotTaste ? { x: shotTaste.x, y: shotTaste.y, descriptors: shotTaste.descriptors } as TasteData : undefined}
+                              onSkip={() => { setShowTasteGate(false); handleLlmAnalysis(null) }}
+                              onAnalyze={(taste) => {
+                                const stored: StoredTaste = { x: taste.x, y: taste.y, descriptors: taste.descriptors ?? [] }
+                                setShotTaste(stored)
+                                if (selectedShot) saveShotTaste(profileName, selectedShot.date, selectedShot.filename, stored)
+                                setShowTasteGate(false)
+                                handleLlmAnalysis(stored)
+                              }}
+                            />
+                          )}
 
                           {!aiConfigured && !hideAiWhenUnavailable && (
                             <p className="text-[11px] text-muted-foreground text-center">{t('shotHistory.aiUnavailable')}</p>
