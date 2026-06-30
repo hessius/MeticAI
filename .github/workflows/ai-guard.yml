@@ -8,8 +8,12 @@
 # Intentionally NON-BLOCKING (`--fail-on none` + continue-on-error): findings are
 # advisory and triaged by a human (fix or dismiss), exactly like CodeQL alerts.
 # This keeps the pipeline green while still catching new high-severity patterns.
-# Promote to blocking (`--fail-on high`, drop continue-on-error) once the
-# existing baseline of false positives in tests/fixtures is suppressed.
+#
+# A reviewed baseline of false positives (async test callbacks, localStorage key
+# names, first-party JSON.parse in the direct-mode interceptor, etc.) is stripped
+# from the SARIF before upload via .github/scripts/ai-guard-sarif-filter.mjs,
+# driven by the allowlist in .github/ai-guard-ignore.json. Add new suppressions
+# there (with a justification) rather than dismissing alerts one by one.
 #
 # Note: the JS project lives in apps/web (no root package.json). ai-guard's
 # `changed` mode resolves git-diff paths relative to the repo root, so the CLI is
@@ -78,6 +82,10 @@ jobs:
             --sarif-output ai-guard-results.sarif \
             --github-summary \
             --fail-on none
+
+      - name: Suppress reviewed false-positive baseline
+        if: always() && hashFiles('ai-guard-results.sarif') != ''
+        run: node .github/scripts/ai-guard-sarif-filter.mjs ai-guard-results.sarif
 
       - name: Upload to GitHub Code Scanning
         if: always() && hashFiles('ai-guard-results.sarif') != ''
