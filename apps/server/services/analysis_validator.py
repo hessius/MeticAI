@@ -18,7 +18,9 @@ _EARLY_EXIT_PATTERNS = [
     re.compile(r"stopped?\s+before\s+reaching", re.I),
 ]
 _CHANNELING_ASSERTION = re.compile(r"\bchannel(?:ing|ed|s)?\b", re.I)
-_CHANNELING_NEGATION = re.compile(r"\b(no|not|without|absence of|isn'?t|wasn'?t)\b[^.]{0,30}channel", re.I)
+_CHANNELING_NEGATION = re.compile(
+    r"\b(no|not|without|absence of|isn'?t|wasn'?t)\b[^.]{0,30}channel", re.I
+)
 
 
 def validate_against_facts(text: str, facts: dict) -> dict:
@@ -37,7 +39,11 @@ def validate_against_facts(text: str, facts: dict) -> dict:
         issues.append("mischaracterized-targeted-exit")
 
     any_channeling = any((s.get("channeling") or {}).get("channeling") for s in stages)
-    if not any_channeling and _CHANNELING_ASSERTION.search(body) and not _CHANNELING_NEGATION.search(body):
+    if (
+        not any_channeling
+        and _CHANNELING_ASSERTION.search(body)
+        and not _CHANNELING_NEGATION.search(body)
+    ):
         issues.append("unsupported-channeling")
 
     return {"valid": len(issues) == 0, "issues": issues}

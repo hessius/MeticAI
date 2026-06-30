@@ -56,7 +56,9 @@ def _fmt_num(value) -> str:
 
 def build_fact_sheet(facts: dict) -> str:
     """Render ShotFacts into compact prose for the LLM prompt (replaces raw JSON dump)."""
-    lines: list[str] = ["### Deterministic Shot Facts (authoritative — trust over raw telemetry)"]
+    lines: list[str] = [
+        "### Deterministic Shot Facts (authoritative — trust over raw telemetry)"
+    ]
 
     weight = facts.get("weight") or {}
     lines.append(
@@ -85,7 +87,11 @@ def build_fact_sheet(facts: dict) -> str:
         ca = s.get("curve_adherence")
         if ca and abs(float(ca.get("delta", 0) or 0)) >= 0.5:
             parts.append(f"curve off-target by {_fmt_num(ca.get('delta'))}")
-        lines.append(f"  - {s.get('stage_name')} [{s.get('control_mode')}]: " + "; ".join(parts) + ".")
+        lines.append(
+            f"  - {s.get('stage_name')} [{s.get('control_mode')}]: "
+            + "; ".join(parts)
+            + "."
+        )
 
     return "\n".join(lines)
 

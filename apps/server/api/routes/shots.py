@@ -465,12 +465,8 @@ async def get_shots_by_profile(
                     return None
 
                 shot_profile_name = shot_data.get("profile_name", "")
-                if not shot_profile_name and isinstance(
-                    shot_data.get("profile"), dict
-                ):
-                    shot_profile_name = (
-                        shot_data.get("profile", {}).get("name", "")
-                    )
+                if not shot_profile_name and isinstance(shot_data.get("profile"), dict):
+                    shot_profile_name = shot_data.get("profile", {}).get("name", "")
 
                 profile_id = ""
                 if isinstance(shot_data.get("profile"), dict):
@@ -504,9 +500,7 @@ async def get_shots_by_profile(
                     "timestamp": shot_data.get("time"),
                     "profile_name": shot_profile_name,
                     "final_weight": final_weight,
-                    "total_time": total_time_ms / 1000
-                    if total_time_ms
-                    else None,
+                    "total_time": total_time_ms / 1000 if total_time_ms else None,
                 }
                 if include_data:
                     shot_info["data"] = shot_data
@@ -524,25 +518,19 @@ async def get_shots_by_profile(
 
         # Collect matches from new scans
         new_matches = [
-            r
-            for r in scan_results
-            if r is not None and not isinstance(r, Exception)
+            r for r in scan_results if r is not None and not isinstance(r, Exception)
         ]
 
         # Combine with matches from already-indexed dates
         indexed_matches = lookup_shots_by_profile(profile_name, limit) or []
         # Filter indexed matches to only already-indexed dates
         idx_from_cache = [
-            m
-            for m in indexed_matches
-            if m["date"] in already_indexed_dates
+            m for m in indexed_matches if m["date"] in already_indexed_dates
         ]
 
         matching_shots = new_matches + idx_from_cache
         # Sort newest first, trim to limit
-        matching_shots.sort(
-            key=lambda x: x.get("timestamp") or "", reverse=True
-        )
+        matching_shots.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
         matching_shots = matching_shots[:limit]
 
         logger.info(
@@ -701,9 +689,11 @@ async def analyze_shot(
                                     # Convert to list of dicts if needed
                                     if isinstance(val, list):
                                         stage_dict[attr] = [
-                                            dict(item)
-                                            if hasattr(item, "__dict__")
-                                            else item
+                                            (
+                                                dict(item)
+                                                if hasattr(item, "__dict__")
+                                                else item
+                                            )
                                             for item in val
                                         ]
                                     else:
@@ -949,9 +939,11 @@ async def analyze_shot_with_llm(
                                 if val is not None:
                                     if isinstance(val, list):
                                         stage_dict[attr] = [
-                                            dict(item)
-                                            if hasattr(item, "__dict__")
-                                            else item
+                                            (
+                                                dict(item)
+                                                if hasattr(item, "__dict__")
+                                                else item
+                                            )
                                             for item in val
                                         ]
                                     else:
@@ -1325,9 +1317,11 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
                     result = await async_get_shot_files(date)
                     if hasattr(result, "error") and result.error:
                         return date, []
-                    return date, sorted(
-                        [f.name for f in result], reverse=True
-                    ) if result else (date, [])
+                    return date, (
+                        sorted([f.name for f in result], reverse=True)
+                        if result
+                        else (date, [])
+                    )
                 except Exception:
                     return date, []
 
@@ -1405,8 +1399,7 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
 
         # Combine new scans with indexed data
         new_shots = [
-            r for r in scan_results
-            if r is not None and not isinstance(r, Exception)
+            r for r in scan_results if r is not None and not isinstance(r, Exception)
         ]
         # Also include already-indexed shots
         idx_shots = get_all_indexed_shots(limit=needed + 10, offset=0) or []
@@ -1414,10 +1407,7 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
             annotation = get_annotation(shot["date"], shot["filename"])
             shot["has_annotation"] = annotation is not None
 
-        all_shots = new_shots + [
-            s for s in idx_shots
-            if s["date"] in indexed_dates
-        ]
+        all_shots = new_shots + [s for s in idx_shots if s["date"] in indexed_dates]
 
         # Sort by timestamp descending (handle None timestamps)
         all_shots.sort(

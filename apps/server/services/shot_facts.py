@@ -94,47 +94,71 @@ def detect_stall(stage: dict) -> dict:
     ed = stage.get("execution_data") or {}
     gain = float(ed.get("weight_gain", 0) or 0)
     klass = classify_trigger(_stage_control_mode(stage), trig_type, total)
-    stalled = klass["kind"] == "failsafe" and trig_type == "time" and gain < STALL_MIN_WEIGHT_GAIN_G
+    stalled = (
+        klass["kind"] == "failsafe"
+        and trig_type == "time"
+        and gain < STALL_MIN_WEIGHT_GAIN_G
+    )
     return {"stalled": stalled, "weight_gain": round(gain, 2)}
 
 
 def detect_channeling(execution_data: dict) -> dict:
     """Flag likely channeling: pressure falls while flow rises within the stage."""
     ed = execution_data or {}
-    p_drop = float(ed.get("start_pressure", 0) or 0) - float(ed.get("end_pressure", 0) or 0)
+    p_drop = float(ed.get("start_pressure", 0) or 0) - float(
+        ed.get("end_pressure", 0) or 0
+    )
     f_rise = float(ed.get("end_flow", 0) or 0) - float(ed.get("start_flow", 0) or 0)
-    channeling = p_drop >= CHANNELING_PRESSURE_DROP_BAR and f_rise >= CHANNELING_FLOW_RISE_MLS
-    return {"channeling": channeling, "pressure_drop": round(p_drop, 2), "flow_rise": round(f_rise, 2)}
+    channeling = (
+        p_drop >= CHANNELING_PRESSURE_DROP_BAR and f_rise >= CHANNELING_FLOW_RISE_MLS
+    )
+    return {
+        "channeling": channeling,
+        "pressure_drop": round(p_drop, 2),
+        "flow_rise": round(f_rise, 2),
+    }
 
 
 def _build_phases(local_analysis: dict) -> list[dict]:
     """Group stages into pre-infusion / ramp / peak / decline by avg pressure shape."""
-    stages = [s for s in local_analysis.get("stage_analyses", []) if s.get("execution_data")]
+    stages = [
+        s for s in local_analysis.get("stage_analyses", []) if s.get("execution_data")
+    ]
     phases: list[dict] = []
     for s in stages:
         ed = s["execution_data"]
         avg_p = float(ed.get("avg_pressure", 0) or 0)
         if avg_p < 3.0:
             phase = "pre-infusion"
-        elif float(ed.get("end_pressure", 0) or 0) > float(ed.get("start_pressure", 0) or 0):
+        elif float(ed.get("end_pressure", 0) or 0) > float(
+            ed.get("start_pressure", 0) or 0
+        ):
             phase = "ramp"
-        elif float(ed.get("end_pressure", 0) or 0) < float(ed.get("start_pressure", 0) or 0):
+        elif float(ed.get("end_pressure", 0) or 0) < float(
+            ed.get("start_pressure", 0) or 0
+        ):
             phase = "decline"
         else:
             phase = "peak"
-        phases.append({
-            "stage_name": s.get("stage_name"),
-            "phase": phase,
-            "avg_pressure": ed.get("avg_pressure"),
-            "avg_flow": ed.get("avg_flow"),
-            "weight_gain": ed.get("weight_gain"),
-        })
+        phases.append(
+            {
+                "stage_name": s.get("stage_name"),
+                "phase": phase,
+                "avg_pressure": ed.get("avg_pressure"),
+                "avg_flow": ed.get("avg_flow"),
+                "weight_gain": ed.get("weight_gain"),
+            }
+        )
     return phases
 
 
 def _curve_adherence(stage: dict) -> dict | None:
     """Compare measured avg vs the stage's first target dynamics point, if numeric."""
-    points = ((stage.get("profile_target") or {}) if isinstance(stage.get("profile_target"), dict) else {})
+    points = (
+        (stage.get("profile_target") or {})
+        if isinstance(stage.get("profile_target"), dict)
+        else {}
+    )
     target = points.get("target_value")
     ed = stage.get("execution_data") or {}
     if target is None:
@@ -143,7 +167,11 @@ def _curve_adherence(stage: dict) -> dict | None:
     measured = ed.get("avg_pressure") if mode == "pressure" else ed.get("avg_flow")
     if measured is None:
         return None
-    return {"target": target, "measured": measured, "delta": round(float(measured) - float(target), 2)}
+    return {
+        "target": target,
+        "measured": measured,
+        "delta": round(float(measured) - float(target), 2),
+    }
 
 
 def build_shot_facts(local_analysis: dict) -> dict:
@@ -158,16 +186,20 @@ def build_shot_facts(local_analysis: dict) -> dict:
         triggered = (s.get("exit_trigger_result") or {}).get("triggered") or {}
         trig_type = triggered.get("type", "")
         total = len(s.get("exit_triggers") or [])
-        stages_out.append({
-            "stage_name": s.get("stage_name"),
-            "reached": True,
-            "control_mode": _stage_control_mode(s),
-            "trigger_type": trig_type,
-            "trigger_class": classify_trigger(_stage_control_mode(s), trig_type, total),
-            "stall": detect_stall(s),
-            "channeling": detect_channeling(ed),
-            "curve_adherence": _curve_adherence(s),
-        })
+        stages_out.append(
+            {
+                "stage_name": s.get("stage_name"),
+                "reached": True,
+                "control_mode": _stage_control_mode(s),
+                "trigger_type": trig_type,
+                "trigger_class": classify_trigger(
+                    _stage_control_mode(s), trig_type, total
+                ),
+                "stall": detect_stall(s),
+                "channeling": detect_channeling(ed),
+                "curve_adherence": _curve_adherence(s),
+            }
+        )
     wa = local_analysis.get("weight_analysis", {})
     return {
         "stages": stages_out,

@@ -68,7 +68,7 @@ export function classifyTrigger(stageControlMode: string, triggerType: string, t
   return { kind: 'unknown', label: 'Unknown', reason: 'Trigger/control-mode combination is not classified.' }
 }
 
-function stageControlMode(stage: StageAnalysis): string {
+function resolveStageControlMode(stage: StageAnalysis): string {
   const t = (stage.stage_type ?? stage.type ?? '').toLowerCase()
   if (t.includes('flow')) return 'flow'
   if (t.includes('pressure')) return 'pressure'
@@ -79,7 +79,7 @@ export function detectStall(stage: StageAnalysis): StallResult {
   const trigType = stage.exit_trigger_result?.triggered?.type ?? ''
   const total = (stage.exit_triggers ?? []).length
   const gain = n(stage.execution_data?.weight_gain)
-  const klass = classifyTrigger(stageControlMode(stage), trigType, total)
+  const klass = classifyTrigger(resolveStageControlMode(stage), trigType, total)
   const stalled = klass.kind === 'failsafe' && trigType === 'time' && gain < STALL_MIN_WEIGHT_GAIN_G
   return { stalled, weight_gain: r2(gain) }
 }
@@ -113,7 +113,7 @@ function curveAdherence(stage: StageAnalysis): ShotFactStage['curve_adherence'] 
   const pt = stage.profile_target as { target_value?: number } | undefined
   const target = pt?.target_value
   if (target == null) return null
-  const mode = stageControlMode(stage)
+  const mode = resolveStageControlMode(stage)
   const measured = mode === 'pressure' ? stage.execution_data?.avg_pressure : stage.execution_data?.avg_flow
   if (measured == null) return null
   return { target, measured, delta: r2(measured - target) }
@@ -133,9 +133,9 @@ export function buildShotFacts(analysis: {
     return {
       stage_name: s.stage_name,
       reached: true,
-      control_mode: stageControlMode(s),
+      control_mode: resolveStageControlMode(s),
       trigger_type: trigType,
-      trigger_class: classifyTrigger(stageControlMode(s), trigType, total),
+      trigger_class: classifyTrigger(resolveStageControlMode(s), trigType, total),
       stall: detectStall(s),
       channeling: detectChanneling(s.execution_data),
       curve_adherence: curveAdherence(s),
