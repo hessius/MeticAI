@@ -17370,3 +17370,52 @@ class TestAITags:
         assert resp.status_code == 200
         assert history[0]["ai_tags"] == ["Chocolate", "Creamy"]
         assert history[0]["reply"] == "A fresh AI description."
+
+
+class TestShotFactsClassify:
+    """#423 Targeted vs Failsafe trigger classification."""
+
+    def test_weight_is_always_targeted(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("pressure", "weight", total_triggers=2)
+        assert r["kind"] == "targeted"
+        assert "yield" in r["label"].lower()
+
+    def test_time_only_trigger_is_planned_duration(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("flow", "time", total_triggers=1)
+        assert r["kind"] == "targeted"
+        assert "planned" in r["label"].lower()
+
+    def test_time_with_other_triggers_is_failsafe_timeout(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("flow", "time", total_triggers=2)
+        assert r["kind"] == "failsafe"
+        assert "timeout" in r["label"].lower()
+
+    def test_flow_control_pressure_trigger_is_puck_resistance(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("flow", "pressure", total_triggers=2)
+        assert r["kind"] == "targeted"
+        assert "resistance" in r["label"].lower()
+
+    def test_pressure_control_flow_only_trigger_is_planned_transition(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("pressure", "flow", total_triggers=1)
+        assert r["kind"] == "targeted"
+
+    def test_pressure_control_flow_with_others_is_failsafe_channeling(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("pressure", "flow", total_triggers=2)
+        assert r["kind"] == "failsafe"
+        assert "channel" in r["label"].lower() or "chok" in r["label"].lower()
+
+    def test_pressure_control_pressure_trigger_is_threshold(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("pressure", "pressure", total_triggers=1)
+        assert r["kind"] == "targeted"
+
+    def test_unknown_combo_returns_unknown(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("power", "weird", total_triggers=1)
+        assert r["kind"] == "unknown"
