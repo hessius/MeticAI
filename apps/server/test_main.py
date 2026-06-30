@@ -17600,3 +17600,77 @@ class TestAnalysisKnowledge:
         sheet = build_fact_sheet(facts).lower()
         assert "stall" in sheet
         assert "channel" in sheet
+
+
+class TestAnalysisPromptContent:
+    """The analyze-llm prompt must carry ANALYSIS_KNOWLEDGE, the fact sheet, and the few-shot."""
+
+    @patch("api.routes.shots.fetch_shot_data", new_callable=AsyncMock)
+    @patch("api.routes.shots.async_get_profile", new_callable=AsyncMock)
+    @patch("api.routes.shots.async_list_profiles", new_callable=AsyncMock)
+    @patch("api.routes.shots.get_vision_model")
+    @patch("api.routes.shots._perform_local_shot_analysis")
+    def test_prompt_includes_knowledge_factsheet_fewshot(
+        self,
+        mock_local_analysis,
+        mock_get_model,
+        mock_list_profiles,
+        mock_get_profile,
+        mock_fetch_shot,
+        client,
+    ):
+        mock_fetch_shot.return_value = {
+            "profile_name": "Test",
+            "time": 1705320000,
+            "data": [{"time": 25000, "shot": {"weight": 36.0}}],
+        }
+
+        partial = type("P", (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_list_profiles.return_value = [partial]
+
+        full = type("F", (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0
+        full.variables = []
+        full.stages = []
+        full.error = None
+        mock_get_profile.return_value = full
+
+        mock_local_analysis.return_value = {
+            "shot_summary": {"final_weight": 36.0, "total_time": 28.0},
+            "weight_analysis": {"actual": 36.0, "target": 36.0, "deviation_percent": 0.0},
+            "stage_analyses": [],
+            "shot_facts": {
+                "stages": [],
+                "phases": [],
+                "weight": {"actual": 36.0, "target": 36.0, "deviation_pct": 0.0},
+                "total_time_s": 28.0,
+            },
+        }
+
+        mock_model = MagicMock()
+        mock_model.async_generate_content = AsyncMock(
+            return_value=MagicMock(
+                text="## 1. Shot Performance\n**What Happened:**\n- ok\n**Assessment:** Good"
+            )
+        )
+        mock_get_model.return_value = mock_model
+
+        resp = client.post(
+            "/api/shots/analyze-llm",
+            data={
+                "profile_name": "Test",
+                "shot_date": "2024-01-15",
+                "shot_filename": "shot.json",
+                "force_refresh": "true",
+            },
+        )
+        assert resp.status_code == 200
+        prompt = mock_model.async_generate_content.call_args[0][0]
+        assert "EXIT TRIGGER CLASSIFICATION" in prompt          # ANALYSIS_KNOWLEDGE
+        assert "Deterministic Shot Facts" in prompt              # fact sheet
+        assert "Worked Example" in prompt                        # few-shot

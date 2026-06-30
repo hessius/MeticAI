@@ -35,6 +35,11 @@ from services.gemini_service import (
     compute_taste_hash,
 )
 from prompt_builder import build_taste_context
+from analysis_knowledge import (
+    ANALYSIS_KNOWLEDGE,
+    FEW_SHOT_ANALYSIS_EXAMPLE,
+    build_fact_sheet,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -960,6 +965,8 @@ async def analyze_shot_with_llm(
 
         # Run local analysis first to extract data
         local_analysis = _perform_local_shot_analysis(shot_data, profile_data)
+        shot_facts = local_analysis.get("shot_facts", {})
+        fact_sheet = build_fact_sheet(shot_facts)
 
         # Prepare profile data (clean, no image)
         clean_profile = _prepare_profile_for_llm(profile_data, profile_description)
@@ -993,6 +1000,9 @@ async def analyze_shot_with_llm(
 ## Expert Knowledge
 {PROFILING_KNOWLEDGE}
 
+## Analysis Framework
+{ANALYSIS_KNOWLEDGE}
+
 ## Profile Being Used
 Name: {clean_profile["name"]}
 Temperature: {clean_profile.get("temperature", "Not set")}°C
@@ -1015,8 +1025,13 @@ If a stage ended early but the cumulative weight was near the target weight, the
 correctly due to reaching the final weight target - this is NORMAL and EXPECTED behavior.
 A stage that appears "short" may simply mean the target yield was reached, which is the correct outcome.
 
-{json.dumps(local_analysis, indent=2)}
+## Shot Facts (digested)
+{fact_sheet}
 {taste_context}
+
+---
+
+{FEW_SHOT_ANALYSIS_EXAMPLE}
 
 ---
 

@@ -88,3 +88,21 @@ def build_fact_sheet(facts: dict) -> str:
         lines.append(f"  - {s.get('stage_name')} [{s.get('control_mode')}]: " + "; ".join(parts) + ".")
 
     return "\n".join(lines)
+
+
+FEW_SHOT_ANALYSIS_EXAMPLE = """\
+### Worked Example (format + reasoning reference — do not copy its numbers)
+Facts: Pre-infusion [flow] exit = Targeted (planned duration); Ramp [pressure] exit = Targeted
+(pressure threshold reached); Hold [pressure] exit = Targeted (yield reached); final weight 36 g
+(target 36 g, deviation 0%); total time 28 s.
+
+Good analysis excerpt:
+## 1. Shot Performance
+**What Happened:**
+- Pre-infusion ran its planned duration, then pressure ramped cleanly to target.
+- The hold stage ended exactly on the weight target — a correct, intentional finish.
+**Assessment:** Good
+
+Note how every claim maps to a fact, no values are invented, and the Targeted weight exit is
+described as success, not "early termination".
+"""
