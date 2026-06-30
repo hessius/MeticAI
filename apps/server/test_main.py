@@ -17555,3 +17555,48 @@ class TestCompassRules:
     def test_centered_taste_returns_no_changes(self):
         from services.compass_rules import compass_adjustments
         assert compass_adjustments(taste_x=0.0, taste_y=0.0) == []
+
+
+class TestAnalysisKnowledge:
+    def test_knowledge_constant_covers_trigger_classes(self):
+        from analysis_knowledge import ANALYSIS_KNOWLEDGE
+        assert "Targeted" in ANALYSIS_KNOWLEDGE
+        assert "Failsafe" in ANALYSIS_KNOWLEDGE
+        assert "channeling" in ANALYSIS_KNOWLEDGE.lower()
+
+    def test_fact_sheet_renders_stage_classification(self):
+        from analysis_knowledge import build_fact_sheet
+        facts = {
+            "stages": [{
+                "stage_name": "Infusion", "reached": True, "control_mode": "pressure",
+                "trigger_type": "weight",
+                "trigger_class": {"kind": "targeted", "label": "Targeted (yield reached)", "reason": "x"},
+                "stall": {"stalled": False, "weight_gain": 30.0},
+                "channeling": {"channeling": False, "pressure_drop": 0.1, "flow_rise": 0.1},
+                "curve_adherence": {"target": 9.0, "measured": 8.5, "delta": -0.5},
+            }],
+            "phases": [],
+            "weight": {"actual": 36.0, "target": 36.0, "deviation_pct": 0.0},
+            "total_time_s": 30.0,
+        }
+        sheet = build_fact_sheet(facts)
+        assert "Infusion" in sheet
+        assert "Targeted (yield reached)" in sheet
+        assert "36" in sheet
+
+    def test_fact_sheet_flags_stall_and_channeling(self):
+        from analysis_knowledge import build_fact_sheet
+        facts = {
+            "stages": [{
+                "stage_name": "Decline", "reached": True, "control_mode": "pressure",
+                "trigger_type": "time",
+                "trigger_class": {"kind": "failsafe", "label": "Failsafe (timeout limit)", "reason": "x"},
+                "stall": {"stalled": True, "weight_gain": 0.2},
+                "channeling": {"channeling": True, "pressure_drop": 3.0, "flow_rise": 2.0},
+                "curve_adherence": None,
+            }],
+            "phases": [], "weight": {}, "total_time_s": 25.0,
+        }
+        sheet = build_fact_sheet(facts).lower()
+        assert "stall" in sheet
+        assert "channel" in sheet
