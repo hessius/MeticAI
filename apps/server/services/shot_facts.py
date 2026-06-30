@@ -177,5 +177,8 @@ def build_shot_facts(local_analysis: dict) -> dict:
             "target": wa.get("target"),
             "deviation_pct": wa.get("deviation_percent"),
         },
-        "total_time_s": local_analysis.get("overall_metrics", {}).get("total_time"),
+        "total_time_s": (
+            local_analysis.get("overall_metrics", {}).get("total_time")
+            or local_analysis.get("shot_summary", {}).get("total_time")
+        ),
     }

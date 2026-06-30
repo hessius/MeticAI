@@ -17485,6 +17485,15 @@ class TestShotFacts:
         assert facts["stages"][0]["trigger_class"]["kind"] == "targeted"
         assert "phases" in facts
 
+    def test_total_time_falls_back_to_shot_summary(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [],
+            "weight_analysis": {},
+            "shot_summary": {"total_time": 28.5},
+        }
+        assert build_shot_facts(local)["total_time_s"] == 28.5
+
 
 class TestLocalAnalysisIncludesFacts:
     def test_local_analysis_attaches_shot_facts(self):
