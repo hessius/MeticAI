@@ -60,6 +60,7 @@ import {
 } from './shotDataTransforms'
 import { useReplayAnimation } from './useReplayAnimation'
 import { ReplayScrubber } from './ReplayScrubber'
+import { ShotFactsPanel } from './ShotFactsPanel'
 
 // ---------------------------------------------------------------------------
 // Comparison StatCard — extracted from inline IIFE for clarity
@@ -1029,6 +1030,7 @@ export function ShotDetail({
                     {analysisResult && (
                       <div className="space-y-4">
                         <div ref={analysisCardRef} className="space-y-4">
+                          {analysisResult.shot_facts && <ShotFactsPanel facts={analysisResult.shot_facts} />}
                           {/* Shot Summary Card */}
                           <div className="p-4 bg-gradient-to-br from-primary/10 via-secondary/30 to-secondary/20 rounded-xl border border-primary/20">
                             <div className="flex items-center gap-2 mb-3">

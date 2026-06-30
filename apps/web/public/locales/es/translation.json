@@ -1845,5 +1845,13 @@
     "selectImage": "Seleccionar una imagen",
     "regenerateSlot": "Regenerar",
     "generating": "Generando..."
+  },
+  "analysis": {
+    "facts": {
+      "title": "Señales de fase",
+      "stalled": "Estancado",
+      "channeling": "Posible canalización",
+      "curveDelta": "Curva Δ {{delta}}"
+    }
   }
 }
