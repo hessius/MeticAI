@@ -17419,3 +17419,68 @@ class TestShotFactsClassify:
         from services.shot_facts import classify_trigger
         r = classify_trigger("power", "weird", total_triggers=1)
         assert r["kind"] == "unknown"
+
+
+class TestShotFacts:
+    def _stage(self, **kw):
+        base = {
+            "stage_name": "Infusion",
+            "stage_type": "flow",
+            "exit_triggers": [],
+            "execution_data": {
+                "duration": 10.0, "weight_gain": 2.0, "end_weight": 8.0,
+                "start_pressure": 1.0, "end_pressure": 6.0, "avg_pressure": 4.0,
+                "max_pressure": 6.5, "min_pressure": 1.0,
+                "start_flow": 4.0, "end_flow": 0.5, "avg_flow": 2.0, "max_flow": 4.5,
+            },
+            "exit_trigger_result": {"triggered": {"type": "time"}},
+        }
+        base.update(kw)
+        return base
+
+    def test_stall_detected_on_time_failsafe_with_low_gain(self):
+        from services.shot_facts import detect_stall
+        stage = self._stage(
+            stage_type="pressure",
+            exit_triggers=[{"type": "flow"}, {"type": "time"}],
+            exit_trigger_result={"triggered": {"type": "time"}},
+            execution_data={**self._stage()["execution_data"], "weight_gain": 0.3},
+        )
+        assert detect_stall(stage)["stalled"] is True
+
+    def test_no_stall_when_weight_trigger(self):
+        from services.shot_facts import detect_stall
+        stage = self._stage(exit_trigger_result={"triggered": {"type": "weight"}})
+        assert detect_stall(stage)["stalled"] is False
+
+    def test_channeling_flag_on_pressure_drop_with_flow_rise(self):
+        from services.shot_facts import detect_channeling
+        ed = {**self._stage()["execution_data"],
+              "start_pressure": 8.0, "end_pressure": 3.0,
+              "start_flow": 1.0, "end_flow": 5.0}
+        assert detect_channeling(ed)["channeling"] is True
+
+    def test_no_channeling_on_stable_stage(self):
+        from services.shot_facts import detect_channeling
+        ed = {**self._stage()["execution_data"],
+              "start_pressure": 6.0, "end_pressure": 6.2,
+              "start_flow": 2.0, "end_flow": 2.1}
+        assert detect_channeling(ed)["channeling"] is False
+
+    def test_build_shot_facts_classifies_each_stage(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [
+                self._stage(
+                    stage_type="pressure",
+                    exit_triggers=[{"type": "weight"}],
+                    exit_trigger_result={"triggered": {"type": "weight"}},
+                ),
+            ],
+            "weight_analysis": {"actual": 36.0, "target": 36.0, "deviation_percent": 0.0},
+            "overall_metrics": {"total_time": 30.0},
+        }
+        facts = build_shot_facts(local)
+        assert len(facts["stages"]) == 1
+        assert facts["stages"][0]["trigger_class"]["kind"] == "targeted"
+        assert "phases" in facts
