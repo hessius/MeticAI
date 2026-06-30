@@ -33,7 +33,7 @@ import { STORAGE_KEYS } from '@/lib/constants'
 import { lintShotAnalysis, repairShotAnalysis } from '@/lib/analysisLint'
 import { safeRandomUUID } from '@/lib/uuid'
 import { AIServiceError, type AIErrorCode as AIErrorCodeBase } from './aiErrors'
-import { getActiveProvider } from './providers'
+import { getProviderForMethod, isAIConfigured } from './providers'
 
 /**
  * Typed AI service error codes — UI layer translates these via i18n.
@@ -47,13 +47,13 @@ export function createBrowserAIService(): AIService {
   return {
     name: 'BrowserAIService',
 
-    isConfigured: () => getActiveProvider().isConfigured(),
+    isConfigured: () => isAIConfigured(),
 
     generateProfile: async (
       request: ProfileGenerationRequest,
       onProgress?: ProgressCallback,
     ): Promise<ProfileGenerationResult> => {
-      const provider = getActiveProvider()
+      const provider = getProviderForMethod('generateProfile', { hasImage: Boolean(request.image) })
       onProgress?.({ phase: 'analyzing', message: 'generation.progress.preparingPrompt' })
 
       // Build multipart content
@@ -123,7 +123,7 @@ export function createBrowserAIService(): AIService {
     },
 
     analyzeShot: async (request: ShotAnalysisRequest): Promise<ShotAnalysisResult> => {
-      const provider = getActiveProvider()
+      const provider = getProviderForMethod('analyzeShot')
       const prompt = buildShotAnalysisPrompt(
         request.profileName,
         request.shotDate,
@@ -159,7 +159,8 @@ export function createBrowserAIService(): AIService {
     },
 
     generateImage: async (request: ImageGenerationRequest): Promise<Blob> => {
-      const provider = getActiveProvider()
+      // Image generation is always hosted — on-device models are text-only.
+      const provider = getProviderForMethod(undefined, { hasImage: true })
       if (!provider.capabilities.imageGen || !provider.generateImage) {
         throw new AIServiceError('IMAGE_GENERATION_FAILED')
       }
@@ -168,7 +169,7 @@ export function createBrowserAIService(): AIService {
     },
 
     getRecommendations: async (request: RecommendationRequest): Promise<Recommendation[]> => {
-      const provider = getActiveProvider()
+      const provider = getProviderForMethod('recommendations')
       const prompt = buildRecommendationPrompt(request.profileName, request.shotFilename)
 
       const response = await provider.generateText({
@@ -207,7 +208,7 @@ export function createBrowserAIService(): AIService {
     },
 
     getDialInRecommendation: async (): Promise<DialInRecommendation[]> => {
-      const provider = getActiveProvider()
+      const provider = getProviderForMethod('dialIn')
       const prompt = buildDialInPrompt()
 
       const response = await provider.generateText({

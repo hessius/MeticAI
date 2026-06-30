@@ -48,6 +48,8 @@ export function formatGeminiError(err: unknown): string {
     if (err.code === 'LOCAL_VISION_UNSUPPORTED') return i18n.t('error.localVisionUnsupported')
     if (err.code === 'LOCAL_UNAVAILABLE') return i18n.t('error.localUnavailable')
     if (err.code === 'LOCAL_TIMEOUT') return i18n.t('error.localTimeout')
+    if (err.code === 'LOCAL_MODEL_NOT_DOWNLOADED') return i18n.t('error.localModelNotDownloaded')
+    if (err.code === 'LOCAL_OUT_OF_MEMORY') return i18n.t('error.localOutOfMemory')
   }
   const raw = err instanceof Error ? err.message : String(err)
   if (raw.includes('503') || raw.includes('UNAVAILABLE') || raw.includes('overloaded'))

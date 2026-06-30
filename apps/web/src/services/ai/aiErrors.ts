@@ -10,6 +10,8 @@ export type AIErrorCode =
   | 'LOCAL_UNAVAILABLE'
   | 'LOCAL_VISION_UNSUPPORTED'
   | 'LOCAL_TIMEOUT'
+  | 'LOCAL_MODEL_NOT_DOWNLOADED'
+  | 'LOCAL_OUT_OF_MEMORY'
   | 'UNKNOWN'
 
 export class AIServiceError extends Error {

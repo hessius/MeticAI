@@ -1,6 +1,6 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
-import { getActiveProvider, getActiveProviderId, getProviderModel, PROVIDERS } from '@/services/ai/providers'
+import { getActiveProviderId, getActiveHostedProviderId, getProvider, getProviderForMethod, getProviderModel, isAIConfigured, PROVIDERS } from '@/services/ai/providers'
 import { retryWithBackoff, formatGeminiError } from '@/services/ai/retryUtils'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { CapacitorHttp } from '@capacitor/core'
@@ -3224,12 +3224,13 @@ Rules for recommendations:
 - If no recommendations apply, output an empty array: RECOMMENDATIONS_JSON:\n[]\nEND_RECOMMENDATIONS_JSON
 `
 
-          // 6. Call the active AI provider (with retry on transient errors)
-          if (!getActiveProvider().isConfigured()) {
+          // 6. Call the AI provider for shot analysis (with retry on transient errors)
+          if (!isAIConfigured()) {
             return jsonResponse({ status: 'error', message: aiNotConfiguredMessage() })
           }
+          const analyzeProvider = getProviderForMethod('analyzeShot')
           const response = await retryWithBackoff(() =>
-            getActiveProvider().generateText({
+            analyzeProvider.generateText({
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
             })
           ) as { text?: string }
@@ -3678,7 +3679,7 @@ Rules for recommendations:
             try {
               const resolvedName = (profileJson as {name?: string}).name || profileName || 'Unknown Profile'
               const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]${AI_TAGS_PROMPT}`
-              const response = await getActiveProvider().generateText({
+              const response = await getProviderForMethod('generateProfile').generateText({
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
               }) as { text?: string }
               const rawText = response.text?.trim()
@@ -3744,8 +3745,8 @@ Rules for recommendations:
     // GET /api/available-models → live discovery in direct mode, static fallback offline
     if (url.match(/\/api\/available-models$/)) {
       return (async () => {
-        const provider = getActiveProvider()
-        const currentModel = getProviderModel()
+        const provider = getProvider(getActiveHostedProviderId())
+        const currentModel = getProviderModel(getActiveHostedProviderId())
         try {
           if (provider.isConfigured()) {
             const models = await provider.listModels()

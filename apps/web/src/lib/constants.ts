@@ -18,6 +18,18 @@ export const STORAGE_KEYS = {
   AI_KEY_PREFIX: 'meticai-ai-key-',
   AI_MODEL_PREFIX: 'meticai-ai-model-',
 
+  // -- On-device AI / four-mode routing (#373). AI_MODE is the top-level
+  // selector (none | local | hosted | both); when 'both', each text method is
+  // routed to local or hosted via the AI_ROUTE_* keys. LOCAL_MODEL_* track the
+  // selected on-device backend and any downloaded Gemma model path. --
+  AI_MODE: 'meticai-ai-mode',
+  LOCAL_MODEL_TYPE: 'meticai-local-model-type',
+  LOCAL_MODEL_PATH: 'meticai-local-model-path',
+  AI_ROUTE_ANALYZE_SHOT: 'meticai-ai-route-analyze-shot',
+  AI_ROUTE_GENERATE_PROFILE: 'meticai-ai-route-generate-profile',
+  AI_ROUTE_RECOMMENDATIONS: 'meticai-ai-route-recommendations',
+  AI_ROUTE_DIAL_IN: 'meticai-ai-route-dial-in',
+
   // -- Direct mode caches --
   PROFILE_LIST_CACHE: 'meticai-direct-profile-list',
   DESCRIPTION_CACHE: 'meticai-direct-desc-cache',

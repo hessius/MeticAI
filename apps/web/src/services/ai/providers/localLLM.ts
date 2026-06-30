@@ -1,10 +1,13 @@
 /**
  * On-device LLM bridge (#373).
  *
- * Thin wrapper over `@capgo/capacitor-llm` for Apple Intelligence (iOS 26+,
- * A17 Pro and later). Gemma / MediaPipe download support is intentionally
- * scaffolded but inert for this first iteration — only the Apple Intelligence
- * (zero-download, system model) path is wired up.
+ * Wraps `@capgo/capacitor-llm` for two local backends:
+ *
+ * - **Apple Intelligence** — iOS 26+, A17 Pro and later. Zero download, system
+ *   model loaded via `setModel({ path: 'Apple Intelligence', engine: 'apple' })`.
+ * - **Gemma 4 E2B-IT** — iOS and Android. Requires a ~2.6 GB model download
+ *   (managed by {@link LocalModelManager}); loaded via MediaPipe GenAI from the
+ *   downloaded file path.
  *
  * The plugin is event-driven: `sendMessage` resolves immediately and the
  * generated text arrives as a stream of `textFromAi` events terminated by an
@@ -15,12 +18,14 @@
 
 import { CapgoLLM } from '@capgo/capacitor-llm'
 import { isNativePlatform } from '@/lib/machineMode'
+import { STORAGE_KEYS } from '@/lib/constants'
 import { AIServiceError } from '../aiErrors'
 
-/** Local backends planned for #373. Only `apple-intelligence` ships in v1. */
+/** Local backends supported in #373. */
 export type LocalBackend = 'apple-intelligence' | 'gemma-4-e2b'
 
 export const APPLE_INTELLIGENCE_MODEL_ID = 'apple-intelligence'
+export const GEMMA_MODEL_ID = 'gemma-4-e2b'
 
 /** The plugin reports this exact readiness string when the model is usable. */
 const READY = 'ready'
@@ -37,13 +42,67 @@ function getCapacitorPlatform(): string {
   }
 }
 
+function isIOS(): boolean {
+  return isNativePlatform() && getCapacitorPlatform() === 'ios'
+}
+
+function isAndroid(): boolean {
+  return isNativePlatform() && getCapacitorPlatform() === 'android'
+}
+
+/** Apple Intelligence is iOS-only. */
+export function isAppleIntelligenceSupported(): boolean {
+  return isIOS()
+}
+
 /**
  * Whether on-device AI can be offered at all on this platform. Apple
- * Intelligence is iOS-only; Android (Gemma) is deferred, so non-iOS natives and
- * the web build report unsupported.
+ * Intelligence is iOS-only; Gemma runs on both iOS and Android, so any native
+ * iOS/Android build qualifies. The web build never does.
  */
 export function isLocalLLMSupported(): boolean {
-  return isNativePlatform() && getCapacitorPlatform() === 'ios'
+  return isIOS() || isAndroid()
+}
+
+function readLS(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The selected on-device backend. Defaults to Apple Intelligence on iOS (no
+ * download) and Gemma on Android (the only local option there).
+ */
+export function getLocalBackend(): LocalBackend {
+  const stored = readLS(STORAGE_KEYS.LOCAL_MODEL_TYPE)
+  if (stored === APPLE_INTELLIGENCE_MODEL_ID || stored === GEMMA_MODEL_ID) {
+    // Apple Intelligence is unavailable off iOS — fall back to Gemma there.
+    if (stored === APPLE_INTELLIGENCE_MODEL_ID && !isAppleIntelligenceSupported()) {
+      return GEMMA_MODEL_ID
+    }
+    return stored
+  }
+  return isAppleIntelligenceSupported() ? APPLE_INTELLIGENCE_MODEL_ID : GEMMA_MODEL_ID
+}
+
+export function setLocalBackend(backend: LocalBackend): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.LOCAL_MODEL_TYPE, backend)
+  } catch {
+    /* ignore */
+  }
+  // Switching backend invalidates the readiness cache.
+  cachedReady = null
+  cachedReadiness = ''
+}
+
+/** Path to the downloaded Gemma model, or null when not yet downloaded. */
+export function getGemmaModelPath(): string | null {
+  const path = readLS(STORAGE_KEYS.LOCAL_MODEL_PATH)
+  return path?.trim() ? path.trim() : null
 }
 
 /**
@@ -58,9 +117,24 @@ export function getCachedLocalReadiness(): string {
   return cachedReadiness
 }
 
+/** Build the `setModel` options for the active backend. */
+function modelOptionsFor(backend: LocalBackend, extra: Record<string, unknown> = {}) {
+  if (backend === GEMMA_MODEL_ID) {
+    const path = getGemmaModelPath()
+    if (!path) throw new AIServiceError('LOCAL_MODEL_NOT_DOWNLOADED')
+    return { path, engine: 'mediapipe' as const, ...extra }
+  }
+  return { path: 'Apple Intelligence', engine: 'apple' as const, ...extra }
+}
+
 /** Best-effort sync answer used by the AI gate and provider selection. */
 export function isLocalLLMConfigured(): boolean {
-  if (!isLocalLLMSupported()) return false
+  const backend = getLocalBackend()
+  if (backend === GEMMA_MODEL_ID) {
+    if (!isLocalLLMSupported() || !getGemmaModelPath()) return false
+    return cachedReady ?? true
+  }
+  if (!isAppleIntelligenceSupported()) return false
   return cachedReady ?? true
 }
 
@@ -71,8 +145,14 @@ export async function refreshLocalReadiness(): Promise<{ ready: boolean; readine
     cachedReadiness = 'unsupported'
     return { ready: false, readiness: 'unsupported' }
   }
+  const backend = getLocalBackend()
+  if (backend === GEMMA_MODEL_ID && !getGemmaModelPath()) {
+    cachedReady = false
+    cachedReadiness = 'not-downloaded'
+    return { ready: false, readiness: 'not-downloaded' }
+  }
   try {
-    await CapgoLLM.setModel({ path: 'Apple Intelligence', engine: 'apple' })
+    await CapgoLLM.setModel(modelOptionsFor(backend))
     const { readiness } = await CapgoLLM.getReadiness()
     cachedReadiness = readiness
     cachedReady = readiness === READY
@@ -93,13 +173,25 @@ interface GenerateOptions {
   timeoutMs?: number
 }
 
+function isOutOfMemoryError(message: string): boolean {
+  return /out of memory|oom|memory pressure|cannot allocate/i.test(message)
+}
+
 async function runGeneration(prompt: string, opts: GenerateOptions): Promise<string> {
-  await CapgoLLM.setModel({
-    path: 'Apple Intelligence',
-    engine: 'apple',
-    temperature: opts.temperature ?? 0.7,
-    maxTokens: opts.maxTokens ?? 2048,
-  })
+  const backend = getLocalBackend()
+  try {
+    await CapgoLLM.setModel(
+      modelOptionsFor(backend, {
+        temperature: opts.temperature ?? 0.7,
+        maxTokens: opts.maxTokens ?? 2048,
+      }),
+    )
+  } catch (err) {
+    if (err instanceof AIServiceError) throw err
+    const message = err instanceof Error ? err.message : String(err)
+    if (isOutOfMemoryError(message)) throw new AIServiceError('LOCAL_OUT_OF_MEMORY', err)
+    throw new AIServiceError('LOCAL_UNAVAILABLE', err)
+  }
 
   const { id: chatId } = await CapgoLLM.createChat()
 
@@ -117,9 +209,9 @@ async function runGeneration(prompt: string, opts: GenerateOptions): Promise<str
     if (!incoming) return
     // Apple Intelligence's streamResponse yields a growing *snapshot* of the
     // full text so far on each chunk (the capgo plugin forwards Snapshot.content
-    // verbatim), whereas other engines (MediaPipe) emit incremental deltas.
-    // Detect which by prefix relationship instead of blindly appending, so
-    // cumulative snapshots don't pile up into "repeating, slowly growing" output.
+    // verbatim), whereas MediaPipe (Gemma) emits incremental deltas. Detect
+    // which by prefix relationship instead of blindly appending, so cumulative
+    // snapshots don't pile up into "repeating, slowly growing" output.
     if (incoming.length >= text.length && incoming.startsWith(text)) {
       // Cumulative snapshot (or first chunk): replace with the fuller text.
       text = incoming

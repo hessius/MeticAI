@@ -14,7 +14,9 @@ import { AIServiceError } from '../aiErrors'
 import type { AIProvider, ProviderCapabilities } from './AIProvider'
 import {
   APPLE_INTELLIGENCE_MODEL_ID,
+  GEMMA_MODEL_ID,
   generateLocalText,
+  getLocalBackend,
   isLocalLLMConfigured,
 } from './localLLM'
 
@@ -81,6 +83,15 @@ export class LocalLLMProvider implements AIProvider {
   }
 
   async listModels(): Promise<AvailableModel[]> {
+    if (getLocalBackend() === GEMMA_MODEL_ID) {
+      return [
+        {
+          id: GEMMA_MODEL_ID,
+          display_name: 'Gemma 4 E2B',
+          description: 'On-device, private — 2.6 GB download',
+        },
+      ]
+    }
     return [
       {
         id: APPLE_INTELLIGENCE_MODEL_ID,

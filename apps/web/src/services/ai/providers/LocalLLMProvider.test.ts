@@ -70,9 +70,9 @@ describe('isLocalLLMSupported', () => {
     setPlatform('ios', true)
     expect(isLocalLLMSupported()).toBe(true)
   })
-  it('is false on android native (Gemma deferred)', () => {
+  it('is true on android native (Gemma)', () => {
     setPlatform('android', true)
-    expect(isLocalLLMSupported()).toBe(false)
+    expect(isLocalLLMSupported()).toBe(true)
   })
   it('is false on web', () => {
     setPlatform('web', false)

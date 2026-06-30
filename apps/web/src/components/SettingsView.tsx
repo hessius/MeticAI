@@ -39,14 +39,18 @@ import { isDirectMode, isDemoMode, isNativePlatform, getDefaultMachineUrl } from
 import { STORAGE_KEYS } from '@/lib/constants'
 import {
   PROVIDERS,
-  getSelectableProviderIds,
+  HOSTED_PROVIDER_IDS,
   getActiveProviderId,
+  getActiveHostedProviderId,
   setActiveProviderId,
   apiKeyStorageKey,
   modelStorageKey,
   detectProviderFromKey,
-  refreshLocalReadiness,
+  getAIMode,
+  setAIMode,
+  isLocalLLMSupported,
   type ProviderId,
+  type AIMode,
 } from '@/services/ai/providers'
 import { persistMachineUrl } from '@/services/machine/machineUrl'
 import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable, AI_PREFS_CHANGED_EVENT } from '@/lib/aiPreferences'
@@ -55,6 +59,7 @@ import { useSoundEffects } from '@/hooks/useSoundEffects'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
 import { MarkdownText } from '@/components/MarkdownText'
+import { LocalAISettings } from '@/components/LocalAISettings'
 import { LanguageSelector } from '@/components/LanguageSelector'
 import { useSecureStorage } from '@/hooks/useSecureStorage'
 import { useBiometrics } from '@/hooks/useBiometrics'
@@ -156,9 +161,8 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     geminiModel: 'gemini-2.5-flash',
     mqttEnabled: true
   })
-  const [aiProvider, setAiProviderState] = useState<ProviderId>(getActiveProviderId())
-  const [localReadiness, setLocalReadiness] = useState<{ ready: boolean; readiness: string } | null>(null)
-  const [localChecking, setLocalChecking] = useState(false)
+  const [aiProvider, setAiProviderState] = useState<ProviderId>(getActiveHostedProviderId())
+  const [aiMode, setAiModeState] = useState<AIMode>(getAIMode())
   const [isRestarting, setIsRestarting] = useState(false)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
   const [restartStatus, setRestartStatus] = useState<'idle' | 'success' | 'error'>('idle')
@@ -212,6 +216,13 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   const [hideAiWhenUnavailable, setHideAiWhenUnavailableState] = useState(false)
   const [soundsEnabled, setSoundsEnabledState] = useState(false)
   const hasGeminiKey = Boolean((settings.geminiApiKey || '').trim()) || settings.geminiApiKeyConfigured === true
+  // On-device AI needs no API key, so AI can be enabled where local is supported.
+  const canEnableAi = hasGeminiKey || isLocalLLMSupported()
+  const localSupported = isLocalLLMSupported()
+  // Hosted provider block shows for cloud/both modes (and always when on-device
+  // is unsupported); the on-device block shows for local/both modes.
+  const showHostedAi = !localSupported || aiMode === 'hosted' || aiMode === 'both'
+  const showLocalAi = localSupported && (aiMode === 'local' || aiMode === 'both')
 
   // Beta channel state
   const [betaChannelEnabled, setBetaChannelEnabled] = useState(false)
@@ -644,23 +655,11 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     return () => { cancelled = true }
   }, [aiProvider])
 
-  const checkLocalReadiness = useCallback(async () => {
-    setLocalChecking(true)
-    try {
-      const result = await refreshLocalReadiness()
-      setLocalReadiness(result)
-    } finally {
-      setLocalChecking(false)
-    }
-  }, [])
-
-  // Probe on-device AI availability whenever the on-device provider is active.
-  useEffect(() => {
-    if (aiProvider !== 'local') return
-    void (async () => {
-      await checkLocalReadiness()
-    })()
-  }, [aiProvider, checkLocalReadiness])
+  const handleModeChange = (mode: AIMode) => {
+    setAIMode(mode)
+    setAiModeState(mode)
+    window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { providerChanged: true } }))
+  }
 
   const handleDetectMachine = async () => {
     setIsDetecting(true)
@@ -1247,11 +1246,41 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     setAiEnabled(next)
                     if (next) playToggleOn(); else playToggleOff()
                   }}
-                  disabled={!hasGeminiKey}
+                  disabled={!canEnableAi}
                 />
               </div>
 
-              {/* AI provider selector (#491) */}
+              {/* AI mode selector (#373) — on-device / cloud / both. Only shown
+                  where on-device AI is available (native iOS/Android). */}
+              {localSupported && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">{t('settings.aiMode')}</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['local', 'hosted', 'both'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => handleModeChange(mode)}
+                        className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                          aiMode === mode
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-input bg-background text-muted-foreground hover:bg-accent'
+                        }`}
+                      >
+                        {mode === 'local'
+                          ? t('settings.aiModeLocal')
+                          : mode === 'hosted'
+                            ? t('settings.aiModeHosted')
+                            : t('settings.aiModeBoth')}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('settings.aiModeHint')}</p>
+                </div>
+              )}
+
+              {/* AI provider selector (#491) — hosted providers only. */}
+              {showHostedAi && (
               <div className="space-y-2">
                 <Label htmlFor="aiProvider" className="text-sm font-medium">
                   {t('settings.aiProvider')}
@@ -1262,9 +1291,9 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                   onChange={(e) => handleProviderChange(e.target.value as ProviderId)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
-                  {getSelectableProviderIds().map((id) => (
+                  {HOSTED_PROVIDER_IDS.map((id) => (
                     <option key={id} value={id}>
-                      {id === 'local' ? t('settings.aiProviderLocal') : PROVIDERS[id].label}
+                      {PROVIDERS[id].label}
                     </option>
                   ))}
                 </select>
@@ -1274,39 +1303,9 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                   </p>
                 )}
               </div>
+              )}
 
-              {aiProvider === 'local' ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">{t('settings.localModelStatus')}</Label>
-                    <button
-                      type="button"
-                      onClick={() => void checkLocalReadiness()}
-                      disabled={localChecking}
-                      className="text-xs text-primary hover:underline flex items-center gap-1 disabled:opacity-50"
-                    >
-                      <ArrowsClockwise size={12} className={localChecking ? 'animate-spin' : ''} />
-                      {t('settings.localModelRecheck')}
-                    </button>
-                  </div>
-                  <div className="rounded-md border border-input bg-background px-3 py-2 text-sm flex items-center gap-2">
-                    {localChecking ? (
-                      <span className="text-muted-foreground">{t('settings.localModelChecking')}</span>
-                    ) : localReadiness?.ready ? (
-                      <span className="text-success flex items-center gap-1">
-                        <CheckCircle size={14} weight="fill" />
-                        {t('settings.localModelReady')}
-                      </span>
-                    ) : (
-                      <span className="text-amber-500 flex items-center gap-1">
-                        <Warning size={14} weight="fill" />
-                        {t('settings.localModelUnavailable')}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{t('settings.localModelDescription')}</p>
-                </div>
-              ) : (
+              {showHostedAi && (
               <>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -1381,13 +1380,19 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                         </option>
                       ))
                     ) : (
-                      <>
-                        <option value="gemini-2.5-flash">{t('settings.geminiModel25Flash')}</option>
-                        <option value="gemini-2.5-pro">{t('settings.geminiModel25Pro')}</option>
-                        <option value="gemini-2.5-flash-lite">{t('settings.geminiModel25FlashLite')}</option>
-                        <option value="gemini-3.1-pro-preview">{t('settings.geminiModel31Pro')}</option>
-                        <option value="gemini-3.1-flash-lite">{t('settings.geminiModel31FlashLite')}</option>
-                      </>
+                      aiProvider === 'gemini' ? (
+                        <>
+                          <option value="gemini-2.5-flash">{t('settings.geminiModel25Flash')}</option>
+                          <option value="gemini-2.5-pro">{t('settings.geminiModel25Pro')}</option>
+                          <option value="gemini-2.5-flash-lite">{t('settings.geminiModel25FlashLite')}</option>
+                          <option value="gemini-3.1-pro-preview">{t('settings.geminiModel31Pro')}</option>
+                          <option value="gemini-3.1-flash-lite">{t('settings.geminiModel31FlashLite')}</option>
+                        </>
+                      ) : (
+                        <option value={settings.geminiModel || ''}>
+                          {settings.geminiModel || t('settings.modelDefault')}
+                        </option>
+                      )
                     )}
                   </select>
                   {modelsLoading && (
@@ -1406,6 +1411,9 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
               </div>
               </>
               )}
+
+              {/* On-device AI settings (#373) — local/both modes. */}
+              {showLocalAi && <LocalAISettings mode={aiMode} />}
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">

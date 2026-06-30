@@ -38,7 +38,8 @@ import {
   detectProviderFromKey,
   setActiveProviderId,
   apiKeyStorageKey,
-  isLocalLLMSupported,
+  isAppleIntelligenceSupported,
+  setAIMode,
 } from '@/services/ai/providers'
 import { isDemoMode, isNativePlatform, setMachineUrl } from '@/lib/machineMode'
 import { persistMachineUrl } from '@/services/machine/machineUrl'
@@ -112,7 +113,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     () => localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
   )
   // On-device AI (#373): offered only where Apple Intelligence is supported.
-  const localAiSupported = isLocalLLMSupported()
+  const localAiSupported = isAppleIntelligenceSupported()
   const [useLocalAI, setUseLocalAI] = useState(false)
 
   // Language — initialize from i18n's detected language (device locale on fresh install)
@@ -285,12 +286,13 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, authorName.trim())
     }
     if (useLocalAI && localAiSupported) {
-      // On-device AI: no key, just select the local provider.
-      setActiveProviderId('local')
+      // On-device AI: no key, route everything through the local backend.
+      setAIMode('local')
     } else if (geminiKey.trim()) {
       const key = geminiKey.trim()
       // Auto-detect the provider from the key shape and persist under its slot.
       const provider = detectProviderFromKey(key) ?? 'gemini'
+      setAIMode('hosted')
       setActiveProviderId(provider)
       const slot = apiKeyStorageKey(provider)
       // Write to both localStorage (immediate) and secure storage (Keychain on native)
