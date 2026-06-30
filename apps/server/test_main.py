@@ -17707,3 +17707,22 @@ class TestAnalysisValidator:
         from services.analysis_validator import validate_against_facts
         text = "- Severe channeling caused the pressure to collapse."
         assert "unsupported-channeling" in validate_against_facts(text, self._facts_targeted_weight())["issues"]
+
+
+class TestAnalysisStructure:
+    def test_schema_lists_core_sections(self):
+        from analysis_schema import REQUIRED_ANALYSIS_SECTIONS
+        assert "Shot Performance" in REQUIRED_ANALYSIS_SECTIONS
+        assert len(REQUIRED_ANALYSIS_SECTIONS) >= 5
+
+    def test_check_structure_flags_missing_sections(self):
+        from services.analysis_validator import check_structure
+        r = check_structure("## 1. Shot Performance\n- ok")
+        assert r["valid"] is False
+        assert "missing-sections" in r["issues"]
+
+    def test_check_structure_accepts_full_text(self):
+        from analysis_schema import REQUIRED_ANALYSIS_SECTIONS
+        from services.analysis_validator import check_structure
+        text = "\n".join(f"## {i+1}. {s}\n- content" for i, s in enumerate(REQUIRED_ANALYSIS_SECTIONS))
+        assert check_structure(text)["valid"] is True

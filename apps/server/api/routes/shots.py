@@ -35,7 +35,7 @@ from services.gemini_service import (
     compute_taste_hash,
 )
 from prompt_builder import build_taste_context
-from services.analysis_validator import validate_against_facts
+from services.analysis_validator import validate_against_facts, check_structure
 from analysis_knowledge import (
     ANALYSIS_KNOWLEDGE,
     FEW_SHOT_ANALYSIS_EXAMPLE,
@@ -1145,10 +1145,17 @@ Rules for recommendations:
         response = await model.async_generate_content(prompt)
 
         llm_analysis = response.text if response else "Analysis generation failed"
-        if not validate_against_facts(llm_analysis, shot_facts)["valid"]:
+        first_ok = (
+            validate_against_facts(llm_analysis, shot_facts)["valid"]
+            and check_structure(llm_analysis)["valid"]
+        )
+        if not first_ok:
             retry = await model.async_generate_content(prompt)
             retry_text = retry.text if retry else llm_analysis
-            if validate_against_facts(retry_text, shot_facts)["valid"]:
+            if (
+                validate_against_facts(retry_text, shot_facts)["valid"]
+                and check_structure(retry_text)["valid"]
+            ):
                 llm_analysis = retry_text
 
         # Save to cache

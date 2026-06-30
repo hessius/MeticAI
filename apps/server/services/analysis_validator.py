@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import re
 
+from analysis_schema import REQUIRED_ANALYSIS_SECTIONS
+
 _EARLY_EXIT_PATTERNS = [
     re.compile(r"terminat\w*\s+early", re.I),
     re.compile(r"\bearly\s+terminat", re.I),
@@ -39,3 +41,10 @@ def validate_against_facts(text: str, facts: dict) -> dict:
         issues.append("unsupported-channeling")
 
     return {"valid": len(issues) == 0, "issues": issues}
+
+
+def check_structure(text: str) -> dict:
+    """Verify the analysis contains each required section title (L1)."""
+    body = (text or "").lower()
+    missing = [s for s in REQUIRED_ANALYSIS_SECTIONS if s.lower() not in body]
+    return {"valid": not missing, "issues": ["missing-sections"] if missing else []}

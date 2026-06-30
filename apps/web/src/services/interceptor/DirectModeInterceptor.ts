@@ -9,7 +9,7 @@ import { deriveStructuralTags } from '@/lib/profileAnalysis'
 import type { AnalyzableProfile } from '@/lib/profileAnalysis'
 import { AI_TAGS_PROMPT, parseAiTags, stripTagsLine } from '@/lib/tags'
 import { buildShotFacts } from '@/lib/shotFacts'
-import { lintShotAnalysis, repairShotAnalysis, validateAgainstFacts } from '@/lib/analysisLint'
+import { lintShotAnalysis, repairShotAnalysis, validateAgainstFacts, checkStructure } from '@/lib/analysisLint'
 import { buildAnalyzeLlmPrompt } from './analyzeLlmPrompt'
 import { buildTasteContext } from '../ai/prompts'
 import {
@@ -3057,14 +3057,13 @@ export function installDirectModeInterceptor(): void {
             return r.text ?? ''
           }
           let analysisText = await gen()
-          let lint = lintShotAnalysis(analysisText)
-          let factCheck = validateAgainstFacts(analysisText, facts)
-          if (!lint.valid || !factCheck.valid) {
-            analysisText = await gen()  // one retry
-            lint = lintShotAnalysis(analysisText)
-            factCheck = validateAgainstFacts(analysisText, facts)
+          const ok = (txt: string) =>
+            lintShotAnalysis(txt).valid && validateAgainstFacts(txt, facts).valid && checkStructure(txt).valid
+          if (!ok(analysisText)) {
+            const retry = await gen()
+            if (ok(retry)) analysisText = retry
           }
-          if (!lint.valid) analysisText = repairShotAnalysis(analysisText)
+          if (!lintShotAnalysis(analysisText).valid) analysisText = repairShotAnalysis(analysisText)
           return jsonResponse({
             status: 'success',
             llm_analysis: analysisText,
