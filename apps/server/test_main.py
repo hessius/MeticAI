@@ -17674,3 +17674,36 @@ class TestAnalysisPromptContent:
         assert "EXIT TRIGGER CLASSIFICATION" in prompt          # ANALYSIS_KNOWLEDGE
         assert "Deterministic Shot Facts" in prompt              # fact sheet
         assert "Worked Example" in prompt                        # few-shot
+
+
+class TestAnalysisValidator:
+    def _facts_targeted_weight(self):
+        return {
+            "stages": [{
+                "stage_name": "Hold", "reached": True, "control_mode": "pressure",
+                "trigger_type": "weight",
+                "trigger_class": {"kind": "targeted", "label": "Targeted (yield reached)", "reason": ""},
+                "stall": {"stalled": False, "weight_gain": 30.0},
+                "channeling": {"channeling": False, "pressure_drop": 0.0, "flow_rise": 0.0},
+                "curve_adherence": None,
+            }],
+            "phases": [], "weight": {"actual": 36.0, "target": 36.0, "deviation_pct": 0.0},
+            "total_time_s": 28.0,
+        }
+
+    def test_flags_targeted_exit_called_early_termination(self):
+        from services.analysis_validator import validate_against_facts
+        text = "- The hold stage terminated early before reaching its goal."
+        r = validate_against_facts(text, self._facts_targeted_weight())
+        assert r["valid"] is False
+        assert "mischaracterized-targeted-exit" in r["issues"]
+
+    def test_accepts_success_framing(self):
+        from services.analysis_validator import validate_against_facts
+        text = "- The hold stage ended exactly on the weight target, a correct finish."
+        assert validate_against_facts(text, self._facts_targeted_weight())["valid"] is True
+
+    def test_flags_unsupported_channeling(self):
+        from services.analysis_validator import validate_against_facts
+        text = "- Severe channeling caused the pressure to collapse."
+        assert "unsupported-channeling" in validate_against_facts(text, self._facts_targeted_weight())["issues"]
