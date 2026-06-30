@@ -17726,3 +17726,13 @@ class TestAnalysisStructure:
         from services.analysis_validator import check_structure
         text = "\n".join(f"## {i+1}. {s}\n- content" for i, s in enumerate(REQUIRED_ANALYSIS_SECTIONS))
         assert check_structure(text)["valid"] is True
+
+
+class TestAnalysisCoverageMatrix:
+    def test_server_exposes_all_analysis_checks(self):
+        from services import analysis_validator as v
+        assert callable(v.validate_against_facts)
+        assert callable(v.check_structure)
+        from analysis_knowledge import build_fact_sheet, ANALYSIS_KNOWLEDGE  # noqa: F401
+        from services.shot_facts import build_shot_facts, classify_trigger  # noqa: F401
+        from services.compass_rules import compass_adjustments  # noqa: F401
