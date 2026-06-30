@@ -17536,3 +17536,22 @@ class TestLocalAnalysisIncludesFacts:
 
         assert "shot_facts" in result
         assert "stages" in result["shot_facts"]
+
+
+class TestCompassRules:
+    def test_sour_and_weak_suggests_finer_and_hotter(self):
+        from services.compass_rules import compass_adjustments
+        adj = compass_adjustments(taste_x=-0.8, taste_y=-0.6)
+        kinds = {a["kind"] for a in adj}
+        assert "grind_finer" in kinds
+        assert any(a["kind"] in ("temp_up", "ratio_up", "dose_up") for a in adj)
+
+    def test_bitter_and_strong_suggests_coarser_and_cooler(self):
+        from services.compass_rules import compass_adjustments
+        adj = compass_adjustments(taste_x=0.8, taste_y=0.7)
+        kinds = {a["kind"] for a in adj}
+        assert "grind_coarser" in kinds
+
+    def test_centered_taste_returns_no_changes(self):
+        from services.compass_rules import compass_adjustments
+        assert compass_adjustments(taste_x=0.0, taste_y=0.0) == []
