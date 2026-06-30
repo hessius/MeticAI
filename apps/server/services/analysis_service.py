@@ -13,6 +13,7 @@ import re
 from typing import Any, Optional
 
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
+from services.shot_facts import build_shot_facts
 from logging_config import get_logger
 
 logger = get_logger()
@@ -1378,7 +1379,7 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
                 "Consider adding a weight-based exit trigger to limit pre-infusion volume"
             )
 
-    return {
+    analysis_result = {
         "shot_summary": {
             "final_weight": round(final_weight, 1),
             "target_weight": round(target_weight, 1) if target_weight else None,
@@ -1410,6 +1411,8 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
         },
         "profile_target_curves": profile_target_curves,
     }
+    analysis_result["shot_facts"] = build_shot_facts(analysis_result)
+    return analysis_result
 
 
 def _prepare_shot_summary_for_llm(

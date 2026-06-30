@@ -17484,3 +17484,46 @@ class TestShotFacts:
         assert len(facts["stages"]) == 1
         assert facts["stages"][0]["trigger_class"]["kind"] == "targeted"
         assert "phases" in facts
+
+
+class TestLocalAnalysisIncludesFacts:
+    def test_local_analysis_attaches_shot_facts(self):
+        from services.analysis_service import _perform_local_shot_analysis
+
+        shot_data = {
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 2.0, "flow": 0.5}, "status": "Bloom"},
+                {"time": 5000, "shot": {"weight": 2.0, "pressure": 2.0, "flow": 0.5}, "status": "Bloom"},
+                {"time": 6000, "shot": {"weight": 5.0, "pressure": 9.0, "flow": 2.5}, "status": "Main"},
+                {"time": 25000, "shot": {"weight": 36.0, "pressure": 9.0, "flow": 2.5}, "status": "Main"},
+            ]
+        }
+
+        profile_data = {
+            "name": "Test Profile",
+            "final_weight": 36.0,
+            "stages": [
+                {
+                    "name": "Bloom",
+                    "key": "bloom",
+                    "type": "pressure",
+                    "dynamics_points": [[0, 2.0]],
+                    "dynamics_over": "time",
+                    "exit_triggers": [{"type": "time", "value": 5, "comparison": ">="}],
+                },
+                {
+                    "name": "Main",
+                    "key": "main",
+                    "type": "pressure",
+                    "dynamics_points": [[0, 9.0]],
+                    "dynamics_over": "time",
+                    "exit_triggers": [{"type": "weight", "value": 36, "comparison": ">="}],
+                },
+            ],
+            "variables": [],
+        }
+
+        result = _perform_local_shot_analysis(shot_data, profile_data)
+
+        assert "shot_facts" in result
+        assert "stages" in result["shot_facts"]
