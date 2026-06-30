@@ -149,7 +149,8 @@ channeling flags, the phase breakdown, and curve-adherence deltas. New i18n keys
 - **K3 — Few-shot worked example.** One compact example shot → ideal analysis embedded in the
   prompt to lock format and reasoning depth. Single example to bound token cost.
 - **K4 — Semantic validation + repair (both runtimes).** Extend `analysisLint.ts` and add a
-  server parity validator sharing one schema. Checks: all required sections/subsections
+  server parity validator sharing one schema (the linter's format coverage and test matrix are
+  formalized in Phase 4). Checks: all required sections/subsections
   present; `Assessment` is one of the allowed enum values; `RECOMMENDATIONS_JSON` parses and
   values stay within profile variable bounds; and **anti-hallucination cross-checks** — reject
   or repair claims that contradict `ShotFacts` (e.g. AI claims "reached target yield" when D1
@@ -173,6 +174,34 @@ channeling flags, the phase breakdown, and curve-adherence deltas. New i18n keys
 
 ---
 
+## Phase 4 — Linter format coverage & comprehensive test coverage
+
+The recently introduced AI-analysis linter (`analysisLint.ts`, degeneracy-only) must be
+expanded to fully cover the **new** output format produced by Phases 1–3, and validation must
+be wired across every analysis entry point in both runtimes. K4 introduces the semantic
+validator; Phase 4 makes the linter a first-class, explicitly-tested deliverable and closes
+any gaps so the linter cannot drift out of sync with the output schema.
+
+- **L1 — Format-aware linting.** Extend the linter (and its server parity validator) to assert
+  the full new section schema: required headers/subsections, the `Assessment` enum, the
+  bullet-point structure, the `RECOMMENDATIONS_JSON` block (parse + bounds), and the
+  Taste-Based Recommendations section when compass data is present. Keep the existing
+  degeneracy checks (repetition/diversity/empty).
+- **L2 — Single source of truth for the schema.** The expected-section schema lives in one
+  shared definition per runtime, consumed by both the prompt builder and the linter, so the
+  prompt and the validator cannot diverge. Numerically/structurally identical across runtimes.
+- **L3 — Universal wiring.** Every analysis path runs the linter → retry → repair → fallback,
+  including native DirectMode (currently returns raw, unlinted text) and the server LLM route.
+  No entry point may return unvalidated analysis text.
+- **L4 — Anti-hallucination tie-in.** The linter consumes `ShotFacts` so contradiction checks
+  (D1 Failsafe vs an AI "yield reached" claim) are part of the standard lint pass, not a
+  separate ad-hoc step.
+- **L5 — Comprehensive test coverage (release gate).** A coverage matrix proving the linter
+  catches and repairs each failure mode, on **both** runtimes (see Testing). New code lands
+  with tests for success **and** failure/edge-case paths, per project conventions.
+
+---
+
 ## Testing (dual-runtime, parity is release-blocking)
 
 - Table-driven unit tests for every D1 trigger combination → expected classification, including
@@ -182,8 +211,18 @@ channeling flags, the phase breakdown, and curve-adherence deltas. New i18n keys
 - D6 compass rule tests: each quadrant + descriptors → expected adjustments.
 - K4 validator tests: schema gaps, out-of-bounds recommendations, and anti-hallucination
   (fact says Failsafe → AI claim of "yield reached" is rejected/repaired).
+- **Phase 4 linter coverage matrix (release gate), both runtimes:** for each failure mode —
+  missing/extra section, invalid `Assessment` value, malformed/missing bullet structure,
+  unparseable or out-of-bounds `RECOMMENDATIONS_JSON`, missing Taste-Based Recommendations
+  when compass data is present, runaway repetition/low-diversity, and a fact contradiction —
+  assert the linter (a) flags it and (b) repair or retry yields valid output. Plus a
+  schema-drift guard test asserting the prompt builder and linter consume the same shared
+  schema definition (L2).
 - Golden small-model regression: feed a known-bad shot, assert the output passes the new
   validator (and that repair fires when needed).
+- Each new function (`buildShotFacts`/`build_shot_facts`, `compassAdjustments`,
+  `buildFactSheet`, validator) ships with success **and** failure/edge-case tests per project
+  conventions; no analysis entry point returns unvalidated text (L3).
 - i18n parity: all new keys present in all 6 locales (existing parity test covers this).
 - Server suite in `test_main.py` / `test_ai_providers.py`; web suite via
   `bun run test:run -- --reporter=dot <paths>`.
