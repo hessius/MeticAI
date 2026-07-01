@@ -1845,5 +1845,20 @@
     "selectImage": "Bild auswählen",
     "regenerateSlot": "Neu generieren",
     "generating": "Wird generiert..."
+  },
+  "analysis": {
+    "facts": {
+      "title": "Phasensignale",
+      "stalled": "Stehengeblieben",
+      "channeling": "Mögliches Channeling",
+      "curveDelta": "Kurve Δ {{delta}}",
+      "adjustmentsTitle": "Vorgeschlagene Anpassungen"
+    },
+    "taste": {
+      "gateTitle": "Mit Geschmack verfeinern (optional)",
+      "gateBody": "Teile mit, wie der Shot geschmeckt hat, für geschmacksbewusste Empfehlungen.",
+      "skip": "Überspringen",
+      "analyzeWithTaste": "Mit Geschmack analysieren"
+    }
   }
 }

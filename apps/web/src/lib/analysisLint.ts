@@ -9,6 +9,9 @@
  * best-effort repair that collapses runaway repetition when a retry still fails.
  */
 
+import type { ShotFacts } from './shotFacts'
+import { REQUIRED_ANALYSIS_SECTIONS } from './analysisSchema'
+
 export interface AnalysisLintResult {
   valid: boolean
   /** Machine-readable issue codes (e.g. 'empty', 'repetition', 'low-diversity'). */
@@ -102,4 +105,50 @@ export function repairShotAnalysis(text: string): string {
   }
 
   return out.join('\n').trim()
+}
+
+/** Phrases that frame a stage exit as a failure/early stop. */
+const EARLY_EXIT_PATTERNS = [
+  /terminat\w*\s+early/i,
+  /\bearly\s+terminat/i,
+  /ended?\s+(too\s+)?(early|prematurely)/i,
+  /\bcut\s+short\b/i,
+  /stopped?\s+before\s+reaching/i,
+]
+/** Phrases asserting channeling occurred. */
+const CHANNELING_ASSERTION = /\bchannel(?:ing|ed|s)?\b/i
+/** Phrases that negate channeling (so we don't flag "no channeling"). */
+const CHANNELING_NEGATION = /\b(no|not|without|absence of|isn'?t|wasn'?t)\b[^.]{0,30}channel/i
+
+/**
+ * Reject analyses that contradict the deterministic ShotFacts. High precision:
+ * only flags clear, well-supported contradictions.
+ */
+export function validateAgainstFacts(text: string, facts: ShotFacts): AnalysisLintResult {
+  const issues: string[] = []
+  const body = text ?? ''
+
+  const hasTargetedWeightExit = facts.stages.some(
+    s => s.reached && s.trigger_type === 'weight' && s.trigger_class?.kind === 'targeted',
+  )
+  if (hasTargetedWeightExit && EARLY_EXIT_PATTERNS.some(re => re.test(body))) {
+    issues.push('mischaracterized-targeted-exit')
+  }
+
+  const anyChanneling = facts.stages.some(s => s.channeling?.channeling)
+  if (!anyChanneling && CHANNELING_ASSERTION.test(body) && !CHANNELING_NEGATION.test(body)) {
+    issues.push('unsupported-channeling')
+  }
+
+  return { valid: issues.length === 0, issues }
+}
+
+/**
+ * Verify the analysis contains each required section title (L1). Matches on the title text so
+ * it is robust to numbering/heading-level variations the model may introduce.
+ */
+export function checkStructure(text: string): AnalysisLintResult {
+  const body = (text ?? '').toLowerCase()
+  const missing = REQUIRED_ANALYSIS_SECTIONS.filter(s => !body.includes(s.toLowerCase()))
+  return { valid: missing.length === 0, issues: missing.length ? ['missing-sections'] : [] }
 }

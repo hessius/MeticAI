@@ -1845,5 +1845,20 @@
     "selectImage": "Välj en bild",
     "regenerateSlot": "Generera om",
     "generating": "Genererar..."
+  },
+  "analysis": {
+    "facts": {
+      "title": "Stegsignaler",
+      "stalled": "Avstannade",
+      "channeling": "Möjlig kanalbildning",
+      "curveDelta": "Kurva Δ {{delta}}",
+      "adjustmentsTitle": "Föreslagna justeringar"
+    },
+    "taste": {
+      "gateTitle": "Förfina med smak (valfritt)",
+      "gateBody": "Berätta hur koppen smakade för smakmedvetna rekommendationer.",
+      "skip": "Hoppa över",
+      "analyzeWithTaste": "Analysera med smak"
+    }
   }
 }

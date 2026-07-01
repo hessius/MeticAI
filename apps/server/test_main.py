@@ -17370,3 +17370,418 @@ class TestAITags:
         assert resp.status_code == 200
         assert history[0]["ai_tags"] == ["Chocolate", "Creamy"]
         assert history[0]["reply"] == "A fresh AI description."
+
+
+class TestShotFactsClassify:
+    """#423 Targeted vs Failsafe trigger classification."""
+
+    def test_weight_is_always_targeted(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("pressure", "weight", total_triggers=2)
+        assert r["kind"] == "targeted"
+        assert "yield" in r["label"].lower()
+
+    def test_time_only_trigger_is_planned_duration(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("flow", "time", total_triggers=1)
+        assert r["kind"] == "targeted"
+        assert "planned" in r["label"].lower()
+
+    def test_time_with_other_triggers_is_failsafe_timeout(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("flow", "time", total_triggers=2)
+        assert r["kind"] == "failsafe"
+        assert "timeout" in r["label"].lower()
+
+    def test_flow_control_pressure_trigger_is_puck_resistance(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("flow", "pressure", total_triggers=2)
+        assert r["kind"] == "targeted"
+        assert "resistance" in r["label"].lower()
+
+    def test_pressure_control_flow_only_trigger_is_planned_transition(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("pressure", "flow", total_triggers=1)
+        assert r["kind"] == "targeted"
+
+    def test_pressure_control_flow_with_others_is_failsafe_channeling(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("pressure", "flow", total_triggers=2)
+        assert r["kind"] == "failsafe"
+        assert "channel" in r["label"].lower() or "chok" in r["label"].lower()
+
+    def test_pressure_control_pressure_trigger_is_threshold(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("pressure", "pressure", total_triggers=1)
+        assert r["kind"] == "targeted"
+
+    def test_unknown_combo_returns_unknown(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("power", "weird", total_triggers=1)
+        assert r["kind"] == "unknown"
+
+
+class TestShotFacts:
+    def _stage(self, **kw):
+        base = {
+            "stage_name": "Infusion",
+            "stage_type": "flow",
+            "exit_triggers": [],
+            "execution_data": {
+                "duration": 10.0, "weight_gain": 2.0, "end_weight": 8.0,
+                "start_pressure": 1.0, "end_pressure": 6.0, "avg_pressure": 4.0,
+                "max_pressure": 6.5, "min_pressure": 1.0,
+                "start_flow": 4.0, "end_flow": 0.5, "avg_flow": 2.0, "max_flow": 4.5,
+            },
+            "exit_trigger_result": {"triggered": {"type": "time"}},
+        }
+        base.update(kw)
+        return base
+
+    def test_stall_detected_on_time_failsafe_with_low_gain(self):
+        from services.shot_facts import detect_stall
+        stage = self._stage(
+            stage_type="pressure",
+            exit_triggers=[{"type": "flow"}, {"type": "time"}],
+            exit_trigger_result={"triggered": {"type": "time"}},
+            execution_data={**self._stage()["execution_data"], "weight_gain": 0.3},
+        )
+        assert detect_stall(stage)["stalled"] is True
+
+    def test_no_stall_when_weight_trigger(self):
+        from services.shot_facts import detect_stall
+        stage = self._stage(exit_trigger_result={"triggered": {"type": "weight"}})
+        assert detect_stall(stage)["stalled"] is False
+
+    def test_channeling_flag_on_pressure_drop_with_flow_rise(self):
+        from services.shot_facts import detect_channeling
+        ed = {**self._stage()["execution_data"],
+              "start_pressure": 8.0, "end_pressure": 3.0,
+              "start_flow": 1.0, "end_flow": 5.0}
+        assert detect_channeling(ed)["channeling"] is True
+
+    def test_no_channeling_on_stable_stage(self):
+        from services.shot_facts import detect_channeling
+        ed = {**self._stage()["execution_data"],
+              "start_pressure": 6.0, "end_pressure": 6.2,
+              "start_flow": 2.0, "end_flow": 2.1}
+        assert detect_channeling(ed)["channeling"] is False
+
+    def test_build_shot_facts_classifies_each_stage(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [
+                self._stage(
+                    stage_type="pressure",
+                    exit_triggers=[{"type": "weight"}],
+                    exit_trigger_result={"triggered": {"type": "weight"}},
+                ),
+            ],
+            "weight_analysis": {"actual": 36.0, "target": 36.0, "deviation_percent": 0.0},
+            "overall_metrics": {"total_time": 30.0},
+        }
+        facts = build_shot_facts(local)
+        assert len(facts["stages"]) == 1
+        assert facts["stages"][0]["trigger_class"]["kind"] == "targeted"
+        assert "phases" in facts
+
+    def test_total_time_falls_back_to_shot_summary(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [],
+            "weight_analysis": {},
+            "shot_summary": {"total_time": 28.5},
+        }
+        assert build_shot_facts(local)["total_time_s"] == 28.5
+
+    def test_curve_adherence_uses_profile_target_value(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [
+                self._stage(
+                    stage_type="pressure",
+                    profile_target_value=9.0,
+                    execution_data={**self._stage()["execution_data"], "avg_pressure": 8.5},
+                ),
+            ],
+            "weight_analysis": {},
+            "shot_summary": {"total_time": 30.0},
+        }
+        ca = build_shot_facts(local)["stages"][0]["curve_adherence"]
+        assert ca is not None
+        assert ca["target"] == 9.0
+        assert ca["measured"] == 8.5
+        assert ca["delta"] == -0.5
+
+    def test_curve_adherence_none_without_target(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [self._stage(stage_type="pressure")],
+            "weight_analysis": {},
+            "shot_summary": {"total_time": 30.0},
+        }
+        assert build_shot_facts(local)["stages"][0]["curve_adherence"] is None
+
+
+class TestMeanDynamicsTarget:
+    def test_mean_of_pressure_setpoints(self):
+        from services.analysis_service import _mean_dynamics_target
+        stage = {"type": "pressure", "dynamics_points": [[0, 2.0], [10, 8.0]]}
+        assert _mean_dynamics_target(stage) == 5.0
+
+    def test_resolves_variable_references(self):
+        from services.analysis_service import _mean_dynamics_target
+        stage = {"type": "flow", "dynamics_points": [[0, "$f"], [5, 4.0]]}
+        variables = [{"key": "f", "name": "Flow", "value": 2.0}]
+        assert _mean_dynamics_target(stage, variables) == 3.0
+
+    def test_none_for_non_pressure_flow_stage(self):
+        from services.analysis_service import _mean_dynamics_target
+        assert _mean_dynamics_target({"type": "power", "dynamics_points": [[0, 5]]}) is None
+
+    def test_none_when_no_numeric_points(self):
+        from services.analysis_service import _mean_dynamics_target
+        assert _mean_dynamics_target({"type": "pressure", "dynamics_points": []}) is None
+
+
+class TestLocalAnalysisIncludesFacts:
+    def test_local_analysis_attaches_shot_facts(self):
+        from services.analysis_service import _perform_local_shot_analysis
+
+        shot_data = {
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 2.0, "flow": 0.5}, "status": "Bloom"},
+                {"time": 5000, "shot": {"weight": 2.0, "pressure": 2.0, "flow": 0.5}, "status": "Bloom"},
+                {"time": 6000, "shot": {"weight": 5.0, "pressure": 9.0, "flow": 2.5}, "status": "Main"},
+                {"time": 25000, "shot": {"weight": 36.0, "pressure": 9.0, "flow": 2.5}, "status": "Main"},
+            ]
+        }
+
+        profile_data = {
+            "name": "Test Profile",
+            "final_weight": 36.0,
+            "stages": [
+                {
+                    "name": "Bloom",
+                    "key": "bloom",
+                    "type": "pressure",
+                    "dynamics_points": [[0, 2.0]],
+                    "dynamics_over": "time",
+                    "exit_triggers": [{"type": "time", "value": 5, "comparison": ">="}],
+                },
+                {
+                    "name": "Main",
+                    "key": "main",
+                    "type": "pressure",
+                    "dynamics_points": [[0, 9.0]],
+                    "dynamics_over": "time",
+                    "exit_triggers": [{"type": "weight", "value": 36, "comparison": ">="}],
+                },
+            ],
+            "variables": [],
+        }
+
+        result = _perform_local_shot_analysis(shot_data, profile_data)
+
+        assert "shot_facts" in result
+        assert "stages" in result["shot_facts"]
+
+
+class TestCompassRules:
+    def test_sour_and_weak_suggests_finer_and_hotter(self):
+        from services.compass_rules import compass_adjustments
+        adj = compass_adjustments(taste_x=-0.8, taste_y=-0.6)
+        kinds = {a["kind"] for a in adj}
+        assert "grind_finer" in kinds
+        assert any(a["kind"] in ("temp_up", "ratio_up", "dose_up") for a in adj)
+
+    def test_bitter_and_strong_suggests_coarser_and_cooler(self):
+        from services.compass_rules import compass_adjustments
+        adj = compass_adjustments(taste_x=0.8, taste_y=0.7)
+        kinds = {a["kind"] for a in adj}
+        assert "grind_coarser" in kinds
+
+    def test_centered_taste_returns_no_changes(self):
+        from services.compass_rules import compass_adjustments
+        assert compass_adjustments(taste_x=0.0, taste_y=0.0) == []
+
+
+class TestAnalysisKnowledge:
+    def test_knowledge_constant_covers_trigger_classes(self):
+        from analysis_knowledge import ANALYSIS_KNOWLEDGE
+        assert "Targeted" in ANALYSIS_KNOWLEDGE
+        assert "Failsafe" in ANALYSIS_KNOWLEDGE
+        assert "channeling" in ANALYSIS_KNOWLEDGE.lower()
+
+    def test_fact_sheet_renders_stage_classification(self):
+        from analysis_knowledge import build_fact_sheet
+        facts = {
+            "stages": [{
+                "stage_name": "Infusion", "reached": True, "control_mode": "pressure",
+                "trigger_type": "weight",
+                "trigger_class": {"kind": "targeted", "label": "Targeted (yield reached)", "reason": "x"},
+                "stall": {"stalled": False, "weight_gain": 30.0},
+                "channeling": {"channeling": False, "pressure_drop": 0.1, "flow_rise": 0.1},
+                "curve_adherence": {"target": 9.0, "measured": 8.5, "delta": -0.5},
+            }],
+            "phases": [],
+            "weight": {"actual": 36.0, "target": 36.0, "deviation_pct": 0.0},
+            "total_time_s": 30.0,
+        }
+        sheet = build_fact_sheet(facts)
+        assert "Infusion" in sheet
+        assert "Targeted (yield reached)" in sheet
+        assert "36" in sheet
+
+    def test_fact_sheet_flags_stall_and_channeling(self):
+        from analysis_knowledge import build_fact_sheet
+        facts = {
+            "stages": [{
+                "stage_name": "Decline", "reached": True, "control_mode": "pressure",
+                "trigger_type": "time",
+                "trigger_class": {"kind": "failsafe", "label": "Failsafe (timeout limit)", "reason": "x"},
+                "stall": {"stalled": True, "weight_gain": 0.2},
+                "channeling": {"channeling": True, "pressure_drop": 3.0, "flow_rise": 2.0},
+                "curve_adherence": None,
+            }],
+            "phases": [], "weight": {}, "total_time_s": 25.0,
+        }
+        sheet = build_fact_sheet(facts).lower()
+        assert "stall" in sheet
+        assert "channel" in sheet
+
+
+class TestAnalysisPromptContent:
+    """The analyze-llm prompt must carry ANALYSIS_KNOWLEDGE, the fact sheet, and the few-shot."""
+
+    @patch("api.routes.shots.fetch_shot_data", new_callable=AsyncMock)
+    @patch("api.routes.shots.async_get_profile", new_callable=AsyncMock)
+    @patch("api.routes.shots.async_list_profiles", new_callable=AsyncMock)
+    @patch("api.routes.shots.get_vision_model")
+    @patch("api.routes.shots._perform_local_shot_analysis")
+    def test_prompt_includes_knowledge_factsheet_fewshot(
+        self,
+        mock_local_analysis,
+        mock_get_model,
+        mock_list_profiles,
+        mock_get_profile,
+        mock_fetch_shot,
+        client,
+    ):
+        mock_fetch_shot.return_value = {
+            "profile_name": "Test",
+            "time": 1705320000,
+            "data": [{"time": 25000, "shot": {"weight": 36.0}}],
+        }
+
+        partial = type("P", (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_list_profiles.return_value = [partial]
+
+        full = type("F", (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0
+        full.variables = []
+        full.stages = []
+        full.error = None
+        mock_get_profile.return_value = full
+
+        mock_local_analysis.return_value = {
+            "shot_summary": {"final_weight": 36.0, "total_time": 28.0},
+            "weight_analysis": {"actual": 36.0, "target": 36.0, "deviation_percent": 0.0},
+            "stage_analyses": [],
+            "shot_facts": {
+                "stages": [],
+                "phases": [],
+                "weight": {"actual": 36.0, "target": 36.0, "deviation_pct": 0.0},
+                "total_time_s": 28.0,
+            },
+        }
+
+        mock_model = MagicMock()
+        mock_model.async_generate_content = AsyncMock(
+            return_value=MagicMock(
+                text="## 1. Shot Performance\n**What Happened:**\n- ok\n**Assessment:** Good"
+            )
+        )
+        mock_get_model.return_value = mock_model
+
+        resp = client.post(
+            "/api/shots/analyze-llm",
+            data={
+                "profile_name": "Test",
+                "shot_date": "2024-01-15",
+                "shot_filename": "shot.json",
+                "force_refresh": "true",
+            },
+        )
+        assert resp.status_code == 200
+        prompt = mock_model.async_generate_content.call_args[0][0]
+        assert "EXIT TRIGGER CLASSIFICATION" in prompt          # ANALYSIS_KNOWLEDGE
+        assert "Deterministic Shot Facts" in prompt              # fact sheet
+        assert "Worked Example" in prompt                        # few-shot
+
+
+class TestAnalysisValidator:
+    def _facts_targeted_weight(self):
+        return {
+            "stages": [{
+                "stage_name": "Hold", "reached": True, "control_mode": "pressure",
+                "trigger_type": "weight",
+                "trigger_class": {"kind": "targeted", "label": "Targeted (yield reached)", "reason": ""},
+                "stall": {"stalled": False, "weight_gain": 30.0},
+                "channeling": {"channeling": False, "pressure_drop": 0.0, "flow_rise": 0.0},
+                "curve_adherence": None,
+            }],
+            "phases": [], "weight": {"actual": 36.0, "target": 36.0, "deviation_pct": 0.0},
+            "total_time_s": 28.0,
+        }
+
+    def test_flags_targeted_exit_called_early_termination(self):
+        from services.analysis_validator import validate_against_facts
+        text = "- The hold stage terminated early before reaching its goal."
+        r = validate_against_facts(text, self._facts_targeted_weight())
+        assert r["valid"] is False
+        assert "mischaracterized-targeted-exit" in r["issues"]
+
+    def test_accepts_success_framing(self):
+        from services.analysis_validator import validate_against_facts
+        text = "- The hold stage ended exactly on the weight target, a correct finish."
+        assert validate_against_facts(text, self._facts_targeted_weight())["valid"] is True
+
+    def test_flags_unsupported_channeling(self):
+        from services.analysis_validator import validate_against_facts
+        text = "- Severe channeling caused the pressure to collapse."
+        assert "unsupported-channeling" in validate_against_facts(text, self._facts_targeted_weight())["issues"]
+
+
+class TestAnalysisStructure:
+    def test_schema_lists_core_sections(self):
+        from analysis_schema import REQUIRED_ANALYSIS_SECTIONS
+        assert "Shot Performance" in REQUIRED_ANALYSIS_SECTIONS
+        assert len(REQUIRED_ANALYSIS_SECTIONS) >= 5
+
+    def test_check_structure_flags_missing_sections(self):
+        from services.analysis_validator import check_structure
+        r = check_structure("## 1. Shot Performance\n- ok")
+        assert r["valid"] is False
+        assert "missing-sections" in r["issues"]
+
+    def test_check_structure_accepts_full_text(self):
+        from analysis_schema import REQUIRED_ANALYSIS_SECTIONS
+        from services.analysis_validator import check_structure
+        text = "\n".join(f"## {i+1}. {s}\n- content" for i, s in enumerate(REQUIRED_ANALYSIS_SECTIONS))
+        assert check_structure(text)["valid"] is True
+
+
+class TestAnalysisCoverageMatrix:
+    def test_server_exposes_all_analysis_checks(self):
+        from services import analysis_validator as v
+        assert callable(v.validate_against_facts)
+        assert callable(v.check_structure)
+        from analysis_knowledge import build_fact_sheet, ANALYSIS_KNOWLEDGE  # noqa: F401
+        from services.shot_facts import build_shot_facts, classify_trigger  # noqa: F401
+        from services.compass_rules import compass_adjustments  # noqa: F401

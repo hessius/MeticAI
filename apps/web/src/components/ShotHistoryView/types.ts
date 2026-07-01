@@ -1,4 +1,5 @@
 import type { ShotInfo, ShotData } from '@/hooks/useShotHistory'
+import type { ShotFacts } from '@/lib/shotFacts'
 
 // Re-export for convenience
 export type { ShotInfo, ShotData }
@@ -123,6 +124,7 @@ export interface LocalAnalysisResult {
   preinfusion_summary: PreinfusionSummary
   profile_info: ProfileInfo
   profile_target_curves?: ProfileTargetPoint[]
+  shot_facts?: ShotFacts
 }
 
 export interface ChartDataPoint {

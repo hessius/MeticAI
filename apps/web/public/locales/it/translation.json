@@ -1845,5 +1845,20 @@
     "selectImage": "Seleziona un'immagine",
     "regenerateSlot": "Rigenera",
     "generating": "Generazione..."
+  },
+  "analysis": {
+    "facts": {
+      "title": "Segnali di fase",
+      "stalled": "Bloccato",
+      "channeling": "Possibile canalizzazione",
+      "curveDelta": "Curva Δ {{delta}}",
+      "adjustmentsTitle": "Regolazioni suggerite"
+    },
+    "taste": {
+      "gateTitle": "Affina con il gusto (facoltativo)",
+      "gateBody": "Indica com'era il gusto per consigli più mirati.",
+      "skip": "Salta",
+      "analyzeWithTaste": "Analizza con il gusto"
+    }
   }
 }

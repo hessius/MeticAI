@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { lintShotAnalysis, repairShotAnalysis } from './analysisLint'
+import { lintShotAnalysis, repairShotAnalysis, validateAgainstFacts, checkStructure } from './analysisLint'
+import { REQUIRED_ANALYSIS_SECTIONS } from './analysisSchema'
+import type { ShotFacts } from './shotFacts'
 
 const wellFormed = `## 1. Overall Assessment
 **Summary:** A balanced, well-extracted shot with good temperature stability.
@@ -93,5 +95,54 @@ describe('repairShotAnalysis', () => {
   it('collapses 3+ consecutive blank lines to a single blank', () => {
     const repaired = repairShotAnalysis('Line one.\n\n\n\n\nLine two is also substantive here.')
     expect(repaired).not.toMatch(/\n{3,}/)
+  })
+})
+
+const factsTargetedWeight: ShotFacts = {
+  stages: [{ stage_name: 'Hold', reached: true, control_mode: 'pressure', trigger_type: 'weight',
+    trigger_class: { kind: 'targeted', label: 'Targeted (yield reached)', reason: '' },
+    stall: { stalled: false, weight_gain: 30 },
+    channeling: { channeling: false, pressure_drop: 0, flow_rise: 0 },
+    curve_adherence: null }],
+  phases: [], weight: { actual: 36, target: 36, deviation_pct: 0 }, total_time_s: 28,
+}
+
+describe('validateAgainstFacts (K4)', () => {
+  it('flags a targeted weight exit described as early termination', () => {
+    const text = '## 1. Shot Performance\n- The hold stage terminated early before reaching its goal.'
+    const r = validateAgainstFacts(text, factsTargetedWeight)
+    expect(r.valid).toBe(false)
+    expect(r.issues).toContain('mischaracterized-targeted-exit')
+  })
+  it('accepts analysis that frames the targeted exit as success', () => {
+    const text = '## 1. Shot Performance\n- The hold stage ended exactly on the weight target, a correct finish.'
+    expect(validateAgainstFacts(text, factsTargetedWeight).valid).toBe(true)
+  })
+  it('flags channeling claimed when no stage channeled', () => {
+    const text = '## 2. Root Cause\n- Severe channeling caused the pressure to collapse.'
+    const r = validateAgainstFacts(text, factsTargetedWeight)
+    expect(r.issues).toContain('unsupported-channeling')
+  })
+  it('does not flag channeling when a stage actually channeled', () => {
+    const facts: ShotFacts = { ...factsTargetedWeight, stages: [{ ...factsTargetedWeight.stages[0],
+      channeling: { channeling: true, pressure_drop: 3, flow_rise: 2 } }] }
+    const text = '- Channeling is evident from the pressure drop.'
+    expect(validateAgainstFacts(text, facts).issues).not.toContain('unsupported-channeling')
+  })
+})
+
+describe('checkStructure (L1) + schema (L2)', () => {
+  it('schema lists the five core sections', () => {
+    expect(REQUIRED_ANALYSIS_SECTIONS).toContain('Shot Performance')
+    expect(REQUIRED_ANALYSIS_SECTIONS.length).toBeGreaterThanOrEqual(5)
+  })
+  it('flags missing required sections', () => {
+    const r = checkStructure('## 1. Shot Performance\n- ok')
+    expect(r.valid).toBe(false)
+    expect(r.issues).toContain('missing-sections')
+  })
+  it('accepts text containing all required section titles', () => {
+    const text = REQUIRED_ANALYSIS_SECTIONS.map((s, i) => `## ${i + 1}. ${s}\n- content line here`).join('\n')
+    expect(checkStructure(text).valid).toBe(true)
   })
 })

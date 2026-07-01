@@ -30,7 +30,7 @@ import { retryWithBackoff } from './retryUtils'
 import i18n from 'i18next'
 
 import { STORAGE_KEYS } from '@/lib/constants'
-import { lintShotAnalysis, repairShotAnalysis } from '@/lib/analysisLint'
+import { lintShotAnalysis, repairShotAnalysis, checkStructure } from '@/lib/analysisLint'
 import { safeRandomUUID } from '@/lib/uuid'
 import { AIServiceError, type AIErrorCode as AIErrorCodeBase } from './aiErrors'
 import { getProviderForMethod, isAIConfigured } from './providers'
@@ -144,9 +144,10 @@ export function createBrowserAIService(): AIService {
       // back to a best-effort repair so the user still gets usable analysis.
       const response = await runAnalysis()
       let text = response.text
-      if (!lintShotAnalysis(text).valid) {
+      const valid = (txt: string) => lintShotAnalysis(txt).valid && checkStructure(txt).valid
+      if (!valid(text)) {
         const retry = await runAnalysis()
-        text = lintShotAnalysis(retry.text).valid
+        text = valid(retry.text)
           ? retry.text
           : repairShotAnalysis(retry.text.length >= text.length ? retry.text : text)
       }

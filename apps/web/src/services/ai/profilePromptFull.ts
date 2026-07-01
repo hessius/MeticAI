@@ -166,7 +166,7 @@ Profile JSON structure: {name, author, stages[], variables[], temperature}
 
 `
 
-const PROFILING_KNOWLEDGE = `ESPRESSO PROFILING GUIDE:
+export const PROFILING_KNOWLEDGE = `ESPRESSO PROFILING GUIDE:
 
 ## Core Concepts
 - Flow Rate: Higher = acidity/clarity, Lower = body/sweetness

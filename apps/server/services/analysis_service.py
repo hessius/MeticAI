@@ -13,6 +13,7 @@ import re
 from typing import Any, Optional
 
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
+from services.shot_facts import build_shot_facts
 from logging_config import get_logger
 
 logger = get_logger()
@@ -268,6 +269,33 @@ def _resolve_variable(value, variables: list) -> tuple[Any, str | None]:
     return value, var_key
 
 
+def _mean_dynamics_target(stage: dict, variables: list | None = None) -> float | None:
+    """Mean of a pressure/flow stage's resolved dynamics setpoints.
+
+    Returns the intended scalar target (bar or ml/s) used by
+    shot_facts._curve_adherence, or None for non-pressure/flow stages or when
+    no numeric setpoints are present. Mirror of the native
+    DirectModeInterceptor.meanDynamicsTarget — keep the two in sync.
+    """
+    stage_type = stage.get("type", "unknown")
+    if stage_type not in ("pressure", "flow"):
+        return None
+    variables = variables or []
+    values: list[float] = []
+    for point in stage.get("dynamics_points") or []:
+        if not isinstance(point, (list, tuple)) or len(point) == 0:
+            continue
+        raw = point[1] if len(point) > 1 else point[0]
+        resolved, _ = _resolve_variable(raw, variables)
+        try:
+            values.append(float(resolved))
+        except (TypeError, ValueError):
+            continue
+    if not values:
+        return None
+    return round(sum(values) / len(values), 2)
+
+
 def _format_exit_triggers(
     exit_triggers: list, variables: list | None = None
 ) -> list[dict]:
@@ -451,6 +479,7 @@ def _analyze_stage_execution(
         "stage_key": stage_key,
         "stage_type": stage_type,
         "profile_target": dynamics_desc,
+        "profile_target_value": _mean_dynamics_target(profile_stage, variables),
         "exit_triggers": exit_triggers,
         "limits": limits,
         "executed": shot_stage_data is not None,
@@ -1378,7 +1407,7 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
                 "Consider adding a weight-based exit trigger to limit pre-infusion volume"
             )
 
-    return {
+    analysis_result = {
         "shot_summary": {
             "final_weight": round(final_weight, 1),
             "target_weight": round(target_weight, 1) if target_weight else None,
@@ -1410,6 +1439,8 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
         },
         "profile_target_curves": profile_target_curves,
     }
+    analysis_result["shot_facts"] = build_shot_facts(analysis_result)
+    return analysis_result
 
 
 def _prepare_shot_summary_for_llm(
