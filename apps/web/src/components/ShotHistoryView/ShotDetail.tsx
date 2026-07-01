@@ -170,6 +170,7 @@ export function ShotDetail({
   const [isLlmCached, setIsLlmCached] = useState(false)
   const [showTasteGate, setShowTasteGate] = useState(false)
   const [shotTaste, setShotTaste] = useState<StoredTaste | null>(null)
+  const [lastUsedTaste, setLastUsedTaste] = useState<StoredTaste | null>(null)
 
   useScrollToTop([showLlmView])
 
@@ -293,13 +294,16 @@ export function ShotDetail({
   }, [selectedShot, shotData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load persisted taste on shot change
-    if (selectedShot) setShotTaste(loadShotTaste(profileName, selectedShot.date, selectedShot.filename))
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset taste state on shot change
+    setShowTasteGate(false)
+    setLastUsedTaste(null)
+    setShotTaste(selectedShot ? loadShotTaste(profileName, selectedShot.date, selectedShot.filename) : null)
   }, [selectedShot, profileName])
 
   // ---- LLM analysis -------------------------------------------------------
   const handleLlmAnalysis = async (taste: StoredTaste | null) => {
     if (!selectedShot || !shotData) return
+    setLastUsedTaste(taste)
     setShowLlmView(true)
     setIsLlmAnalyzing(true)
     setLlmAnalysisError(null)
@@ -376,10 +380,10 @@ export function ShotDetail({
       const profileData = shotData.profile as { description?: string; notes?: string } | undefined
       const profileDesc = profileData?.description || profileData?.notes
       if (profileDesc) formData.append('profile_description', profileDesc)
-      if (shotTaste) {
-        formData.append('taste_x', String(shotTaste.x))
-        formData.append('taste_y', String(shotTaste.y))
-        if (shotTaste.descriptors.length) formData.append('taste_descriptors', shotTaste.descriptors.join(','))
+      if (lastUsedTaste) {
+        formData.append('taste_x', String(lastUsedTaste.x))
+        formData.append('taste_y', String(lastUsedTaste.y))
+        if (lastUsedTaste.descriptors.length) formData.append('taste_descriptors', lastUsedTaste.descriptors.join(','))
       }
       const response = await fetch(`${serverUrl}/api/shots/analyze-llm`, { method: 'POST', body: formData })
       if (!response.ok) {

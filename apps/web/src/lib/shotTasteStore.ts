@@ -7,7 +7,8 @@ export interface StoredTaste {
 }
 
 export function shotTasteKey(profileName: string, date: string, filename: string): string {
-  return `shot-taste:${profileName}|${date}|${filename}`
+  const enc = encodeURIComponent
+  return `shot-taste:${enc(profileName)}|${enc(date)}|${enc(filename)}`
 }
 
 export function saveShotTaste(profileName: string, date: string, filename: string, taste: StoredTaste): void {

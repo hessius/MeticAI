@@ -3034,31 +3034,7 @@ export function installDirectModeInterceptor(): void {
             limits: s.limits,
           }))
 
-          // 4. Sample key data points from the shot for graph context
-          const dataEntries = entry.data ?? []
-          const graphSamples: Array<Record<string, unknown>> = []
-          if (dataEntries.length > 0) {
-            const indices = [0]
-            const n = dataEntries.length
-            for (const pct of [0.25, 0.5, 0.75]) {
-              const idx = Math.floor(n * pct)
-              if (!indices.includes(idx)) indices.push(idx)
-            }
-            indices.push(n - 1)
-            for (const idx of [...new Set(indices)].sort((a, b) => a - b)) {
-              const e = dataEntries[idx] as Record<string, unknown>
-              const shot = (e.shot ?? {}) as Record<string, unknown>
-              graphSamples.push({
-                time_s: Math.round(safeNumber(e.profile_time ?? e.time) / 100) / 10,
-                pressure: Math.round(safeNumber(shot.pressure) * 10) / 10,
-                flow: Math.round((safeNumber(shot.flow) || safeNumber(shot.gravimetric_flow)) * 10) / 10,
-                weight: Math.round(safeNumber(shot.weight) * 10) / 10,
-                stage: String(e.status ?? ''),
-              })
-            }
-          }
-
-          // 5. Build the comprehensive prompt (matching server format)
+          // 4. Build the comprehensive prompt
           const tasteX = body.get('taste_x') != null ? Number(body.get('taste_x')) : null
           const tasteY = body.get('taste_y') != null ? Number(body.get('taste_y')) : null
           const tasteDescriptors = String(body.get('taste_descriptors') ?? '')
@@ -3077,10 +3053,9 @@ export function installDirectModeInterceptor(): void {
             cleanStages,
             facts,
             tasteContext,
-            graphSamples,
           })
 
-          // 6. Call the AI provider for shot analysis (with retry on transient errors)
+          // 5. Call the AI provider for shot analysis (with retry on transient errors)
           if (!isAIConfigured()) {
             return jsonResponse({ status: 'error', message: aiNotConfiguredMessage() })
           }

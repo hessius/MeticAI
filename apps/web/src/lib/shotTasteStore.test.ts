@@ -14,4 +14,12 @@ describe('shotTasteStore (U3)', () => {
   it('builds a stable composite key', () => {
     expect(shotTasteKey('P', 'd', 'f')).toBe('shot-taste:P|d|f')
   })
+  it('encodes delimiter characters to avoid key collisions', () => {
+    // Two distinct shots that would collide under naive '|' joining.
+    saveShotTaste('A|B', 'd', 'f', { x: 1, y: 1, descriptors: ['bitter'] })
+    saveShotTaste('A', 'B|d', 'f', { x: -1, y: -1, descriptors: ['sour'] })
+    expect(loadShotTaste('A|B', 'd', 'f')).toEqual({ x: 1, y: 1, descriptors: ['bitter'] })
+    expect(loadShotTaste('A', 'B|d', 'f')).toEqual({ x: -1, y: -1, descriptors: ['sour'] })
+    expect(shotTasteKey('A|B', 'd', 'f')).not.toBe(shotTasteKey('A', 'B|d', 'f'))
+  })
 })

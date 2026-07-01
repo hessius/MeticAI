@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { lintShotAnalysis, repairShotAnalysis } from './analysisLint'
+import { lintShotAnalysis, repairShotAnalysis, validateAgainstFacts, checkStructure } from './analysisLint'
+import { REQUIRED_ANALYSIS_SECTIONS } from './analysisSchema'
+import type { ShotFacts } from './shotFacts'
 
 const wellFormed = `## 1. Overall Assessment
 **Summary:** A balanced, well-extracted shot with good temperature stability.
@@ -96,9 +98,6 @@ describe('repairShotAnalysis', () => {
   })
 })
 
-import { validateAgainstFacts } from './analysisLint'
-import type { ShotFacts } from './shotFacts'
-
 const factsTargetedWeight: ShotFacts = {
   stages: [{ stage_name: 'Hold', reached: true, control_mode: 'pressure', trigger_type: 'weight',
     trigger_class: { kind: 'targeted', label: 'Targeted (yield reached)', reason: '' },
@@ -131,9 +130,6 @@ describe('validateAgainstFacts (K4)', () => {
     expect(validateAgainstFacts(text, facts).issues).not.toContain('unsupported-channeling')
   })
 })
-
-import { checkStructure } from './analysisLint'
-import { REQUIRED_ANALYSIS_SECTIONS } from './analysisSchema'
 
 describe('checkStructure (L1) + schema (L2)', () => {
   it('schema lists the five core sections', () => {

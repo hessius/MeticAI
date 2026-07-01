@@ -11,13 +11,12 @@ export interface AnalyzeLlmPromptInput {
   cleanStages: unknown[]
   facts: ShotFacts
   tasteContext: string
-  graphSamples?: unknown[]
 }
 
 export function buildAnalyzeLlmPrompt(input: AnalyzeLlmPromptInput): string {
   const {
     profileName, temperature, targetWeight, profileDescription,
-    profileVars, cleanStages, facts, tasteContext, graphSamples = [],
+    profileVars, cleanStages, facts, tasteContext,
   } = input
   return `You are an expert espresso barista and profiling specialist analyzing a shot from a Meticulous Espresso Machine.
 
@@ -50,9 +49,6 @@ after the machine's piston retraction completes, so do NOT penalize weight devia
 exceeds ±5%.
 
 ${buildFactSheet(facts)}
-
-### Graph Sample Points
-${JSON.stringify(graphSamples, null, 2)}
 ${tasteContext ? `\n${tasteContext}\n` : ''}
 ${FEW_SHOT_ANALYSIS_EXAMPLE}
 
