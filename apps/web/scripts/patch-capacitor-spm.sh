@@ -272,54 +272,6 @@ for PLUGIN_DIR in "$NODE_MODULES"/@aparajita/*/ios; do
     done
 done
 
-# ─── capgo/capacitor-llm: guard eager Apple Intelligence init on Mac ─
-# LLMPlugin's `appleModel` is a stored-property initializer, so Capacitor
-# runs it unconditionally at bridge startup for every plugin instance —
-# before any JS/runtime gating in localLLM.ts ever executes. The plugin
-# only special-cases Mac Catalyst (targetEnvironment(macCatalyst)); it has
-# no guard for an iOS/iPadOS binary running "Designed for iPad" on Apple
-# Silicon Mac, where FoundationModels' SystemLanguageModel.default is not
-# functional and crashes the app before it can boot. Skip eagerly touching
-# it in that environment (mirrors the plugin's own isiOSAppOnMac check
-# elsewhere in Capacitor apps); everything downstream already treats a nil
-# appleModel as "unavailable" rather than crashing.
-LLM_PLUGIN="$NODE_MODULES/@capgo/capacitor-llm/ios/Sources/LLMPlugin/LLMPlugin.swift"
-if [ -f "$LLM_PLUGIN" ] && ! grep -q 'isiOSAppOnMac' "$LLM_PLUGIN" 2>/dev/null; then
-    python3 << PYEOF
-path = "$LLM_PLUGIN"
-with open(path, 'r') as f:
-    content = f.read()
-
-original = content
-content = content.replace(
-    '''    private var appleModel: Any? = {
-        if #available(iOS 26.0, *) {
-            return SystemLanguageModel.default
-        } else {
-            return nil
-        }
-    }()''',
-    '''    private var appleModel: Any? = {
-        if ProcessInfo.processInfo.isiOSAppOnMac {
-            return nil
-        }
-        if #available(iOS 26.0, *) {
-            return SystemLanguageModel.default
-        } else {
-            return nil
-        }
-    }()'''
-)
-
-if content != original:
-    with open(path, 'w') as f:
-        f.write(content)
-    print("  Patched: @capgo/capacitor-llm (guarded eager Apple Intelligence init on Mac)")
-else:
-    print("  No changes: @capgo/capacitor-llm (expected pattern not found — plugin source may have changed)")
-PYEOF
-fi
-
 # ─── capacitor-zeroconf special handling ────────────────────────────
 # Needs Package.swift for SPM + CAPBridgedPlugin conformance
 ZEROCONF_DIR="$NODE_MODULES/capacitor-zeroconf"
