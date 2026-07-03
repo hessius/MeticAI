@@ -62,10 +62,10 @@ describe('ReplayChart values readout', () => {
     expect(screen.queryByRole('status')).toBeInTheDocument()
   })
 
-  it('renders the tooltip and hides the readout when not replaying', () => {
+  it('renders the tooltip when not replaying while keeping the readout visible', () => {
     render(<ReplayChart {...baseProps} isShowingReplay={false} currentTime={0} />)
     expect(tooltipRenders).toBe(1)
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.queryByRole('status')).toBeInTheDocument()
   })
 })
 
