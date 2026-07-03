@@ -148,3 +148,66 @@ END_RECOMMENDATIONS_JSON`;
     expect(hasRecommendations("")).toBe(false);
   });
 });
+
+describe("malformed on-device model output (missing delimiters)", () => {
+  // Reproduces the Apple Intelligence bug where a bare recommendations array
+  // leaked into the "Potential Improvements" prose as garbage bullet points.
+  const leaked = `## 5. Profile Design Observations
+
+**Potential Improvements:**
+- The pre-infusion duration could be increased.
+- Using a finer grind could help extraction.
+
+[
+  {
+    "variable": "pressure_PreBrew",
+    "current_value": 1.8,
+    "recommended_value": 2.5,
+    "stage": "PreBrew",
+    "confidence": "high",
+    "reason": "Increase pressure during pre-infusion to ensure puck saturation."
+  }
+]
+`;
+
+  it("strips a bare (undelimited) recommendations array from section prose", () => {
+    const sections = parseStructuredAnalysis(leaked);
+    expect(sections).toHaveLength(1);
+    const content = sections[0].content;
+    expect(content).not.toContain('"variable"');
+    expect(content).not.toContain("pressure_PreBrew");
+    expect(content).not.toContain("[");
+    const items = sections[0].subsections[0].items;
+    expect(items).toEqual([
+      "The pre-infusion duration could be increased.",
+      "Using a finer grind could help extraction.",
+    ]);
+  });
+
+  it("recovers recommendations from a bare (undelimited) array", () => {
+    const recs = parseRecommendationsJSON(leaked);
+    expect(recs).toHaveLength(1);
+    expect(recs[0].variable).toBe("pressure_PreBrew");
+    expect(recs[0].recommended_value).toBe(2.5);
+    expect(recs[0].confidence).toBe("high");
+  });
+
+  it("hasRecommendations detects a bare array", () => {
+    expect(hasRecommendations(leaked)).toBe(true);
+  });
+
+  it("tolerates trailing commas in a delimited block", () => {
+    const text = `RECOMMENDATIONS_JSON:
+[{"variable":"flow","current_value":2.5,"recommended_value":3.0,"stage":"main","confidence":"high","reason":"r","is_patchable":true},]
+END_RECOMMENDATIONS_JSON`;
+    const recs = parseRecommendationsJSON(text);
+    expect(recs).toHaveLength(1);
+    expect(recs[0].variable).toBe("flow");
+  });
+
+  it("does not treat prose mentioning variables as a recommendations array", () => {
+    const text = "## 1. Shot Performance\n\n**Notes:**\n- The flow variable was stable.";
+    expect(parseRecommendationsJSON(text)).toEqual([]);
+    expect(hasRecommendations(text)).toBe(false);
+  });
+});

@@ -15383,7 +15383,52 @@ END_RECOMMENDATIONS_JSON
         recs = _parse_recommendations_json(text)
         assert recs == []
 
-    def test_classify_adjustable_variable(self):
+    def test_parse_bare_array_without_delimiters(self):
+        """Bare recommendations array (no delimiters) is recovered.
+
+        Reproduces the weak on-device model bug where the JSON array leaks
+        into prose without RECOMMENDATIONS_JSON markers.
+        """
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """## 5. Profile Design Observations
+**Potential Improvements:**
+- Increase pre-infusion duration.
+
+[
+  {
+    "variable": "pressure_PreBrew",
+    "current_value": 1.8,
+    "recommended_value": 2.5,
+    "stage": "PreBrew",
+    "confidence": "high",
+    "reason": "Increase pressure during pre-infusion."
+  }
+]
+"""
+        recs = _parse_recommendations_json(text)
+        assert len(recs) == 1
+        assert recs[0]["variable"] == "pressure_PreBrew"
+        assert recs[0]["recommended_value"] == 2.5
+
+    def test_parse_tolerates_trailing_comma(self):
+        """Trailing commas emitted by weak models are tolerated."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """RECOMMENDATIONS_JSON:
+[{"variable":"flow","current_value":2.5,"recommended_value":3.0,"stage":"main","confidence":"high","reason":"r"},]
+END_RECOMMENDATIONS_JSON
+"""
+        recs = _parse_recommendations_json(text)
+        assert len(recs) == 1
+        assert recs[0]["variable"] == "flow"
+
+    def test_parse_ignores_prose_mentioning_variables(self):
+        """Prose mentioning 'variable' without an array is not misparsed."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = "## 1. Shot Performance\n**Notes:**\n- The flow variable was stable."
+        assert _parse_recommendations_json(text) == []
         """Adjustable variable (no info_ prefix) is patchable."""
         from api.routes.shots import _classify_recommendation_patchable
 

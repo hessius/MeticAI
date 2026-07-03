@@ -115,6 +115,79 @@ export const CIRCLED_NUMBERS = [
   "\u246F", "\u2470", "\u2471", "\u2472", "\u2473",
 ];
 
+// ---- Recommendation JSON locator ----
+
+/**
+ * Locate the recommendations JSON array within an analysis string.
+ *
+ * Weak models (especially small on-device LLMs such as Apple Intelligence)
+ * frequently omit the `RECOMMENDATIONS_JSON:` / `END_RECOMMENDATIONS_JSON`
+ * delimiters and instead dump a bare JSON array — sometimes embedded inside
+ * a prose section. When that happens the array must still be (a) removed from
+ * the rendered prose and (b) recovered as structured recommendations.
+ *
+ * Strategy:
+ *   1. Prefer the properly delimited block.
+ *   2. Otherwise, fall back to bracket-matching a bare array that contains a
+ *      recommendation-shaped object (`"variable"` / `"recommended_value"`).
+ *
+ * Returns the character range of the located text (for stripping) and the raw
+ * JSON array text (for parsing), or null if none is found.
+ */
+export function locateRecommendationsJSON(
+  text: string,
+): { start: number; end: number; json: string } | null {
+  const delim = text.match(
+    /RECOMMENDATIONS_JSON:\s*\n\s*(\[[\s\S]*?\])\s*\n?\s*END_RECOMMENDATIONS_JSON/,
+  );
+  if (delim && delim.index != null) {
+    return {
+      start: delim.index,
+      end: delim.index + delim[0].length,
+      json: delim[1],
+    };
+  }
+
+  // Fallback: bare array containing a recommendation-shaped object.
+  const keyMatch = text.match(/"(?:variable|recommended_value)"\s*:/);
+  if (!keyMatch || keyMatch.index == null) return null;
+  const open = text.lastIndexOf("[", keyMatch.index);
+  if (open === -1) return null;
+
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = open; i < text.length; i++) {
+    const ch = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === "[") depth++;
+    else if (ch === "]") {
+      depth--;
+      if (depth === 0) {
+        return { start: open, end: i + 1, json: text.slice(open, i + 1) };
+      }
+    }
+  }
+  return null;
+}
+
+/** Tolerantly parse a JSON array, stripping trailing commas weak models emit. */
+function parseJsonArrayLoose(json: string): unknown[] | null {
+  const cleaned = json.replace(/,(\s*[\]}])/g, "$1");
+  try {
+    const parsed: unknown = JSON.parse(cleaned);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 // ---- Parser ----
 
 /**
@@ -127,9 +200,16 @@ export const CIRCLED_NUMBERS = [
  *   **Assessment:** [Good/Acceptable/Needs Improvement/Problematic]
  */
 export function parseStructuredAnalysis(text: string): ParsedSection[] {
-  // Strip the RECOMMENDATIONS_JSON block before parsing sections
-  let cleanText = text.replace(
-    /RECOMMENDATIONS_JSON:\s*\n[\s\S]*?END_RECOMMENDATIONS_JSON/g,
+  // Strip the recommendations JSON (delimited or bare) before parsing sections
+  // so it never leaks into prose as garbage bullet points.
+  let cleanText = text;
+  const located = locateRecommendationsJSON(cleanText);
+  if (located) {
+    cleanText = cleanText.slice(0, located.start) + cleanText.slice(located.end);
+  }
+  // Remove any residual delimiter markers left after an out-of-place array.
+  cleanText = cleanText.replace(
+    /RECOMMENDATIONS_JSON:\s*\n?|END_RECOMMENDATIONS_JSON/g,
     "",
   );
 
@@ -233,41 +313,36 @@ export interface Recommendation {
  *   END_RECOMMENDATIONS_JSON
  */
 export function parseRecommendationsJSON(text: string): Recommendation[] {
-  const match = text.match(
-    /RECOMMENDATIONS_JSON:\s*\n\s*(\[[\s\S]*?\])\s*\n\s*END_RECOMMENDATIONS_JSON/,
-  );
-  if (!match) return [];
+  const located = locateRecommendationsJSON(text);
+  if (!located) return [];
 
-  try {
-    const parsed: unknown = JSON.parse(match[1]);
-    if (!Array.isArray(parsed)) return [];
+  const parsed = parseJsonArrayLoose(located.json);
+  if (!parsed) return [];
 
-    return parsed
-      .filter(
-        (item): item is Record<string, unknown> =>
-          typeof item === "object" && item !== null,
+  return parsed
+    .filter(
+      (item): item is Record<string, unknown> =>
+        typeof item === "object" && item !== null,
+    )
+    .map((item) => ({
+      variable: String(item.variable ?? ""),
+      current_value: Number(item.current_value ?? 0),
+      recommended_value: Number(item.recommended_value ?? 0),
+      stage: String(item.stage ?? ""),
+      confidence: (["high", "medium", "low"].includes(
+        String(item.confidence),
       )
-      .map((item) => ({
-        variable: String(item.variable ?? ""),
-        current_value: Number(item.current_value ?? 0),
-        recommended_value: Number(item.recommended_value ?? 0),
-        stage: String(item.stage ?? ""),
-        confidence: (["high", "medium", "low"].includes(
-          String(item.confidence),
-        )
-          ? String(item.confidence)
-          : "low") as "high" | "medium" | "low",
-        reason: String(item.reason ?? ""),
-        is_patchable: item.is_patchable !== undefined ? Boolean(item.is_patchable) : true,
-      }));
-  } catch {
-    return [];
-  }
+        ? String(item.confidence)
+        : "low") as "high" | "medium" | "low",
+      reason: String(item.reason ?? ""),
+      is_patchable:
+        item.is_patchable !== undefined ? Boolean(item.is_patchable) : true,
+    }));
 }
 
 /**
- * Check if an analysis string contains a RECOMMENDATIONS_JSON block.
+ * Check if an analysis string contains recommendations (delimited or bare).
  */
 export function hasRecommendations(text: string): boolean {
-  return /RECOMMENDATIONS_JSON:\s*\n/.test(text);
+  return locateRecommendationsJSON(text) !== null;
 }

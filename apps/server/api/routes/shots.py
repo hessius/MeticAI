@@ -1629,17 +1629,63 @@ async def get_all_shot_annotations(request: Request):
 # ============================================================================
 
 
-def _parse_recommendations_json(analysis_text: str) -> list[dict]:
-    """Extract and parse the RECOMMENDATIONS_JSON block from analysis text."""
+def _locate_recommendations_json(analysis_text: str) -> str | None:
+    """Locate the recommendations JSON array text (delimited or bare).
+
+    Weak models (small on-device / non-Gemini LLMs) frequently omit the
+    RECOMMENDATIONS_JSON / END_RECOMMENDATIONS_JSON delimiters and emit a bare
+    array, sometimes embedded in prose. Prefer the delimited block; otherwise
+    fall back to bracket-matching a bare array that contains a
+    recommendation-shaped object.
+    """
     match = re.search(
-        r"RECOMMENDATIONS_JSON:\s*\n\s*(\[.*?\])\s*\n\s*END_RECOMMENDATIONS_JSON",
+        r"RECOMMENDATIONS_JSON:\s*\n\s*(\[.*?\])\s*\n?\s*END_RECOMMENDATIONS_JSON",
         analysis_text,
         re.DOTALL,
     )
-    if not match:
+    if match:
+        return match.group(1)
+
+    key = re.search(r'"(?:variable|recommended_value)"\s*:', analysis_text)
+    if not key:
+        return None
+    open_idx = analysis_text.rfind("[", 0, key.start())
+    if open_idx == -1:
+        return None
+
+    depth = 0
+    in_str = False
+    esc = False
+    for i in range(open_idx, len(analysis_text)):
+        ch = analysis_text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                return analysis_text[open_idx : i + 1]
+    return None
+
+
+def _parse_recommendations_json(analysis_text: str) -> list[dict]:
+    """Extract and parse the recommendations JSON (delimited or bare)."""
+    json_text = _locate_recommendations_json(analysis_text)
+    if not json_text:
         return []
+    # Tolerate trailing commas that weak models emit.
+    cleaned = re.sub(r",(\s*[\]}])", r"\1", json_text)
     try:
-        recs = json.loads(match.group(1))
+        recs = json.loads(cleaned)
         if not isinstance(recs, list):
             return []
         return recs
