@@ -973,7 +973,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
           </div>
         ) : (
         canReorder ? (
-        <Reorder.Group axis="y" values={filteredProfiles} onReorder={handleReorder} className="space-y-3">
+        <Reorder.Group axis="y" values={filteredProfiles} onReorder={handleReorder} layoutScroll className="flex flex-col gap-3">
           {filteredProfiles.map((profile) => (
             <Reorder.Item
               key={profile.id}
