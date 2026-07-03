@@ -29,6 +29,7 @@ import {
   type ProfileTargetPoint,
   type TooltipPayloadItem
 } from '@/components/charts/chartConstants'
+import { pointAtTime } from '@/components/charts/pointAtTime'
 
 // Custom tooltip for the chart
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipPayloadItem[]; label?: number }) {
@@ -120,6 +121,7 @@ interface ReplayChartProps {
   hasGravFlow: boolean
   isShowingReplay: boolean
   currentTime: number
+  readoutPoint?: ChartDataPoint
   isPlaying: boolean
   playbackSpeed: number
   isDark: boolean
@@ -136,6 +138,7 @@ export function ReplayChart({
   hasGravFlow,
   isShowingReplay,
   currentTime,
+  readoutPoint,
   isPlaying,
   playbackSpeed,
   isDark,
@@ -183,14 +186,14 @@ export function ReplayChart({
           </ResponsiveContainer>
         </div>
       </div>
-      {/* Live values readout — outside the plot so it never covers the curves */}
-      {isShowingReplay && (
-        <ReplayValuesReadout
-          point={displayData[displayData.length - 1]}
-          currentTime={currentTime}
-          hasGravFlow={hasGravFlow}
-        />
-      )}
+      {/* Live values readout — always visible so the row never disappears at
+          the start/end of a scrub (which caused the layout to jump). Follows
+          the current scrub position; shows the resting shot values otherwise. */}
+      <ReplayValuesReadout
+        point={readoutPoint ?? displayData[displayData.length - 1]}
+        currentTime={Math.max(0, Math.min(currentTime, dataMaxTime))}
+        hasGravFlow={hasGravFlow}
+      />
       {/* Grouped Legend: Shot + Stages */}
       <div className="space-y-1.5 pt-1">
         {/* Shot lines */}
@@ -311,6 +314,8 @@ export function CompareChart({
   const padding = isMobile ? 'p-1' : 'p-2'
   const theme = getChartTheme(isDark)
   const displayData = isShowingReplay ? combinedData.filter(d => d.time <= comparisonCurrentTime) : combinedData
+  const readoutTime = Math.max(0, Math.min(comparisonCurrentTime, dataMaxTime))
+  const readoutPoint = pointAtTime(combinedData, readoutTime)
   
   return (
     <>
@@ -347,13 +352,12 @@ export function CompareChart({
           </ResponsiveContainer>
         </div>
       </div>
-      {/* Live A/B values readout — outside the plot so it never covers the curves */}
-      {isShowingReplay && (
-        <CompareValuesReadout
-          point={displayData[displayData.length - 1]}
-          currentTime={comparisonCurrentTime}
-        />
-      )}
+      {/* Live A/B values readout — always visible so the row never disappears
+          at the start/end of a scrub (which caused the layout to jump). */}
+      <CompareValuesReadout
+        point={readoutPoint}
+        currentTime={readoutTime}
+      />
       <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary rounded" /> {t('shotCharts.shotASolid')}</span>
         <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary/50 rounded border-dashed" /> {t('shotCharts.shotBDashed')}</span>

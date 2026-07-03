@@ -42,6 +42,7 @@ import { ExpertAnalysisView } from '@/components/ExpertAnalysisView'
 import { ShotAnnotation } from '@/components/ShotAnnotation'
 import { ReplayChart, CompareChart, AnalyzeChart } from '@/components/ShotCharts'
 import { computeLeftAxisMax } from '@/components/charts/chartConstants'
+import { pointAtTime } from '@/components/charts/pointAtTime'
 import { getServerUrl } from '@/lib/config'
 import { useNativeShare, shareImageDataUri } from '@/hooks/useNativeShare'
 import { useActionSheet } from '@/hooks/useActionSheet'
@@ -562,6 +563,7 @@ export function ShotDetail({
     const displayStageRanges = isShowingReplay
       ? stageRanges.filter(s => s.startTime <= mainReplay.currentTime).map(s => ({ ...s, endTime: Math.min(s.endTime, mainReplay.currentTime) }))
       : stageRanges
+    const readoutPoint = pointAtTime(mergedData, Math.max(0, Math.min(mainReplay.currentTime, dataMaxTime)))
     return (
       <ReplayChart
         displayData={displayData}
@@ -573,6 +575,7 @@ export function ShotDetail({
         hasGravFlow={hasGravFlow}
         isShowingReplay={isShowingReplay}
         currentTime={mainReplay.currentTime}
+        readoutPoint={readoutPoint}
         isPlaying={mainReplay.isPlaying}
         playbackSpeed={mainReplay.playbackSpeed}
         isDark={isDark}
