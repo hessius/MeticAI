@@ -1440,11 +1440,11 @@ export function ShotDetail({
                                       </div>
                                       <div>
                                         <span className="text-xs text-muted-foreground block">{t('shotHistory.maxPressure')}</span>
-                                        <span className="text-sm font-medium">{stage.execution_data.avg_pressure} bar</span>
+                                        <span className="text-sm font-medium">{stage.execution_data.max_pressure} bar</span>
                                       </div>
                                       <div>
                                         <span className="text-xs text-muted-foreground block">{t('shotHistory.maxFlow')}</span>
-                                        <span className="text-sm font-medium">{stage.execution_data.avg_flow} ml/s</span>
+                                        <span className="text-sm font-medium">{stage.execution_data.max_flow} ml/s</span>
                                       </div>
                                     </div>
                                   )}
