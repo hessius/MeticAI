@@ -17542,6 +17542,96 @@ class TestEffectiveControlMode:
         assert stage["trigger_class"]["kind"] == "targeted"
 
 
+class TestPuckFailure:
+    """#423 puck-failure refinement: weight-terminated yield hit off-curve."""
+
+    def _pressure_governed_stage(self, max_pressure, weight_target=36.0):
+        # Slayer-style: declared flow, high flow target capped by a 6 bar pressure
+        # limit ⇒ effective pressure. Ends on a near-final weight trigger.
+        return {
+            "stage_name": "Extraction",
+            "stage_type": "flow",
+            "profile_max_target": 10.8,
+            "limits": [{"type": "pressure", "value": 6.0}],
+            "exit_triggers": [{"type": "weight"}],
+            "exit_trigger_result": {
+                "triggered": {"type": "weight", "target": weight_target}
+            },
+            "execution_data": {"weight_gain": 30.0, "max_pressure": max_pressure},
+        }
+
+    def test_yield_hit_off_target_is_puck_failure(self):
+        from services.shot_facts import build_shot_facts
+        # Pressure never reached the 6 bar band (max 3.0 < 0.8×6 = 4.8) → puck failure.
+        facts = build_shot_facts(
+            {
+                "weight_analysis": {"target": 36.0},
+                "stage_analyses": [self._pressure_governed_stage(max_pressure=3.0)],
+            }
+        )
+        tc = facts["stages"][0]["trigger_class"]
+        assert tc["kind"] == "failsafe"
+        assert "puck failure" in tc["label"].lower()
+
+    def test_yield_hit_on_target_is_normal_completion(self):
+        from services.shot_facts import build_shot_facts
+        # Pressure reached the band (6.2 ≥ 4.8) → normal targeted yield.
+        facts = build_shot_facts(
+            {
+                "weight_analysis": {"target": 36.0},
+                "stage_analyses": [self._pressure_governed_stage(max_pressure=6.2)],
+            }
+        )
+        tc = facts["stages"][0]["trigger_class"]
+        assert tc["kind"] == "targeted"
+        assert "puck failure" not in tc["label"].lower()
+
+    def test_flow_governed_weight_completion_is_never_puck_failure(self):
+        from services.shot_facts import build_shot_facts
+        # Plain flow stage, no pressure limit ⇒ effective flow. Low pressure is
+        # expected for a volumetric pour and must NOT be flagged as puck failure.
+        facts = build_shot_facts(
+            {
+                "weight_analysis": {"target": 36.0},
+                "stage_analyses": [
+                    {
+                        "stage_name": "Pour",
+                        "stage_type": "flow",
+                        "profile_max_target": 2.0,
+                        "limits": [],
+                        "exit_triggers": [{"type": "weight"}],
+                        "exit_trigger_result": {
+                            "triggered": {"type": "weight", "target": 36.0}
+                        },
+                        "execution_data": {"weight_gain": 30.0, "max_pressure": 2.0},
+                    }
+                ],
+            }
+        )
+        tc = facts["stages"][0]["trigger_class"]
+        assert tc["kind"] == "targeted"
+        assert "puck failure" not in tc["label"].lower()
+
+    def test_intermediate_weight_milestone_is_first_drip_check(self):
+        from services.shot_facts import build_shot_facts
+        facts = build_shot_facts(
+            {
+                "weight_analysis": {"target": 36.0},
+                "stage_analyses": [self._pressure_governed_stage(max_pressure=3.0, weight_target=4.0)],
+            }
+        )
+        tc = facts["stages"][0]["trigger_class"]
+        assert tc["kind"] == "targeted"
+        assert "first-drip" in tc["label"].lower() or "milestone" in tc["reason"].lower()
+
+    def test_classify_trigger_weight_backward_compatible(self):
+        from services.shot_facts import classify_trigger
+        # No context supplied ⇒ legacy behaviour: always targeted yield.
+        r = classify_trigger("pressure", "weight", 1)
+        assert r["kind"] == "targeted"
+        assert "yield" in r["label"].lower()
+
+
 class TestShotFacts:
     def _stage(self, **kw):
         base = {

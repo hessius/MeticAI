@@ -8,19 +8,59 @@ from __future__ import annotations
 
 
 def classify_trigger(
-    stage_control_mode: str, trigger_type: str, total_triggers: int
+    stage_control_mode: str,
+    trigger_type: str,
+    total_triggers: int,
+    *,
+    trigger_value: float | None = None,
+    global_target_weight: float | None = None,
+    on_target: bool | None = None,
 ) -> dict:
     """Classify a stage's exit trigger as Targeted vs Failsafe (#423).
 
     Args:
-        stage_control_mode: the variable the stage controls ('pressure' | 'flow' | other).
+        stage_control_mode: the variable the stage effectively controls
+            ('pressure' | 'flow' | 'power' | other) — pass the *effective* mode.
         trigger_type: the exit trigger that fired ('weight' | 'time' | 'pressure' | 'flow').
         total_triggers: number of exit triggers defined on the stage.
+        trigger_value: resolved value of the fired trigger (for weight triggers,
+            enables the final-yield vs stage-milestone distinction).
+        global_target_weight: the shot's final target weight (grams).
+        on_target: whether the stage tracked its intended target band. Only
+            meaningful for a weight-terminated pressure-governed stage: False
+            flags puck failure (yield reached off-curve). None = unknown.
 
     Returns:
         {'kind': 'targeted'|'failsafe'|'unknown', 'label': str, 'reason': str}
     """
     if trigger_type == "weight":
+        near_final = (
+            global_target_weight is not None
+            and global_target_weight > 0
+            and trigger_value is not None
+            and trigger_value >= global_target_weight * (1 - YIELD_THRESHOLD)
+        )
+        if near_final and on_target is False:
+            return {
+                "kind": "failsafe",
+                "label": "Failsafe (puck failure — yield hit off-target)",
+                "reason": (
+                    "The final weight target was reached, but the stage never "
+                    "built its intended pressure, so the yield came from an "
+                    "uncontrolled extraction (likely channeling or a failed puck)."
+                ),
+            }
+        if (
+            not near_final
+            and trigger_value is not None
+            and global_target_weight is not None
+            and global_target_weight > 0
+        ):
+            return {
+                "kind": "targeted",
+                "label": "Targeted (stage yield / first-drip check)",
+                "reason": "Stage exited on an intermediate weight milestone below the final target.",
+            }
         return {
             "kind": "targeted",
             "label": "Targeted (yield reached)",
@@ -78,6 +118,11 @@ CHANNELING_FLOW_RISE_MLS = 1.5  # simultaneous flow rise
 EFFECTIVE_FLOW_TARGET_MIN = 6.0
 # pressure stage + flow limit ≤ MAX ⇒ flow control
 EFFECTIVE_FLOW_LIMIT_MAX = 3.0
+# #423 puck-failure detection thresholds:
+# a weight trigger within YIELD_THRESHOLD of the global target = a final-yield stage
+YIELD_THRESHOLD = 0.10
+# peak pressure must reach (1 - TOLERANCE_THRESHOLD)×target to count as "on-target"
+TOLERANCE_THRESHOLD = 0.20
 
 
 def _stage_control_mode(stage: dict) -> str:
@@ -136,6 +181,28 @@ def effective_control_mode(stage: dict) -> str:
     ):
         return "flow"
     return declared
+
+
+def _yield_stage_on_target(stage: dict, effective_mode: str) -> bool | None:
+    """Whether a pressure-governed stage actually built its intended pressure (#423).
+
+    Puck failure is only reliably detectable on pressure-governed extraction: if
+    the puck channels or collapses, pressure never reaches the intended band even
+    though weight still accrues. For flow-governed / power / target-less stages we
+    return None (can't prove failure — a volumetric shot hitting weight is normal).
+    """
+    if effective_mode != "pressure":
+        return None
+    target = _limit_value(stage, "pressure")
+    if target is None and _stage_control_mode(stage) == "pressure":
+        target = stage.get("profile_target_value")
+    if not target:
+        return None
+    ed = stage.get("execution_data") or {}
+    max_pressure = ed.get("max_pressure")
+    if max_pressure is None:
+        return None
+    return float(max_pressure) >= (1 - TOLERANCE_THRESHOLD) * float(target)
 
 
 def detect_stall(stage: dict) -> dict:
@@ -232,6 +299,8 @@ def build_shot_facts(local_analysis: dict) -> dict:
     """Assemble the deterministic ShotFacts object consumed by the static view, the
     LLM fact sheet, and the validator. Mirrors buildShotFacts() in shotFacts.ts."""
     stages_out: list[dict] = []
+    wa = local_analysis.get("weight_analysis", {})
+    global_target_weight = wa.get("target")
     for s in local_analysis.get("stage_analyses", []):
         ed = s.get("execution_data")
         if not ed:
@@ -239,9 +308,11 @@ def build_shot_facts(local_analysis: dict) -> dict:
             continue
         triggered = (s.get("exit_trigger_result") or {}).get("triggered") or {}
         trig_type = triggered.get("type", "")
+        trig_value = triggered.get("target")
         total = len(s.get("exit_triggers") or [])
         declared_mode = _stage_control_mode(s)
         effective_mode = effective_control_mode(s)
+        on_target = _yield_stage_on_target(s, effective_mode)
         stages_out.append(
             {
                 "stage_name": s.get("stage_name"),
@@ -250,13 +321,19 @@ def build_shot_facts(local_analysis: dict) -> dict:
                 "declared_mode": declared_mode,
                 "mode_overridden": effective_mode != declared_mode,
                 "trigger_type": trig_type,
-                "trigger_class": classify_trigger(effective_mode, trig_type, total),
+                "trigger_class": classify_trigger(
+                    effective_mode,
+                    trig_type,
+                    total,
+                    trigger_value=trig_value,
+                    global_target_weight=global_target_weight,
+                    on_target=on_target,
+                ),
                 "stall": detect_stall(s),
                 "channeling": detect_channeling(ed),
                 "curve_adherence": _curve_adherence(s),
             }
         )
-    wa = local_analysis.get("weight_analysis", {})
     return {
         "stages": stages_out,
         "phases": _build_phases(local_analysis),

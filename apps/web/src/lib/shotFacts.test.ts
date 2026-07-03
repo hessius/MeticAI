@@ -154,3 +154,57 @@ describe('effectiveControlMode (#423)', () => {
     expect(stage.trigger_class?.kind).toBe('targeted')
   })
 })
+
+describe('puck-failure detection (#423)', () => {
+  // Slayer-style: declared flow, high flow target capped by a 6 bar pressure
+  // limit ⇒ effective pressure, ending on a near-final weight trigger.
+  const pressureGovernedStage = (maxPressure: number, weightTarget = 36) => ({
+    stage_name: 'Extraction', stage_type: 'flow', profile_max_target: 10.8,
+    limits: [{ type: 'pressure', value: 6 }],
+    exit_triggers: [{ type: 'weight' }],
+    exit_trigger_result: { triggered: { type: 'weight', target: weightTarget } },
+    execution_data: { duration: 25, weight_gain: 30, end_weight: 36, start_pressure: 1, end_pressure: 3, avg_pressure: 2.5, max_pressure: maxPressure, min_pressure: 1, start_flow: 10, end_flow: 8, avg_flow: 9, max_flow: 10 },
+  })
+
+  it('flags puck failure when yield is hit but pressure never built', () => {
+    const facts = buildShotFacts({ weight_analysis: { target: 36 }, stage_analyses: [pressureGovernedStage(3.0)] })
+    const tc = facts.stages[0].trigger_class
+    expect(tc?.kind).toBe('failsafe')
+    expect(tc?.label.toLowerCase()).toContain('puck failure')
+  })
+
+  it('normal completion when yield is hit on-target', () => {
+    const facts = buildShotFacts({ weight_analysis: { target: 36 }, stage_analyses: [pressureGovernedStage(6.2)] })
+    const tc = facts.stages[0].trigger_class
+    expect(tc?.kind).toBe('targeted')
+    expect(tc?.label.toLowerCase()).not.toContain('puck failure')
+  })
+
+  it('never flags puck failure on a flow-governed volumetric pour', () => {
+    const facts = buildShotFacts({
+      weight_analysis: { target: 36 },
+      stage_analyses: [{
+        stage_name: 'Pour', stage_type: 'flow', profile_max_target: 2, limits: [],
+        exit_triggers: [{ type: 'weight' }],
+        exit_trigger_result: { triggered: { type: 'weight', target: 36 } },
+        execution_data: { duration: 25, weight_gain: 30, end_weight: 36, start_pressure: 1, end_pressure: 2, avg_pressure: 2, max_pressure: 2, min_pressure: 1, start_flow: 2, end_flow: 2, avg_flow: 2, max_flow: 2 },
+      }],
+    })
+    const tc = facts.stages[0].trigger_class
+    expect(tc?.kind).toBe('targeted')
+    expect(tc?.label.toLowerCase()).not.toContain('puck failure')
+  })
+
+  it('intermediate weight milestone is a first-drip check', () => {
+    const facts = buildShotFacts({ weight_analysis: { target: 36 }, stage_analyses: [pressureGovernedStage(3.0, 4)] })
+    const tc = facts.stages[0].trigger_class
+    expect(tc?.kind).toBe('targeted')
+    expect(tc?.label.toLowerCase()).toContain('first-drip')
+  })
+
+  it('classifyTrigger weight is backward compatible without context', () => {
+    const r = classifyTrigger('pressure', 'weight', 1)
+    expect(r.kind).toBe('targeted')
+    expect(r.label.toLowerCase()).toContain('yield')
+  })
+})

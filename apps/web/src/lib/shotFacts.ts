@@ -10,6 +10,9 @@ export const CHANNELING_FLOW_RISE_MLS = 1.5
 // #423 effective-mode thresholds (from the superseding issue comment):
 export const EFFECTIVE_FLOW_TARGET_MIN = 6.0
 export const EFFECTIVE_FLOW_LIMIT_MAX = 3.0
+// #423 puck-failure detection thresholds:
+export const YIELD_THRESHOLD = 0.10 // weight trigger within this of global target = final-yield stage
+export const TOLERANCE_THRESHOLD = 0.20 // peak pressure must reach (1-this)×target to be "on-target"
 
 export type TriggerKind = 'targeted' | 'failsafe' | 'unknown'
 export interface TriggerClass { kind: TriggerKind; label: string; reason: string }
@@ -24,7 +27,7 @@ interface ExecutionData {
 interface StageAnalysis {
   stage_name?: string; stage_type?: string; type?: string
   exit_triggers?: Array<{ type?: string }>
-  exit_trigger_result?: { triggered?: { type?: string } | null } | null
+  exit_trigger_result?: { triggered?: { type?: string; target?: number } | null } | null
   execution_data?: ExecutionData | null
   profile_target?: { target_value?: number } | unknown
   profile_target_value?: number | null
@@ -53,8 +56,37 @@ export interface ShotFacts {
 const n = (v: unknown): number => (typeof v === 'number' && !Number.isNaN(v) ? v : 0)
 const r2 = (v: number): number => Math.round(v * 100) / 100
 
-export function classifyTrigger(stageControlMode: string, triggerType: string, totalTriggers: number): TriggerClass {
+export interface ClassifyTriggerOptions {
+  triggerValue?: number | null
+  globalTargetWeight?: number | null
+  onTarget?: boolean | null
+}
+
+export function classifyTrigger(
+  stageControlMode: string,
+  triggerType: string,
+  totalTriggers: number,
+  opts: ClassifyTriggerOptions = {},
+): TriggerClass {
+  const { triggerValue = null, globalTargetWeight = null, onTarget = null } = opts
   if (triggerType === 'weight') {
+    const nearFinal =
+      globalTargetWeight != null && globalTargetWeight > 0 &&
+      triggerValue != null && triggerValue >= globalTargetWeight * (1 - YIELD_THRESHOLD)
+    if (nearFinal && onTarget === false) {
+      return {
+        kind: 'failsafe',
+        label: 'Failsafe (puck failure — yield hit off-target)',
+        reason: 'The final weight target was reached, but the stage never built its intended pressure, so the yield came from an uncontrolled extraction (likely channeling or a failed puck).',
+      }
+    }
+    if (!nearFinal && triggerValue != null && globalTargetWeight != null && globalTargetWeight > 0) {
+      return {
+        kind: 'targeted',
+        label: 'Targeted (stage yield / first-drip check)',
+        reason: 'Stage exited on an intermediate weight milestone below the final target.',
+      }
+    }
     return { kind: 'targeted', label: 'Targeted (yield reached)', reason: 'Weight is the ultimate goal of the shot.' }
   }
   if (triggerType === 'time') {
@@ -118,6 +150,26 @@ export function effectiveControlMode(stage: StageAnalysis): string {
   return declared
 }
 
+/**
+ * Whether a pressure-governed stage actually built its intended pressure (#423).
+ *
+ * Puck failure is only reliably detectable on pressure-governed extraction: a
+ * channelled/collapsed puck never lets pressure reach the intended band even
+ * though weight accrues. Flow-governed / power / target-less stages return null
+ * (a volumetric shot hitting weight is normal). Mirror of shot_facts._yield_stage_on_target.
+ */
+export function yieldStageOnTarget(stage: StageAnalysis, effectiveMode: string): boolean | null {
+  if (effectiveMode !== 'pressure') return null
+  let target = limitValue(stage, 'pressure')
+  if (target == null && resolveStageControlMode(stage) === 'pressure') {
+    target = typeof stage.profile_target_value === 'number' ? stage.profile_target_value : null
+  }
+  if (target == null || target === 0) return null
+  const maxPressure = stage.execution_data?.max_pressure
+  if (maxPressure == null) return null
+  return maxPressure >= (1 - TOLERANCE_THRESHOLD) * target
+}
+
 export function detectStall(stage: StageAnalysis): StallResult {
   const trigType = stage.exit_trigger_result?.triggered?.type ?? ''
   const total = (stage.exit_triggers ?? []).length
@@ -168,12 +220,15 @@ export function buildShotFacts(analysis: {
   overall_metrics?: { total_time?: number }
 }): ShotFacts {
   const stages = analysis.stage_analyses ?? []
+  const globalTargetWeight = analysis.weight_analysis?.target ?? null
   const stagesOut: ShotFactStage[] = stages.map(s => {
     if (!s.execution_data) return { stage_name: s.stage_name, reached: false }
     const trigType = s.exit_trigger_result?.triggered?.type ?? ''
+    const trigValue = s.exit_trigger_result?.triggered?.target ?? null
     const total = (s.exit_triggers ?? []).length
     const declaredMode = resolveStageControlMode(s)
     const effectiveMode = effectiveControlMode(s)
+    const onTarget = yieldStageOnTarget(s, effectiveMode)
     return {
       stage_name: s.stage_name,
       reached: true,
@@ -181,7 +236,11 @@ export function buildShotFacts(analysis: {
       declared_mode: declaredMode,
       mode_overridden: effectiveMode !== declaredMode,
       trigger_type: trigType,
-      trigger_class: classifyTrigger(effectiveMode, trigType, total),
+      trigger_class: classifyTrigger(effectiveMode, trigType, total, {
+        triggerValue: trigValue,
+        globalTargetWeight,
+        onTarget,
+      }),
       stall: detectStall(s),
       channeling: detectChanneling(s.execution_data),
       curve_adherence: curveAdherence(s),
