@@ -17465,6 +17465,82 @@ class TestShotFactsClassify:
         r = classify_trigger("power", "weird", total_triggers=1)
         assert r["kind"] == "unknown"
 
+    def test_power_pressure_trigger_is_puck_resistance(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("power", "pressure", total_triggers=1)
+        assert r["kind"] == "targeted"
+        assert "resistance" in r["label"].lower()
+
+
+class TestEffectiveControlMode:
+    """#423 effective-mode detection (declared type vs true control intent)."""
+
+    def test_aggressive_flow_with_pressure_limit_is_pressure(self):
+        # Slayer "Extraction": flow target 10.8 ml/s capped by a 6 bar pressure limit.
+        from services.shot_facts import effective_control_mode
+        stage = {
+            "stage_type": "flow",
+            "profile_max_target": 10.8,
+            "limits": [{"type": "pressure", "value": 6.0}],
+        }
+        assert effective_control_mode(stage) == "pressure"
+
+    def test_gentle_flow_with_pressure_limit_stays_flow(self):
+        # Slayer "PreBrew": flow target 1.2 ml/s + 1.8 bar limit — genuinely flow-led.
+        from services.shot_facts import effective_control_mode
+        stage = {
+            "stage_type": "flow",
+            "profile_max_target": 1.2,
+            "limits": [{"type": "pressure", "value": 1.8}],
+        }
+        assert effective_control_mode(stage) == "flow"
+
+    def test_pressure_with_restricted_flow_limit_is_flow(self):
+        from services.shot_facts import effective_control_mode
+        stage = {
+            "stage_type": "pressure",
+            "profile_max_target": 9.0,
+            "limits": [{"type": "flow", "value": 2.5}],
+        }
+        assert effective_control_mode(stage) == "flow"
+
+    def test_pressure_with_loose_flow_limit_stays_pressure(self):
+        # Damian "Fill": pressure 2 bar + 8 ml/s limit — the limit isn't restrictive.
+        from services.shot_facts import effective_control_mode
+        stage = {
+            "stage_type": "pressure",
+            "profile_max_target": 2.0,
+            "limits": [{"type": "flow", "value": 8.0}],
+        }
+        assert effective_control_mode(stage) == "pressure"
+
+    def test_power_stage_is_power(self):
+        from services.shot_facts import effective_control_mode
+        assert effective_control_mode({"stage_type": "power"}) == "power"
+
+    def test_build_shot_facts_exposes_effective_and_declared_mode(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [
+                {
+                    "stage_name": "Extraction",
+                    "stage_type": "flow",
+                    "profile_max_target": 10.8,
+                    "limits": [{"type": "pressure", "value": 6.0}],
+                    "exit_triggers": [{"type": "pressure"}],
+                    "exit_trigger_result": {"triggered": {"type": "pressure"}},
+                    "execution_data": {"weight_gain": 20.0, "avg_pressure": 6.0},
+                }
+            ]
+        }
+        facts = build_shot_facts(local)
+        stage = facts["stages"][0]
+        assert stage["control_mode"] == "pressure"
+        assert stage["declared_mode"] == "flow"
+        assert stage["mode_overridden"] is True
+        # Effective pressure + pressure trigger ⇒ targeted threshold, not "puck resistance".
+        assert stage["trigger_class"]["kind"] == "targeted"
+
 
 class TestShotFacts:
     def _stage(self, **kw):

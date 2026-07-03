@@ -7,6 +7,9 @@
 export const STALL_MIN_WEIGHT_GAIN_G = 0.5
 export const CHANNELING_PRESSURE_DROP_BAR = 1.5
 export const CHANNELING_FLOW_RISE_MLS = 1.5
+// #423 effective-mode thresholds (from the superseding issue comment):
+export const EFFECTIVE_FLOW_TARGET_MIN = 6.0
+export const EFFECTIVE_FLOW_LIMIT_MAX = 3.0
 
 export type TriggerKind = 'targeted' | 'failsafe' | 'unknown'
 export interface TriggerClass { kind: TriggerKind; label: string; reason: string }
@@ -25,11 +28,15 @@ interface StageAnalysis {
   execution_data?: ExecutionData | null
   profile_target?: { target_value?: number } | unknown
   profile_target_value?: number | null
+  profile_max_target?: number | null
+  limits?: Array<{ type?: string; value?: number }>
 }
 export interface ShotFactStage {
   stage_name?: string
   reached: boolean
   control_mode?: string
+  declared_mode?: string
+  mode_overridden?: boolean
   trigger_type?: string
   trigger_class?: TriggerClass
   stall?: StallResult
@@ -55,7 +62,7 @@ export function classifyTrigger(stageControlMode: string, triggerType: string, t
       ? { kind: 'targeted', label: 'Targeted (planned duration)', reason: 'Time is the only trigger, so this is an intentional timed stage.' }
       : { kind: 'failsafe', label: 'Failsafe (timeout limit)', reason: 'Stage hit its time backstop before another target was reached.' }
   }
-  if (stageControlMode === 'flow' && triggerType === 'pressure') {
+  if ((stageControlMode === 'flow' || stageControlMode === 'power') && triggerType === 'pressure') {
     return { kind: 'targeted', label: 'Targeted (puck resistance achieved)', reason: 'Flow-controlled stage reached its intended pressure.' }
   }
   if (stageControlMode === 'pressure' && triggerType === 'flow') {
@@ -73,14 +80,49 @@ function resolveStageControlMode(stage: StageAnalysis): string {
   const t = (stage.stage_type ?? stage.type ?? '').toLowerCase()
   if (t.includes('flow')) return 'flow'
   if (t.includes('pressure')) return 'pressure'
+  if (t.includes('power')) return 'power'
   return 'unknown'
+}
+
+function limitValue(stage: StageAnalysis, limitType: string): number | null {
+  const lim = (stage.limits ?? []).find(l => l.type === limitType)
+  if (!lim || typeof lim.value !== 'number' || Number.isNaN(lim.value)) return null
+  return lim.value
+}
+
+/**
+ * Determine a stage's *effective* control mode, correcting for #423 cases where
+ * the declared type does not reflect the true intent.
+ *
+ *   1. Aggressive flow (peak target ≥ 6 ml/s) with a pressure limit ⇒ effectively
+ *      pressure-controlled (the pressure limit governs).
+ *   2. A pressure stage with a highly restricted flow limit (≤ 3 ml/s) ⇒
+ *      effectively flow-controlled (can't build pressure).
+ *   3. Power stages are raw mechanical drive.
+ *
+ * Falls back to the declared control mode when no override applies. Mirror of
+ * shot_facts.effective_control_mode — keep the two in sync.
+ */
+export function effectiveControlMode(stage: StageAnalysis): string {
+  const declared = resolveStageControlMode(stage)
+  if (declared === 'power') return 'power'
+  const maxTarget = typeof stage.profile_max_target === 'number' ? stage.profile_max_target : null
+  const pressureLimit = limitValue(stage, 'pressure')
+  const flowLimit = limitValue(stage, 'flow')
+  if (declared === 'flow' && maxTarget != null && maxTarget >= EFFECTIVE_FLOW_TARGET_MIN && pressureLimit != null) {
+    return 'pressure'
+  }
+  if (declared === 'pressure' && flowLimit != null && flowLimit <= EFFECTIVE_FLOW_LIMIT_MAX) {
+    return 'flow'
+  }
+  return declared
 }
 
 export function detectStall(stage: StageAnalysis): StallResult {
   const trigType = stage.exit_trigger_result?.triggered?.type ?? ''
   const total = (stage.exit_triggers ?? []).length
   const gain = n(stage.execution_data?.weight_gain)
-  const klass = classifyTrigger(resolveStageControlMode(stage), trigType, total)
+  const klass = classifyTrigger(effectiveControlMode(stage), trigType, total)
   const stalled = klass.kind === 'failsafe' && trigType === 'time' && gain < STALL_MIN_WEIGHT_GAIN_G
   return { stalled, weight_gain: r2(gain) }
 }
@@ -130,12 +172,16 @@ export function buildShotFacts(analysis: {
     if (!s.execution_data) return { stage_name: s.stage_name, reached: false }
     const trigType = s.exit_trigger_result?.triggered?.type ?? ''
     const total = (s.exit_triggers ?? []).length
+    const declaredMode = resolveStageControlMode(s)
+    const effectiveMode = effectiveControlMode(s)
     return {
       stage_name: s.stage_name,
       reached: true,
-      control_mode: resolveStageControlMode(s),
+      control_mode: effectiveMode,
+      declared_mode: declaredMode,
+      mode_overridden: effectiveMode !== declaredMode,
       trigger_type: trigType,
-      trigger_class: classifyTrigger(resolveStageControlMode(s), trigType, total),
+      trigger_class: classifyTrigger(effectiveMode, trigType, total),
       stall: detectStall(s),
       channeling: detectChanneling(s.execution_data),
       curve_adherence: curveAdherence(s),

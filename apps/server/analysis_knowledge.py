@@ -87,10 +87,15 @@ def build_fact_sheet(facts: dict) -> str:
         ca = s.get("curve_adherence")
         if ca and abs(float(ca.get("delta", 0) or 0)) >= 0.5:
             parts.append(f"curve off-target by {_fmt_num(ca.get('delta'))}")
+        if s.get("mode_overridden") and s.get("declared_mode"):
+            mode_label = (
+                f"{s.get('control_mode')} — effective; declared "
+                f"{s.get('declared_mode')}, reclassified by its limit"
+            )
+        else:
+            mode_label = s.get("control_mode")
         lines.append(
-            f"  - {s.get('stage_name')} [{s.get('control_mode')}]: "
-            + "; ".join(parts)
-            + "."
+            f"  - {s.get('stage_name')} [{mode_label}]: " + "; ".join(parts) + "."
         )
 
     return "\n".join(lines)

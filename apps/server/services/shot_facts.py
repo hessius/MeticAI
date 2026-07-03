@@ -38,7 +38,7 @@ def classify_trigger(
             "label": "Failsafe (timeout limit)",
             "reason": "Stage hit its time backstop before another target was reached.",
         }
-    if stage_control_mode == "flow" and trigger_type == "pressure":
+    if stage_control_mode in ("flow", "power") and trigger_type == "pressure":
         return {
             "kind": "targeted",
             "label": "Targeted (puck resistance achieved)",
@@ -73,16 +73,69 @@ def classify_trigger(
 STALL_MIN_WEIGHT_GAIN_G = 0.5  # below this on a time-failsafe = stalled
 CHANNELING_PRESSURE_DROP_BAR = 1.5  # pressure fall within a stage
 CHANNELING_FLOW_RISE_MLS = 1.5  # simultaneous flow rise
+# #423 effective-mode thresholds (from the superseding issue comment):
+# flow target ≥ MIN + pressure limit ⇒ pressure control
+EFFECTIVE_FLOW_TARGET_MIN = 6.0
+# pressure stage + flow limit ≤ MAX ⇒ flow control
+EFFECTIVE_FLOW_LIMIT_MAX = 3.0
 
 
 def _stage_control_mode(stage: dict) -> str:
-    """Best-effort: which variable the stage controls."""
+    """Best-effort: which variable the stage nominally controls (declared type)."""
     t = (stage.get("stage_type") or stage.get("type") or "").lower()
     if "flow" in t:
         return "flow"
     if "pressure" in t:
         return "pressure"
+    if "power" in t:
+        return "power"
     return "unknown"
+
+
+def _limit_value(stage: dict, limit_type: str) -> float | None:
+    """Resolved numeric value of a stage limit by type, or None if absent."""
+    for lim in stage.get("limits") or []:
+        if lim.get("type") == limit_type:
+            try:
+                return float(lim.get("value"))
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def effective_control_mode(stage: dict) -> str:
+    """Determine a stage's *effective* control mode, correcting for #423 cases
+    where the declared type does not reflect the true intent.
+
+    Overrides (from the superseding #423 comment):
+      1. Aggressive flow (peak target ≥ 6 ml/s) with a pressure limit ⇒ the
+         pressure limit governs, so the stage is effectively pressure-controlled.
+      2. A pressure stage with a highly restricted flow limit (≤ 3 ml/s) can't
+         build pressure, so it is effectively flow-controlled.
+      3. Power stages are raw mechanical drive.
+
+    Falls back to the declared control mode when no override applies.
+    """
+    declared = _stage_control_mode(stage)
+    if declared == "power":
+        return "power"
+    max_target = stage.get("profile_max_target")
+    pressure_limit = _limit_value(stage, "pressure")
+    flow_limit = _limit_value(stage, "flow")
+    if (
+        declared == "flow"
+        and isinstance(max_target, (int, float))
+        and max_target >= EFFECTIVE_FLOW_TARGET_MIN
+        and pressure_limit is not None
+    ):
+        return "pressure"
+    if (
+        declared == "pressure"
+        and flow_limit is not None
+        and flow_limit <= EFFECTIVE_FLOW_LIMIT_MAX
+    ):
+        return "flow"
+    return declared
 
 
 def detect_stall(stage: dict) -> dict:
@@ -93,7 +146,7 @@ def detect_stall(stage: dict) -> dict:
     total = len(stage.get("exit_triggers") or [])
     ed = stage.get("execution_data") or {}
     gain = float(ed.get("weight_gain", 0) or 0)
-    klass = classify_trigger(_stage_control_mode(stage), trig_type, total)
+    klass = classify_trigger(effective_control_mode(stage), trig_type, total)
     stalled = (
         klass["kind"] == "failsafe"
         and trig_type == "time"
@@ -187,15 +240,17 @@ def build_shot_facts(local_analysis: dict) -> dict:
         triggered = (s.get("exit_trigger_result") or {}).get("triggered") or {}
         trig_type = triggered.get("type", "")
         total = len(s.get("exit_triggers") or [])
+        declared_mode = _stage_control_mode(s)
+        effective_mode = effective_control_mode(s)
         stages_out.append(
             {
                 "stage_name": s.get("stage_name"),
                 "reached": True,
-                "control_mode": _stage_control_mode(s),
+                "control_mode": effective_mode,
+                "declared_mode": declared_mode,
+                "mode_overridden": effective_mode != declared_mode,
                 "trigger_type": trig_type,
-                "trigger_class": classify_trigger(
-                    _stage_control_mode(s), trig_type, total
-                ),
+                "trigger_class": classify_trigger(effective_mode, trig_type, total),
                 "stall": detect_stall(s),
                 "channeling": detect_channeling(ed),
                 "curve_adherence": _curve_adherence(s),

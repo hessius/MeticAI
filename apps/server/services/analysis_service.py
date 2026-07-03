@@ -296,6 +296,33 @@ def _mean_dynamics_target(stage: dict, variables: list | None = None) -> float |
     return round(sum(values) / len(values), 2)
 
 
+def _max_dynamics_target(stage: dict, variables: list | None = None) -> float | None:
+    """Peak of a pressure/flow stage's resolved dynamics setpoints.
+
+    Used by shot_facts.effective_control_mode (#423) to detect stages whose
+    control intent differs from their declared type — e.g. an aggressive flow
+    stage (high flow target) paired with a pressure limit is effectively
+    pressure-controlled. Mirror of the native DirectModeInterceptor.maxDynamicsTarget.
+    """
+    stage_type = stage.get("type", "unknown")
+    if stage_type not in ("pressure", "flow"):
+        return None
+    variables = variables or []
+    values: list[float] = []
+    for point in stage.get("dynamics_points") or []:
+        if not isinstance(point, (list, tuple)) or len(point) == 0:
+            continue
+        raw = point[1] if len(point) > 1 else point[0]
+        resolved, _ = _resolve_variable(raw, variables)
+        try:
+            values.append(float(resolved))
+        except (TypeError, ValueError):
+            continue
+    if not values:
+        return None
+    return round(max(values), 2)
+
+
 def _format_exit_triggers(
     exit_triggers: list, variables: list | None = None
 ) -> list[dict]:
@@ -480,6 +507,7 @@ def _analyze_stage_execution(
         "stage_type": stage_type,
         "profile_target": dynamics_desc,
         "profile_target_value": _mean_dynamics_target(profile_stage, variables),
+        "profile_max_target": _max_dynamics_target(profile_stage, variables),
         "exit_triggers": exit_triggers,
         "limits": limits,
         "executed": shot_stage_data is not None,

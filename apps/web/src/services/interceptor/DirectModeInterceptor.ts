@@ -418,6 +418,37 @@ function meanDynamicsTarget(
 }
 
 /**
+ * Peak of a pressure/flow stage's resolved dynamics setpoints (#423).
+ *
+ * Feeds effectiveControlMode() so an aggressive flow stage paired with a
+ * pressure limit can be recognised as effectively pressure-controlled.
+ * Mirror of the server _max_dynamics_target — keep the two in sync.
+ */
+function maxDynamicsTarget(
+  stageType: string,
+  points: unknown,
+  variables: Array<Record<string, unknown>>,
+): number | null {
+  if (stageType !== 'pressure' && stageType !== 'flow') return null
+  if (!Array.isArray(points)) return null
+  const values: number[] = []
+  for (const point of points) {
+    if (!Array.isArray(point) || point.length === 0) continue
+    const raw = point.length > 1 ? point[1] : point[0]
+    let resolved: unknown = raw
+    if (typeof raw === 'string' && raw.startsWith('$')) {
+      const key = raw.slice(1)
+      const variable = variables.find((item) => item.key === key || item.name === key)
+      resolved = variable?.value
+    }
+    const num = typeof resolved === 'number' ? resolved : Number(resolved)
+    if (Number.isFinite(num)) values.push(num)
+  }
+  if (values.length === 0) return null
+  return Math.round(Math.max(...values) * 100) / 100
+}
+
+/**
  * Build target-curve points for a time-based, multi-point stage.
  *
  * Dynamics point x-values are absolute seconds measured from the start of the
@@ -797,6 +828,11 @@ export function computeRichLocalAnalysis(entry: HistEntry, profileName: string) 
               stage_type: stageType,
               profile_target: profileTarget,
               profile_target_value: meanDynamicsTarget(
+                stageType,
+                ps.dynamics?.points,
+                vars as Array<Record<string, unknown>>,
+              ),
+              profile_max_target: maxDynamicsTarget(
                 stageType,
                 ps.dynamics?.points,
                 vars as Array<Record<string, unknown>>,

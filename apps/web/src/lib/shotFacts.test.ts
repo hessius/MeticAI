@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { classifyTrigger, detectStall, detectChanneling, buildShotFacts } from './shotFacts'
+import { classifyTrigger, detectStall, detectChanneling, buildShotFacts, effectiveControlMode } from './shotFacts'
 
 describe('classifyTrigger (#423)', () => {
   it('weight is always targeted', () => {
@@ -103,5 +103,54 @@ describe('buildShotFacts', () => {
       }],
     }
     expect(buildShotFacts(analysis).stages[0].curve_adherence).toBeNull()
+  })
+})
+
+describe('effectiveControlMode (#423)', () => {
+  it('aggressive flow with a pressure limit is effectively pressure', () => {
+    // Slayer "Extraction": flow 10.8 ml/s capped by a 6 bar pressure limit.
+    expect(effectiveControlMode({
+      stage_type: 'flow', profile_max_target: 10.8,
+      limits: [{ type: 'pressure', value: 6 }],
+    })).toBe('pressure')
+  })
+  it('gentle flow with a pressure limit stays flow', () => {
+    // Slayer "PreBrew": flow 1.2 ml/s + 1.8 bar limit — genuinely flow-led.
+    expect(effectiveControlMode({
+      stage_type: 'flow', profile_max_target: 1.2,
+      limits: [{ type: 'pressure', value: 1.8 }],
+    })).toBe('flow')
+  })
+  it('pressure with a restricted flow limit is effectively flow', () => {
+    expect(effectiveControlMode({
+      stage_type: 'pressure', profile_max_target: 9,
+      limits: [{ type: 'flow', value: 2.5 }],
+    })).toBe('flow')
+  })
+  it('pressure with a loose flow limit stays pressure', () => {
+    // Damian "Fill": pressure 2 bar + 8 ml/s limit — limit isn't restrictive.
+    expect(effectiveControlMode({
+      stage_type: 'pressure', profile_max_target: 2,
+      limits: [{ type: 'flow', value: 8 }],
+    })).toBe('pressure')
+  })
+  it('power stage is power', () => {
+    expect(effectiveControlMode({ stage_type: 'power' })).toBe('power')
+  })
+  it('buildShotFacts exposes effective + declared mode and override flag', () => {
+    const facts = buildShotFacts({
+      stage_analyses: [{
+        stage_name: 'Extraction', stage_type: 'flow', profile_max_target: 10.8,
+        limits: [{ type: 'pressure', value: 6 }],
+        exit_triggers: [{ type: 'pressure' }],
+        exit_trigger_result: { triggered: { type: 'pressure' } },
+        execution_data: { duration: 25, weight_gain: 20, end_weight: 36, start_pressure: 1, end_pressure: 6, avg_pressure: 6, max_pressure: 6.5, min_pressure: 1, start_flow: 10, end_flow: 2, avg_flow: 4, max_flow: 10 },
+      }],
+    })
+    const stage = facts.stages[0]
+    expect(stage.control_mode).toBe('pressure')
+    expect(stage.declared_mode).toBe('flow')
+    expect(stage.mode_overridden).toBe(true)
+    expect(stage.trigger_class?.kind).toBe('targeted')
   })
 })

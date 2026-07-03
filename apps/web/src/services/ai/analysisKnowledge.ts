@@ -60,7 +60,10 @@ export function buildFactSheet(facts: ShotFacts): string {
     if (s.curve_adherence && Math.abs(s.curve_adherence.delta) >= 0.5) {
       parts.push(`curve off-target by ${fmtNum(s.curve_adherence.delta)}`)
     }
-    lines.push(`  - ${s.stage_name} [${s.control_mode}]: ${parts.join('; ')}.`)
+    const modeLabel = s.mode_overridden && s.declared_mode
+      ? `${s.control_mode} — effective; declared ${s.declared_mode}, reclassified by its limit`
+      : s.control_mode
+    lines.push(`  - ${s.stage_name} [${modeLabel}]: ${parts.join('; ')}.`)
   }
   return lines.join('\n')
 }
