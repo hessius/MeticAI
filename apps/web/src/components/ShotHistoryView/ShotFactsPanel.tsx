@@ -16,6 +16,7 @@ export function ShotFactsPanel({ facts, taste }: Props) {
   return (
     <div className="rounded-lg border border-border bg-card p-4 space-y-3">
       <h3 className="text-sm font-semibold text-foreground">{t('analysis.facts.title')}</h3>
+      <p className="-mt-2 text-xs text-muted-foreground">{t('analysis.facts.subtitle')}</p>
       <ul className="space-y-2">
         {reached.map((s, i) => (
           <li key={`${s.stage_name}-${i}`} className="flex flex-col gap-1 border-b border-border/50 pb-2 last:border-0 last:pb-0">

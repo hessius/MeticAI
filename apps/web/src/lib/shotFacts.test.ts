@@ -8,13 +8,18 @@ describe('classifyTrigger (#423)', () => {
   it('time-only trigger is planned duration', () => {
     expect(classifyTrigger('flow', 'time', 1).kind).toBe('targeted')
   })
-  it('time with other triggers is failsafe timeout', () => {
+  it('time with other triggers is a targeted timed transition (not a failsafe)', () => {
     const r = classifyTrigger('flow', 'time', 2)
-    expect(r.kind).toBe('failsafe')
-    expect(r.label.toLowerCase()).toContain('timeout')
+    expect(r.kind).toBe('targeted')
+    expect(r.label.toLowerCase()).toContain('timed transition')
   })
   it('flow control + pressure trigger is puck resistance', () => {
     expect(classifyTrigger('flow', 'pressure', 2).kind).toBe('targeted')
+  })
+  it('flow control + flow trigger is flow target reached', () => {
+    const r = classifyTrigger('flow', 'flow', 2)
+    expect(r.kind).toBe('targeted')
+    expect(r.label.toLowerCase()).toContain('flow target')
   })
   it('pressure control + flow-only trigger is planned transition', () => {
     expect(classifyTrigger('pressure', 'flow', 1).kind).toBe('targeted')

@@ -1851,6 +1851,7 @@
   "analysis": {
     "facts": {
       "title": "Stage signals",
+      "subtitle": "How each stage exited (which condition fired) — a description of intent, not a pass/fail verdict. See Stage analysis for goal outcomes.",
       "stalled": "Stalled",
       "channeling": "Possible channeling",
       "curveDelta": "Curve Δ {{delta}}",

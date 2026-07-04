@@ -16,8 +16,8 @@ const facts: ShotFacts = {
       stall: { stalled: false, weight_gain: 30 },
       channeling: { channeling: false, pressure_drop: 0.1, flow_rise: 0.1 },
       curve_adherence: { target: 9, measured: 8.5, delta: -0.5 } },
-    { stage_name: 'Decline', reached: true, control_mode: 'pressure', trigger_type: 'time',
-      trigger_class: { kind: 'failsafe', label: 'Failsafe (timeout limit)', reason: '' },
+    { stage_name: 'Decline', reached: true, control_mode: 'pressure', trigger_type: 'flow',
+      trigger_class: { kind: 'failsafe', label: 'Failsafe (caught channeling or choking)', reason: '' },
       stall: { stalled: true, weight_gain: 0.2 },
       channeling: { channeling: true, pressure_drop: 3, flow_rise: 2 },
       curve_adherence: null },
@@ -33,7 +33,7 @@ describe('ShotFactsPanel', () => {
     expect(screen.getByText('Infusion')).toBeInTheDocument()
     expect(screen.getByText('Decline')).toBeInTheDocument()
     expect(screen.getByText('Targeted (yield reached)')).toBeInTheDocument()
-    expect(screen.getByText('Failsafe (timeout limit)')).toBeInTheDocument()
+    expect(screen.getByText('Failsafe (caught channeling or choking)')).toBeInTheDocument()
   })
   it('shows stall and channeling flags when present', () => {
     render(<ShotFactsPanel facts={facts} />)

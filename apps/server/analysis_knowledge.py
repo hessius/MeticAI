@@ -15,13 +15,15 @@ You are reasoning about a single espresso extraction. Apply this framework:
 EXIT TRIGGER CLASSIFICATION (critical — do not confuse intent with failure):
 - A stage ends when one of its exit triggers fires. Classify each as Targeted or Failsafe:
   - Targeted: the stage reached the outcome it was designed for. Examples: a weight trigger
-    (yield reached), a time trigger that is the stage's ONLY trigger (planned duration), a
-    flow-controlled stage hitting its target pressure (puck resistance achieved), a
-    pressure-controlled stage hitting target pressure, or a pressure-controlled stage whose
-    ONLY trigger is flow (planned flow transition).
-  - Failsafe: a backstop fired before the real target. Examples: a time trigger firing when
-    OTHER triggers also exist (timeout), or a pressure-controlled stage exiting on a flow
-    backstop when other triggers exist (caught channeling or choking).
+    (yield reached), any time trigger (a timed transition is a valid, intended exit — the
+    stage ran for its planned duration), a flow-controlled stage hitting its target pressure
+    (puck resistance achieved) or its target flow, a pressure-controlled stage hitting target
+    pressure, or a pressure-controlled stage whose ONLY trigger is flow (planned flow transition).
+  - Failsafe: a backstop fired instead of the real target. Examples: a weight target reached
+    off-curve without building intended pressure (puck failure), or a pressure-controlled stage
+    exiting on a flow backstop when other triggers exist (caught channeling or choking).
+- A time exit is NOT a failure by itself. A genuine timeout — a timed stage that extracted
+  almost nothing while another target went unmet — is surfaced separately as a STALL signal.
 - NEVER describe a Targeted exit as a problem. A short stage that hit its weight target is a
   correct, successful outcome — not "early termination".
 

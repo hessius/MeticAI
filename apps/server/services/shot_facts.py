@@ -74,15 +74,26 @@ def classify_trigger(
                 "reason": "Time is the only trigger, so this is an intentional timed stage.",
             }
         return {
-            "kind": "failsafe",
-            "label": "Failsafe (timeout limit)",
-            "reason": "Stage hit its time backstop before another target was reached.",
+            "kind": "targeted",
+            "label": "Targeted (timed transition)",
+            "reason": (
+                "The stage transitioned when its planned time elapsed; the other "
+                "exit conditions simply did not fire first. A time exit is a valid, "
+                "intended transition — a genuine timeout with no extraction is "
+                "surfaced separately as a stall."
+            ),
         }
     if stage_control_mode in ("flow", "power") and trigger_type == "pressure":
         return {
             "kind": "targeted",
             "label": "Targeted (puck resistance achieved)",
             "reason": "Flow-controlled stage reached its intended pressure.",
+        }
+    if stage_control_mode in ("flow", "power") and trigger_type == "flow":
+        return {
+            "kind": "targeted",
+            "label": "Targeted (flow target reached)",
+            "reason": "Flow-controlled stage reached its intended flow condition.",
         }
     if stage_control_mode == "pressure" and trigger_type == "flow":
         if total_triggers == 1:
@@ -206,19 +217,20 @@ def _yield_stage_on_target(stage: dict, effective_mode: str) -> bool | None:
 
 
 def detect_stall(stage: dict) -> dict:
-    """A stage stalled if it exited on a time failsafe with negligible weight gain."""
+    """A stage stalled if it timed out with another unmet target and negligible gain.
+
+    A stall is a time-terminated stage that *had* another exit target it failed to
+    reach (total_triggers > 1) yet extracted almost nothing — i.e. the time trigger
+    acted as a backstop for a target that was never met. Purely timed stages
+    (total_triggers == 1, e.g. pre-infusion) are intentional and never stalled.
+    """
     result = stage.get("exit_trigger_result") or {}
     triggered = result.get("triggered") or {}
     trig_type = triggered.get("type", "")
     total = len(stage.get("exit_triggers") or [])
     ed = stage.get("execution_data") or {}
     gain = float(ed.get("weight_gain", 0) or 0)
-    klass = classify_trigger(effective_control_mode(stage), trig_type, total)
-    stalled = (
-        klass["kind"] == "failsafe"
-        and trig_type == "time"
-        and gain < STALL_MIN_WEIGHT_GAIN_G
-    )
+    stalled = trig_type == "time" and total > 1 and gain < STALL_MIN_WEIGHT_GAIN_G
     return {"stalled": stalled, "weight_gain": round(gain, 2)}
 
 

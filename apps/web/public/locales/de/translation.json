@@ -1851,6 +1851,7 @@
   "analysis": {
     "facts": {
       "title": "Phasensignale",
+      "subtitle": "Wie jede Stufe beendet wurde (welche Bedingung ausgelöst hat) — eine Beschreibung der Absicht, kein Bestanden/Nicht-bestanden-Urteil. Zielergebnisse siehe Stufenanalyse.",
       "stalled": "Stehengeblieben",
       "channeling": "Mögliches Channeling",
       "curveDelta": "Kurve Δ {{delta}}",

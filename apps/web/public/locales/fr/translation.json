@@ -1851,6 +1851,7 @@
   "analysis": {
     "facts": {
       "title": "Signaux de phase",
+      "subtitle": "Comment chaque étape s'est terminée (quelle condition s'est déclenchée) — une description de l'intention, pas un verdict réussi/échoué. Voir Analyse des étapes pour les résultats.",
       "stalled": "Bloqué",
       "channeling": "Chenalisation possible",
       "curveDelta": "Courbe Δ {{delta}}",

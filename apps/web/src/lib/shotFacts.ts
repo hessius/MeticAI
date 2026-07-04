@@ -92,10 +92,17 @@ export function classifyTrigger(
   if (triggerType === 'time') {
     return totalTriggers === 1
       ? { kind: 'targeted', label: 'Targeted (planned duration)', reason: 'Time is the only trigger, so this is an intentional timed stage.' }
-      : { kind: 'failsafe', label: 'Failsafe (timeout limit)', reason: 'Stage hit its time backstop before another target was reached.' }
+      : {
+          kind: 'targeted',
+          label: 'Targeted (timed transition)',
+          reason: 'The stage transitioned when its planned time elapsed; the other exit conditions simply did not fire first. A time exit is a valid, intended transition — a genuine timeout with no extraction is surfaced separately as a stall.',
+        }
   }
   if ((stageControlMode === 'flow' || stageControlMode === 'power') && triggerType === 'pressure') {
     return { kind: 'targeted', label: 'Targeted (puck resistance achieved)', reason: 'Flow-controlled stage reached its intended pressure.' }
+  }
+  if ((stageControlMode === 'flow' || stageControlMode === 'power') && triggerType === 'flow') {
+    return { kind: 'targeted', label: 'Targeted (flow target reached)', reason: 'Flow-controlled stage reached its intended flow condition.' }
   }
   if (stageControlMode === 'pressure' && triggerType === 'flow') {
     return totalTriggers === 1
@@ -174,8 +181,9 @@ export function detectStall(stage: StageAnalysis): StallResult {
   const trigType = stage.exit_trigger_result?.triggered?.type ?? ''
   const total = (stage.exit_triggers ?? []).length
   const gain = n(stage.execution_data?.weight_gain)
-  const klass = classifyTrigger(effectiveControlMode(stage), trigType, total)
-  const stalled = klass.kind === 'failsafe' && trigType === 'time' && gain < STALL_MIN_WEIGHT_GAIN_G
+  // A stall is a time-terminated stage that had another unmet target
+  // (total > 1) yet extracted almost nothing. Purely timed stages are intentional.
+  const stalled = trigType === 'time' && total > 1 && gain < STALL_MIN_WEIGHT_GAIN_G
   return { stalled, weight_gain: r2(gain) }
 }
 

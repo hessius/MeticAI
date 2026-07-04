@@ -17469,17 +17469,23 @@ class TestShotFactsClassify:
         assert r["kind"] == "targeted"
         assert "planned" in r["label"].lower()
 
-    def test_time_with_other_triggers_is_failsafe_timeout(self):
+    def test_time_with_other_triggers_is_targeted_timed_transition(self):
         from services.shot_facts import classify_trigger
         r = classify_trigger("flow", "time", total_triggers=2)
-        assert r["kind"] == "failsafe"
-        assert "timeout" in r["label"].lower()
+        assert r["kind"] == "targeted"
+        assert "timed transition" in r["label"].lower()
 
     def test_flow_control_pressure_trigger_is_puck_resistance(self):
         from services.shot_facts import classify_trigger
         r = classify_trigger("flow", "pressure", total_triggers=2)
         assert r["kind"] == "targeted"
         assert "resistance" in r["label"].lower()
+
+    def test_flow_control_flow_trigger_is_flow_target_reached(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("flow", "flow", total_triggers=2)
+        assert r["kind"] == "targeted"
+        assert "flow target" in r["label"].lower()
 
     def test_pressure_control_flow_only_trigger_is_planned_transition(self):
         from services.shot_facts import classify_trigger
