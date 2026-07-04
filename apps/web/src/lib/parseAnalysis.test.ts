@@ -99,16 +99,23 @@ END_RECOMMENDATIONS_JSON`;
     expect(recs[0].confidence).toBe("low");
   });
 
-  it("coerces missing fields to safe defaults", () => {
+  it("coerces missing numeric fields to safe defaults", () => {
     const text = `RECOMMENDATIONS_JSON:
-[{}]
+[{"variable":"grind_size"}]
 END_RECOMMENDATIONS_JSON`;
     const recs = parseRecommendationsJSON(text);
     expect(recs).toHaveLength(1);
-    expect(recs[0].variable).toBe("");
+    expect(recs[0].variable).toBe("grind_size");
     expect(recs[0].current_value).toBe(0);
     expect(recs[0].recommended_value).toBe(0);
     expect(recs[0].is_patchable).toBe(true);
+  });
+
+  it("drops an empty recommendation object", () => {
+    const text = `RECOMMENDATIONS_JSON:
+[{}]
+END_RECOMMENDATIONS_JSON`;
+    expect(parseRecommendationsJSON(text)).toEqual([]);
   });
 
   it("defaults is_patchable to true when field is missing", () => {
@@ -128,6 +135,22 @@ END_RECOMMENDATIONS_JSON`;
     const recs = parseRecommendationsJSON(text);
     expect(recs).toHaveLength(1);
     expect(recs[0].is_patchable).toBe(false);
+  });
+
+  it("drops hallucinated recs with NaN values but keeps valid ones", () => {
+    const text = `RECOMMENDATIONS_JSON:
+[{"variable":"flow_0","current_value":"NaN","recommended_value":"NaN","stage":"main","confidence":"low","reason":"r"},{"variable":"flow","current_value":2.5,"recommended_value":3.0,"stage":"main","confidence":"high","reason":"r"}]
+END_RECOMMENDATIONS_JSON`;
+    const recs = parseRecommendationsJSON(text);
+    expect(recs).toHaveLength(1);
+    expect(recs[0].variable).toBe("flow");
+  });
+
+  it("drops recs with a blank variable name", () => {
+    const text = `RECOMMENDATIONS_JSON:
+[{"variable":"","current_value":1,"recommended_value":2,"stage":"main","confidence":"low","reason":"r"}]
+END_RECOMMENDATIONS_JSON`;
+    expect(parseRecommendationsJSON(text)).toEqual([]);
   });
 });
 

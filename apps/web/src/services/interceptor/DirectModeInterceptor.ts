@@ -1216,10 +1216,27 @@ function parseRecommendationsJson(analysisText: string): Array<Record<string, un
   if (!match) return []
   try {
     const parsed = JSON.parse(match[1])
-    return Array.isArray(parsed) ? parsed.filter(isRecord) : []
+    return Array.isArray(parsed) ? parsed.filter(isRecord).filter(isActionableRecommendation) : []
   } catch {
     return []
   }
+}
+
+/**
+ * Drop hallucinated / non-actionable recommendations. Weak on-device models
+ * sometimes emit garbage variable ids (e.g. "flow_0") with NaN values that
+ * render as "adjust from NaN to NaN". A recommendation is only usable if it
+ * names a variable and its numeric values (when present) are finite. Missing
+ * values are treated as 0 (kept, for advisory recommendations).
+ */
+function isActionableRecommendation(rec: Record<string, unknown>): boolean {
+  if (String(rec.variable ?? '').trim() === '') return false
+  for (const key of ['current_value', 'recommended_value'] as const) {
+    const raw = rec[key]
+    if (raw === undefined || raw === null) continue
+    if (!Number.isFinite(Number(raw))) return false
+  }
+  return true
 }
 
 function isRecommendationPatchable(recommendation: Record<string, unknown>, variables: Array<Record<string, unknown>>): boolean {

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request, Form, HTTPException
 from typing import Optional
 import asyncio
 import json
+import math
 import re
 import time
 import logging
@@ -1677,6 +1678,28 @@ def _locate_recommendations_json(analysis_text: str) -> str | None:
     return None
 
 
+def _is_actionable_recommendation(rec: dict) -> bool:
+    """Drop hallucinated / non-actionable recommendations.
+
+    Weak on-device models sometimes emit garbage variable ids (e.g. "flow_0")
+    with NaN values that render as "adjust from NaN to NaN". A recommendation is
+    only usable if it names a variable and its numeric values (when present) are
+    finite. Missing values are treated as 0 (kept, for advisory recommendations).
+    """
+    if not str(rec.get("variable", "")).strip():
+        return False
+    for key in ("current_value", "recommended_value"):
+        raw = rec.get(key)
+        if raw is None:
+            continue
+        try:
+            if not math.isfinite(float(raw)):
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
 def _parse_recommendations_json(analysis_text: str) -> list[dict]:
     """Extract and parse the recommendations JSON (delimited or bare)."""
     json_text = _locate_recommendations_json(analysis_text)
@@ -1688,7 +1711,9 @@ def _parse_recommendations_json(analysis_text: str) -> list[dict]:
         recs = json.loads(cleaned)
         if not isinstance(recs, list):
             return []
-        return recs
+        return [
+            r for r in recs if isinstance(r, dict) and _is_actionable_recommendation(r)
+        ]
     except (json.JSONDecodeError, TypeError):
         return []
 

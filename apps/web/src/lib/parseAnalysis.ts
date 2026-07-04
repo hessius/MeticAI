@@ -325,7 +325,7 @@ export function parseRecommendationsJSON(text: string): Recommendation[] {
         typeof item === "object" && item !== null,
     )
     .map((item) => ({
-      variable: String(item.variable ?? ""),
+      variable: String(item.variable ?? "").trim(),
       current_value: Number(item.current_value ?? 0),
       recommended_value: Number(item.recommended_value ?? 0),
       stage: String(item.stage ?? ""),
@@ -337,7 +337,17 @@ export function parseRecommendationsJSON(text: string): Recommendation[] {
       reason: String(item.reason ?? ""),
       is_patchable:
         item.is_patchable !== undefined ? Boolean(item.is_patchable) : true,
-    }));
+    }))
+    // Drop hallucinated / non-actionable recommendations (weak on-device models
+    // sometimes emit garbage variable ids like "flow_0" with NaN values). A
+    // recommendation is only usable if it names a variable and both values are
+    // finite numbers. Missing values coerce to 0 above, which is kept (advisory).
+    .filter(
+      (rec) =>
+        rec.variable !== "" &&
+        Number.isFinite(rec.current_value) &&
+        Number.isFinite(rec.recommended_value),
+    );
 }
 
 /**

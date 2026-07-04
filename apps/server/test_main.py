@@ -15429,6 +15429,43 @@ END_RECOMMENDATIONS_JSON
 
         text = "## 1. Shot Performance\n**Notes:**\n- The flow variable was stable."
         assert _parse_recommendations_json(text) == []
+
+    def test_parse_drops_nonfinite_values(self):
+        """Hallucinated recs with NaN values (weak on-device models) are dropped."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """RECOMMENDATIONS_JSON:
+[{"variable":"flow_0","current_value":"NaN","recommended_value":"NaN","stage":"main","confidence":"low","reason":"r"},
+{"variable":"flow","current_value":2.5,"recommended_value":3.0,"stage":"main","confidence":"high","reason":"r"}]
+END_RECOMMENDATIONS_JSON
+"""
+        recs = _parse_recommendations_json(text)
+        assert len(recs) == 1
+        assert recs[0]["variable"] == "flow"
+
+    def test_parse_drops_blank_variable(self):
+        """Recs with an empty variable name are not actionable and are dropped."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """RECOMMENDATIONS_JSON:
+[{"variable":"","current_value":1,"recommended_value":2,"stage":"main","confidence":"low","reason":"r"}]
+END_RECOMMENDATIONS_JSON
+"""
+        assert _parse_recommendations_json(text) == []
+
+    def test_parse_keeps_advisory_zero_values(self):
+        """Advisory recs with finite 0 values are kept (not confused with NaN)."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """RECOMMENDATIONS_JSON:
+[{"variable":"info_note","current_value":0,"recommended_value":0,"stage":"global","confidence":"low","reason":"General advice","is_patchable":false}]
+END_RECOMMENDATIONS_JSON
+"""
+        recs = _parse_recommendations_json(text)
+        assert len(recs) == 1
+        assert recs[0]["variable"] == "info_note"
+
+    def test_classify_adjustable_variable(self):
         """Adjustable variable (no info_ prefix) is patchable."""
         from api.routes.shots import _classify_recommendation_patchable
 
