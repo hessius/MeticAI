@@ -50,6 +50,12 @@ export function ShotHistoryView({
     Record<string, { has_annotation: boolean; rating: number | null }>
   >({})
 
+  // ---- Pagination ---------------------------------------------------------
+  const PAGE_SIZE = 20
+  const [limit, setLimit] = useState(PAGE_SIZE)
+  const [hasMore, setHasMore] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+
   useScrollToTop([selectedShot])
 
   // Track whether the component was opened with a specific shot pre-selected
@@ -75,11 +81,15 @@ export function ShotHistoryView({
   // ---- Fetch shots (stale-while-revalidate) -------------------------------
   useEffect(() => {
     const loadShots = async () => {
+      // Reset pagination whenever the profile changes.
+      setLimit(PAGE_SIZE)
       try {
-        const result = await fetchShotsByProfile(profileName, { limit: 20, includeData: false })
+        const result = await fetchShotsByProfile(profileName, { limit: PAGE_SIZE, includeData: false })
+
+        setHasMore(result.count >= PAGE_SIZE)
 
         if (result.is_stale) {
-          backgroundRefresh(profileName, { limit: 20 })
+          backgroundRefresh(profileName, { limit: PAGE_SIZE })
         }
 
         // Auto-select a specific shot if navigated from ShotAnalysisView
@@ -99,6 +109,22 @@ export function ShotHistoryView({
     loadShots()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileName, fetchShotsByProfile, backgroundRefresh])
+
+  const handleLoadMore = async () => {
+    if (isLoadingMore) return
+    const newLimit = limit + PAGE_SIZE
+    setIsLoadingMore(true)
+    try {
+      const result = await fetchShotsByProfile(profileName, { limit: newLimit, includeData: false })
+      setLimit(newLimit)
+      // A full page implies more may exist; a short page means we've reached the end.
+      setHasMore(result.count >= newLimit)
+    } catch (err) {
+      console.error('Failed to load more shots:', err)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }
 
   // ---- Fetch annotation summaries when shots change -----------------------
   useEffect(() => {
@@ -129,7 +155,7 @@ export function ShotHistoryView({
   }
 
   const handleRefresh = () => {
-    backgroundRefresh(profileName, { limit: 20 })
+    backgroundRefresh(profileName, { limit })
   }
 
   // ---- Render -------------------------------------------------------------
@@ -167,6 +193,9 @@ export function ShotHistoryView({
           onBack={handleBack}
           onSelectShot={handleSelectShot}
           onRefresh={handleRefresh}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          onLoadMore={handleLoadMore}
         />
       )}
     </AnimatePresence>

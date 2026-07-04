@@ -59,13 +59,15 @@ interface ShotCache {
   shots: ShotInfo[]
   lastFetched: Date | null
   cachedAt: number | null
+  limit: number
 }
 
 const shotCache: ShotCache = {
   profileName: null,
   shots: [],
   lastFetched: null,
-  cachedAt: null
+  cachedAt: null,
+  limit: 0
 }
 
 export function useShotHistory() {
@@ -85,7 +87,13 @@ export function useShotHistory() {
     if (options?.forceRefresh) {
       setIsLoading(true)
       setError(null)
-    } else if (shotCache.profileName === profileName && shotCache.shots.length > 0) {
+    } else if (
+      shotCache.profileName === profileName &&
+      shotCache.shots.length > 0 &&
+      // Only serve cache when it already holds enough shots for the request.
+      // A larger `limit` (e.g. "Load more") must fall through to the network.
+      shotCache.limit >= (options?.limit ?? shotCache.limit)
+    ) {
       // Return cached data immediately
       setShots(shotCache.shots)
       setLastFetched(shotCache.lastFetched)
@@ -96,7 +104,7 @@ export function useShotHistory() {
         profile_name: profileName, 
         shots: shotCache.shots, 
         count: shotCache.shots.length, 
-        limit: options?.limit || 20,
+        limit: shotCache.limit || options?.limit || 20,
         cached_at: shotCache.cachedAt || undefined,
         is_stale: false // Client cache, server will determine staleness
       }
@@ -133,6 +141,7 @@ export function useShotHistory() {
       shotCache.shots = data.shots
       shotCache.lastFetched = now
       shotCache.cachedAt = data.cached_at || null
+      shotCache.limit = data.limit || options?.limit || data.shots.length
       
       return data
     } catch (err) {
@@ -175,6 +184,7 @@ export function useShotHistory() {
       shotCache.shots = data.shots
       shotCache.lastFetched = now
       shotCache.cachedAt = data.cached_at || null
+      shotCache.limit = data.limit || options?.limit || data.shots.length
     } catch (err) {
       // Don't set error state for background refresh - we still have cached data
       console.warn('Background refresh failed:', err)

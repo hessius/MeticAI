@@ -334,6 +334,8 @@
     "checkingNewShots": "Letar efter nya körningar...",
     "refreshing": "Uppdaterar...",
     "checkForNewShots": "Sök efter nya körningar",
+    "loadMore": "Ladda fler",
+    "loadingMore": "Laddar...",
     "noShots": "Inga körningar hittade",
     "noShotsDescription": "Inga körningar har gjorts med denna profil ännu",
     "noData": "Ingen data tillgänglig",

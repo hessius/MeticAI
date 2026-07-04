@@ -334,6 +334,8 @@
     "checkingNewShots": "Buscando nuevos shots...",
     "refreshing": "Actualizando...",
     "checkForNewShots": "Buscar nuevos shots",
+    "loadMore": "Cargar más",
+    "loadingMore": "Cargando...",
     "noShots": "No se encontraron shots",
     "noShotsDescription": "Aún no se han realizado shots con este perfil",
     "noData": "No hay datos disponibles",
