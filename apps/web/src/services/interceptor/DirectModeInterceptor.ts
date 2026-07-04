@@ -681,7 +681,7 @@ function generateShotAlignedTargetCurves(
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type HistStage = { name: string; type: string; key?: string; dynamics?: any; exit_triggers?: any[]; limits?: any[] }
+type HistStage = { name: string; type: string; key?: string; dynamics?: any; dynamics_points?: any; dynamics_over?: any; exit_triggers?: any[]; limits?: any[] }
 type HistVar = { key: string; name: string; type: string; value: number }
 type HistEntry = {
   id: string; time: number; name: string; file?: string;
@@ -769,8 +769,24 @@ export function computeRichLocalAnalysis(entry: HistEntry, profileName: string) 
           const unitMap: Record<string, string> = { time: 's', weight: 'g', pressure: 'bar', flow: 'ml/s' }
           const compMap: Record<string, string> = { '>=': '≥', '<=': '≤', '>': '>', '<': '<', '==': '=' }
 
+          // Profiles come in two shapes: a flat one (dynamics_points/dynamics_over)
+          // and the canonical nested one (dynamics.points/dynamics.over). Read
+          // both so curve-adherence deltas and #423 effective-mode detection work
+          // for every profile (e.g. "Slayer at Home", which is nested). Mirror of
+          // the server _stage_dynamics helper.
+          const stageDynamicsPoints = (stage: HistStage): any[] => {
+            if (Array.isArray(stage.dynamics_points)) return stage.dynamics_points
+            if (Array.isArray(stage.dynamics?.points)) return stage.dynamics.points
+            return []
+          }
+          const stageDynamicsOver = (stage: HistStage): string => {
+            if (typeof stage.dynamics_over === 'string') return stage.dynamics_over
+            if (typeof stage.dynamics?.over === 'string') return stage.dynamics.over
+            return 'time'
+          }
+
           const fmtDynamics = (stage: HistStage): string => {
-            const dp = stage.dynamics?.points ?? []
+            const dp = stageDynamicsPoints(stage)
             if (!dp.length) return `${stage.type} stage`
             const unit = stage.type === 'pressure' ? 'bar' : 'ml/s'
             if (dp.length === 1) {
@@ -779,7 +795,7 @@ export function computeRichLocalAnalysis(entry: HistEntry, profileName: string) 
             }
             if (dp.length === 2) {
               const sy = _resolveVar(dp[0][1], vars), ey = _resolveVar(dp[1][1], vars), ex = _sf(dp[1][0])
-              const ou = (stage.dynamics?.over ?? 'time') === 'time' ? 's' : 'g'
+              const ou = stageDynamicsOver(stage) === 'time' ? 's' : 'g'
               if (sy === ey) return `Constant ${stage.type} at ${sy} ${unit} for ${ex}${ou}`
               const dir = ey > sy ? 'ramp up' : 'ramp down'
               return `${stage.type[0].toUpperCase() + stage.type.slice(1)} ${dir} from ${sy} to ${ey} ${unit} over ${ex}${ou}`
@@ -829,12 +845,12 @@ export function computeRichLocalAnalysis(entry: HistEntry, profileName: string) 
               profile_target: profileTarget,
               profile_target_value: meanDynamicsTarget(
                 stageType,
-                ps.dynamics?.points,
+                stageDynamicsPoints(ps),
                 vars as Array<Record<string, unknown>>,
               ),
               profile_max_target: maxDynamicsTarget(
                 stageType,
-                ps.dynamics?.points,
+                stageDynamicsPoints(ps),
                 vars as Array<Record<string, unknown>>,
               ),
               exit_triggers: exitTriggers,

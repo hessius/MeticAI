@@ -121,15 +121,35 @@ PREINFUSION_KEYWORDS = [
 # ============================================================================
 
 
+def _stage_dynamics(stage: dict) -> tuple[list, str]:
+    """Return ``(points, over)`` for a stage, handling both profile formats.
+
+    Meticulous profiles come in two shapes: a flat one
+    (``dynamics_points`` / ``dynamics_over``) and the canonical nested one
+    (``dynamics: {points, over}``). Readers that only looked at the flat keys
+    silently failed on nested profiles (e.g. "Slayer at Home"), returning no
+    target — which broke curve-adherence deltas and #423 effective-mode
+    detection. Mirror of the native ``stageDynamicsPoints`` helper.
+    """
+    points = stage.get("dynamics_points")
+    over = stage.get("dynamics_over")
+    if not points:
+        dynamics = stage.get("dynamics")
+        if isinstance(dynamics, dict):
+            points = dynamics.get("points")
+            if over is None:
+                over = dynamics.get("over")
+    return (points or [], over or "time")
+
+
 def _format_dynamics_description(stage: dict, variables: list | None = None) -> str:
     """Format a human-readable description of the stage dynamics.
 
-    Resolves $variable references in dynamics_points using the provided variables list.
+    Resolves $variable references in dynamics points using the provided variables list.
     """
     variables = variables or []
     stage_type = stage.get("type", "unknown")
-    dynamics_points = stage.get("dynamics_points", [])
-    dynamics_over = stage.get("dynamics_over", "time")
+    dynamics_points, dynamics_over = _stage_dynamics(stage)
 
     if not dynamics_points:
         return f"{stage_type} stage (no dynamics data)"
@@ -282,7 +302,7 @@ def _mean_dynamics_target(stage: dict, variables: list | None = None) -> float |
         return None
     variables = variables or []
     values: list[float] = []
-    for point in stage.get("dynamics_points") or []:
+    for point in _stage_dynamics(stage)[0]:
         if not isinstance(point, (list, tuple)) or len(point) == 0:
             continue
         raw = point[1] if len(point) > 1 else point[0]
@@ -309,7 +329,7 @@ def _max_dynamics_target(stage: dict, variables: list | None = None) -> float | 
         return None
     variables = variables or []
     values: list[float] = []
-    for point in stage.get("dynamics_points") or []:
+    for point in _stage_dynamics(stage)[0]:
         if not isinstance(point, (list, tuple)) or len(point) == 0:
             continue
         raw = point[1] if len(point) > 1 else point[0]
@@ -629,7 +649,7 @@ def _analyze_stage_execution(
         goal_reached = False
         goal_message = ""
 
-        dynamics_points = profile_stage.get("dynamics_points", [])
+        dynamics_points = _stage_dynamics(profile_stage)[0]
         if dynamics_points and len(dynamics_points) >= 1:
             # Get the target value (last point in dynamics)
             raw_target = (

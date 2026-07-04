@@ -3063,6 +3063,57 @@ class TestShotAnalysisHelpers:
         assert isinstance(desc, str)
         assert isinstance(desc, str) and len(desc) > 0
 
+    def test_dynamics_targets_handle_nested_format(self):
+        """Nested dynamics (dynamics.points) must resolve like flat dynamics_points.
+
+        Regression: 'Slayer at Home' uses nested dynamics, so a flat-only reader
+        returned None and mis-detected the effective control mode (#423).
+        """
+        from services.analysis_service import (
+            _max_dynamics_target,
+            _mean_dynamics_target,
+            _format_dynamics_description,
+        )
+
+        variables = [{"key": "flow_MaxFlowRate", "type": "flow", "value": 10.8}]
+        stage = {
+            "type": "flow",
+            "dynamics": {
+                "points": [[0, "$flow_MaxFlowRate"], [30, "$flow_MaxFlowRate"]],
+                "over": "time",
+            },
+        }
+        assert _max_dynamics_target(stage, variables) == 10.8
+        assert _mean_dynamics_target(stage, variables) == 10.8
+        assert "10.8" in _format_dynamics_description(stage, variables)
+
+    def test_effective_mode_pressure_for_nested_aggressive_flow(self):
+        """A nested aggressive-flow stage with a pressure limit is pressure-governed."""
+        from services.shot_facts import effective_control_mode
+        from services.analysis_service import (
+            _max_dynamics_target,
+            _mean_dynamics_target,
+            _format_limits,
+        )
+
+        variables = [
+            {"key": "flow_MaxFlowRate", "type": "flow", "value": 10.8},
+            {"key": "pressure_Max Pressure", "type": "pressure", "value": 6},
+        ]
+        profile_stage = {
+            "type": "flow",
+            "dynamics": {"points": [[0, "$flow_MaxFlowRate"], [30, "$flow_MaxFlowRate"]]},
+            "limits": [{"type": "pressure", "value": "$pressure_Max Pressure"}],
+        }
+        stage = {
+            "type": "flow",
+            "stage_type": "flow",
+            "profile_max_target": _max_dynamics_target(profile_stage, variables),
+            "profile_target_value": _mean_dynamics_target(profile_stage, variables),
+            "limits": _format_limits(profile_stage["limits"], variables),
+        }
+        assert effective_control_mode(stage) == "pressure"
+
     def test_compute_stage_stats_basic(self):
         """Test computing statistics for stage telemetry."""
         from services.analysis_service import _compute_stage_stats

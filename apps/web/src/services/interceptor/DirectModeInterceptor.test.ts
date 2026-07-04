@@ -30,7 +30,7 @@ vi.mock('@/services/ai/BrowserAIService', () => ({
   })),
 }))
 
-import { installDirectModeInterceptor } from './DirectModeInterceptor'
+import { computeRichLocalAnalysis, installDirectModeInterceptor } from './DirectModeInterceptor'
 
 type FetchCall = {
   input: RequestInfo | URL
@@ -1750,5 +1750,73 @@ describe('DirectModeInterceptor regression harness', () => {
       expect(lastShot.final_weight).toBe(35.9)
       expect(lastShot.total_time).toBe(33)
     })
+  })
+})
+
+describe('computeRichLocalAnalysis dynamics-format parity (#423 nested profiles)', () => {
+  // A "Slayer at Home"-style extraction: declared flow with an aggressive flow
+  // target (≥6 ml/s) governed by a pressure limit. Its effective control mode
+  // must resolve to 'pressure', and profile_max_target must resolve the $var —
+  // regardless of whether the profile stores dynamics in the flat
+  // (dynamics_points/dynamics_over) or canonical nested (dynamics.points) shape.
+  const variables = [
+    { key: 'flow_MaxFlowRate', name: 'flow_MaxFlowRate', type: 'flow', value: 10.8 },
+    { key: 'pressure_Max', name: 'Max Pressure', type: 'pressure', value: 6 },
+  ]
+  const exitTriggers = [{ type: 'weight', value: 36, comparison: '>=' }]
+  const limits = [{ type: 'pressure', value: '$pressure_Max' }]
+  const telemetry = [
+    { time: 0, profile_time: 0, status: 'Extraction', shot: { pressure: 0, flow: 0, weight: 0 } },
+    { time: 5000, profile_time: 5000, status: 'Extraction', shot: { pressure: 6, flow: 3.2, weight: 8 } },
+    { time: 30000, profile_time: 30000, status: 'Extraction', shot: { pressure: 6, flow: 2.1, weight: 36 } },
+  ]
+  const makeEntry = (stage: Record<string, unknown>): Parameters<typeof computeRichLocalAnalysis>[0] => ({
+    id: 'shot-slayer',
+    time: 0,
+    name: 'Slayer at Home',
+    profile: { name: 'Slayer at Home', final_weight: 36, temperature: 93, variables, stages: [stage as never] },
+    data: telemetry as never,
+  })
+
+  const flatStage = {
+    name: 'Extraction',
+    type: 'flow',
+    key: 'flow_extraction',
+    dynamics_points: [[0, '$flow_MaxFlowRate'], [30, '$flow_MaxFlowRate']],
+    dynamics_over: 'time',
+    exit_triggers: exitTriggers,
+    limits,
+  }
+  const nestedStage = {
+    name: 'Extraction',
+    type: 'flow',
+    key: 'flow_extraction',
+    dynamics: { points: [[0, '$flow_MaxFlowRate'], [30, '$flow_MaxFlowRate']], over: 'time', interpolation: 'linear' },
+    exit_triggers: exitTriggers,
+    limits,
+  }
+
+  it('resolves the flow target and effective pressure mode for a FLAT-format stage', () => {
+    const analysis = computeRichLocalAnalysis(makeEntry(flatStage), 'Slayer at Home') as unknown as {
+      stage_analyses: Array<{ profile_max_target: number | null; profile_target_value: number | null }>
+      shot_facts: { stages: Array<{ stage_name: string; control_mode?: string; mode_overridden?: boolean }> }
+    }
+    expect(analysis.stage_analyses[0].profile_max_target).toBe(10.8)
+    expect(analysis.stage_analyses[0].profile_target_value).toBe(10.8)
+    const fact = analysis.shot_facts.stages.find(s => s.stage_name === 'Extraction')
+    expect(fact?.control_mode).toBe('pressure')
+    expect(fact?.mode_overridden).toBe(true)
+  })
+
+  it('resolves the same for a NESTED-format stage (parity)', () => {
+    const analysis = computeRichLocalAnalysis(makeEntry(nestedStage), 'Slayer at Home') as unknown as {
+      stage_analyses: Array<{ profile_max_target: number | null; profile_target_value: number | null }>
+      shot_facts: { stages: Array<{ stage_name: string; control_mode?: string; mode_overridden?: boolean }> }
+    }
+    expect(analysis.stage_analyses[0].profile_max_target).toBe(10.8)
+    expect(analysis.stage_analyses[0].profile_target_value).toBe(10.8)
+    const fact = analysis.shot_facts.stages.find(s => s.stage_name === 'Extraction')
+    expect(fact?.control_mode).toBe('pressure')
+    expect(fact?.mode_overridden).toBe(true)
   })
 })
