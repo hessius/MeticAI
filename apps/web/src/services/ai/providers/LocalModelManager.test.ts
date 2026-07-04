@@ -45,6 +45,7 @@ import {
   deleteModel,
   cancelDownload,
   MIN_FREE_STORAGE_BYTES,
+  GEMMA_DOWNLOAD_BYTES,
   __resetModelManagerForTests,
 } from './LocalModelManager'
 
@@ -116,6 +117,26 @@ describe('downloadModel', () => {
     expect(progress).toContain(42)
     expect(progress).toContain(100)
     expect(getModelStatus()).toBe('ready')
+  })
+  it('derives progress from bytes when the stream omits a percentage', async () => {
+    const progress: number[] = []
+    const promise = downloadModel(p => progress.push(p.percent))
+    // HF xet CDN case: no `progress`/`totalBytes`, only bytes downloaded so far.
+    listeners.downloadProgress.forEach(fn =>
+      fn({ progress: 0, downloadedBytes: GEMMA_DOWNLOAD_BYTES / 2 }),
+    )
+    await promise
+    // Half of the known model size ⇒ ~50%.
+    expect(progress.some(p => p >= 49 && p <= 51)).toBe(true)
+  })
+  it('caps derived progress at 100% when bytes exceed the expected size', async () => {
+    const progress: number[] = []
+    const promise = downloadModel(p => progress.push(p.percent))
+    listeners.downloadProgress.forEach(fn =>
+      fn({ progress: 0, downloadedBytes: GEMMA_DOWNLOAD_BYTES * 2 }),
+    )
+    await promise
+    expect(Math.max(...progress)).toBeLessThanOrEqual(100)
   })
   it('throws on unsupported platforms', async () => {
     supported = false

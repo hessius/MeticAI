@@ -44,17 +44,25 @@ export interface DeviceCapability {
   enoughMemory: boolean
 }
 
-/** Approximate Gemma 4 E2B download size (2.58 GB). */
-export const GEMMA_DOWNLOAD_BYTES = 2_580_000_000
+/**
+ * Approximate Gemma 4 E2B download size (~2.0 GB, measured from the HF LFS
+ * redirect Content-Length). Used as a denominator for progress % when the
+ * download stream does not report a total size (the HF xet CDN often omits
+ * Content-Length, leaving the native delegate unable to compute a percentage).
+ */
+export const GEMMA_DOWNLOAD_BYTES = 2_003_697_664
 /** Require ≥ 3 GB free before downloading. */
 export const MIN_FREE_STORAGE_BYTES = 3_000_000_000
 /** Recommend ≥ 4 GB total RAM. */
 export const MIN_RAM_BYTES = 4_000_000_000
 
+// `?download=true` forces the HuggingFace LFS endpoint to serve the file as an
+// attachment (Content-Disposition), which some CDN paths need to expose a size
+// and to avoid an inline-render redirect that can stall native downloaders.
 const GEMMA_URLS = {
-  ios: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task',
+  ios: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task?download=true',
   android:
-    'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm',
+    'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm?download=true',
 } as const
 
 function getCapacitorPlatform(): string {
@@ -151,12 +159,35 @@ export async function downloadModel(
   downloading = true
   cancelled = false
 
+  console.log('[LocalModelManager] starting Gemma download', { platform, url })
+
   const progressSub = await CapgoLLM.addListener('downloadProgress', (event) => {
     if (cancelled) return
+    const downloadedBytes = event.downloadedBytes
+    const totalBytes = event.totalBytes
+    let percent = event.progress
+    // Fallback: the native delegate reports a percentage from the response's
+    // total size, but the HF xet CDN may not provide Content-Length, leaving
+    // `progress` at 0. Derive it from bytes-downloaded against the known model
+    // size instead, so the UI advances rather than sitting at 0%.
+    if (
+      (percent == null || percent <= 0) &&
+      typeof downloadedBytes === 'number' &&
+      downloadedBytes > 0
+    ) {
+      percent = (downloadedBytes / GEMMA_DOWNLOAD_BYTES) * 100
+    }
+    const clampedPercent = Math.max(0, Math.min(100, percent ?? 0))
+    console.log('[LocalModelManager] downloadProgress', {
+      rawProgress: event.progress,
+      downloadedBytes,
+      totalBytes,
+      computedPercent: clampedPercent,
+    })
     onProgress?.({
-      percent: Math.max(0, Math.min(100, event.progress ?? 0)),
-      downloadedBytes: event.downloadedBytes,
-      totalBytes: event.totalBytes,
+      percent: clampedPercent,
+      downloadedBytes,
+      totalBytes,
     })
   })
 
@@ -164,14 +195,17 @@ export async function downloadModel(
     const result = await CapgoLLM.downloadModel({ url })
     if (cancelled) {
       // Best-effort: discard a download the user asked to cancel.
+      console.log('[LocalModelManager] download cancelled; discarding', result.path)
       await deleteFileQuietly(result.path)
       return
     }
+    console.log('[LocalModelManager] download complete', { path: result.path })
     writeLS(STORAGE_KEYS.LOCAL_MODEL_PATH, result.path)
     setLocalBackend(GEMMA_MODEL_ID)
     onProgress?.({ percent: 100 })
   } catch (err) {
     if (cancelled) return
+    console.error('[LocalModelManager] download failed', err)
     throw new AIServiceError('LOCAL_UNAVAILABLE', err)
   } finally {
     downloading = false
