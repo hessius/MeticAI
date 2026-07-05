@@ -16,7 +16,10 @@
     "./logic/decentConverter": "./src/logic/decentConverter.ts",
     "./logic/tags": "./src/logic/tags.ts",
     "./logic/profileAnalysis": "./src/logic/profileAnalysis.ts",
-    "./logic/profileRecommendation": "./src/logic/profileRecommendation.ts"
+    "./logic/profileRecommendation": "./src/logic/profileRecommendation.ts",
+    "./ai/aiErrors": "./src/ai/aiErrors.ts",
+    "./ai/analysisKnowledge": "./src/ai/analysisKnowledge.ts",
+    "./ai/prompts": "./src/ai/prompts.ts"
   },
   "scripts": {
     "test": "vitest run",

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { ANALYSIS_KNOWLEDGE, buildFactSheet } from './analysisKnowledge'
-import type { ShotFacts } from '../../lib/shotFacts'
+import { ANALYSIS_KNOWLEDGE, buildFactSheet } from '../../src/ai/analysisKnowledge'
+import type { ShotFacts } from '../../src/logic/shotFacts'
 
 describe('ANALYSIS_KNOWLEDGE', () => {
   it('covers trigger classes + channeling', () => {

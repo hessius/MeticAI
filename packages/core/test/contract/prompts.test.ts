@@ -6,7 +6,7 @@ import {
   buildRecommendationPrompt,
   buildTasteContext,
   buildDialInPrompt,
-} from '@/services/ai/prompts/index'
+} from '../../src/ai/prompts'
 
 describe('prompt builders', () => {
   // -------------------------------------------------------------------
