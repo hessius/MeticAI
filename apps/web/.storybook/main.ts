@@ -28,6 +28,13 @@ const config: StorybookConfig = {
         alias: {
           '@': fileURLToPath(new URL('../src', import.meta.url))
         }
+      },
+      // Mirror the app's vite.config.ts (cssMinify: 'esbuild'). Storybook's
+      // default lightningcss minifier rejects Tailwind v4's generated
+      // `@media (width >= (display-mode: standalone))` rules; esbuild tolerates
+      // them, matching how the production app is actually built.
+      build: {
+        cssMinify: 'esbuild'
       }
     });
   }
