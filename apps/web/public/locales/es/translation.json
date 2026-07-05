@@ -225,6 +225,8 @@
     "useImagePrompt": "¿Desea usar esta imagen para su perfil?",
     "generateAiDescription": "Generar explicación IA",
     "generatingAiDescription": "Generando explicación IA...",
+    "regenerateAiDescription": "Regenerar explicación IA",
+    "regeneratingAiDescription": "Regenerando explicación IA...",
     "aiDescriptionGenerated": "Explicación IA generada correctamente",
     "aiDescriptionFailed": "Error al generar la explicación IA",
     "notes": "Notas",

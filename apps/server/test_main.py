@@ -17504,6 +17504,40 @@ class TestAITags:
         assert history[0]["ai_tags"] == ["Chocolate", "Creamy"]
         assert history[0]["reply"] == "A fresh AI description."
 
+    def test_regenerate_invalidates_profile_list_cache(self):
+        """Regenerating a description must bust the profile-list cache so the
+        catalogue reloads the freshly-generated ai_tags (beta feedback: tags
+        never appeared after generating an AI explanation)."""
+        from services.analysis_service import DescriptionResult
+
+        history = [
+            {
+                "id": "entry-1",
+                "profile_name": "Test Profile",
+                "profile_json": {"name": "Test Profile"},
+                "reply": "old static description",
+            }
+        ]
+
+        with patch(
+            "api.routes.profiles._generate_profile_description",
+            new_callable=AsyncMock,
+        ) as mock_gen, patch(
+            "api.routes.profiles.load_history", return_value=history
+        ), patch(
+            "api.routes.profiles.save_history"
+        ), patch(
+            "api.routes.profiles.invalidate_profile_list_cache"
+        ) as mock_invalidate:
+            mock_gen.return_value = DescriptionResult(
+                "A fresh AI description.", ["Chocolate", "Creamy"]
+            )
+            client = TestClient(app)
+            resp = client.post("/api/profile/entry-1/regenerate-description")
+
+        assert resp.status_code == 200
+        mock_invalidate.assert_called_once()
+
 
 class TestShotFactsClassify:
     """#423 Targeted vs Failsafe trigger classification."""

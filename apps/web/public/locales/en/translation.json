@@ -229,6 +229,8 @@
     "notesSaveFailed": "Failed to save notes",
     "generateAiDescription": "Generate AI Explanation",
     "generatingAiDescription": "Generating AI explanation...",
+    "regenerateAiDescription": "Regenerate AI Explanation",
+    "regeneratingAiDescription": "Regenerating AI explanation...",
     "aiDescriptionGenerated": "AI explanation generated successfully",
     "aiDescriptionFailed": "Failed to generate AI explanation",
     "fetchFailed": "Failed to load history",

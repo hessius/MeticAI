@@ -225,6 +225,8 @@
     "useImagePrompt": "Möchten Sie dieses Bild für Ihr Profil verwenden?",
     "generateAiDescription": "KI-Erklärung generieren",
     "generatingAiDescription": "KI-Erklärung wird generiert...",
+    "regenerateAiDescription": "KI-Erklärung neu generieren",
+    "regeneratingAiDescription": "KI-Erklärung wird neu generiert...",
     "aiDescriptionGenerated": "KI-Erklärung erfolgreich generiert",
     "aiDescriptionFailed": "KI-Erklärung konnte nicht generiert werden",
     "notes": "Notizen",

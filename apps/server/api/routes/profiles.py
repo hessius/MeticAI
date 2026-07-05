@@ -3792,6 +3792,11 @@ async def regenerate_profile_description(entry_id: str, request: Request):
             target_entry["ai_tags"] = ai_tags
         save_history(history)
 
+        # The catalogue embeds each profile's ai_tags, so a regenerated
+        # description (which may add/change tags) must bust the profile list
+        # cache — otherwise the catalogue keeps serving stale, tag-less entries.
+        invalidate_profile_list_cache()
+
         logger.info(
             f"AI description regenerated for: {profile_name}",
             extra={"request_id": request_id, "entry_id": entry_id},

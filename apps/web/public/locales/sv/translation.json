@@ -225,6 +225,8 @@
     },
     "generateAiDescription": "Generera AI-förklaring",
     "generatingAiDescription": "Genererar AI-förklaring...",
+    "regenerateAiDescription": "Generera om AI-förklaring",
+    "regeneratingAiDescription": "Genererar om AI-förklaring...",
     "aiDescriptionGenerated": "AI-förklaring genererad",
     "aiDescriptionFailed": "Kunde inte generera AI-förklaring",
     "notes": "Anteckningar",

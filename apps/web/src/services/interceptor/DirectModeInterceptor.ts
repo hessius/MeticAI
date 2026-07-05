@@ -3598,6 +3598,10 @@ export function installDirectModeInterceptor(): void {
                 if (aiTags.length) {
                   _aiTagsCache.set(profileName, aiTags)
                   _persistAiTagsCache()
+                  // The profile list cache embeds ai_tags per profile, so it
+                  // must be busted for regenerated tags to surface in the
+                  // catalogue (parity with the server invalidate call).
+                  _invalidateProfileListCache()
                 }
                 return jsonResponse({ status: 'success', description })
               }
