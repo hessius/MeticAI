@@ -27,6 +27,14 @@ export type LocalBackend = 'apple-intelligence' | 'gemma-4-e2b'
 export const APPLE_INTELLIGENCE_MODEL_ID = 'apple-intelligence'
 export const GEMMA_MODEL_ID = 'gemma-4-e2b'
 
+/**
+ * LiteRT-LM context window (input + output tokens) for Gemma. The plugin
+ * defaults to 2048, which the shot-analysis prompt (~2900 tokens) overruns
+ * with "exceeding the maximum number of tokens allowed". 4096 fits the prompt
+ * with headroom for the response while staying within E2B's on-device memory.
+ */
+export const GEMMA_CONTEXT_TOKENS = 4096
+
 /** The plugin reports this exact readiness string when the model is usable. */
 const READY = 'ready'
 
@@ -143,7 +151,14 @@ function modelOptionsFor(backend: LocalBackend, extra: Record<string, unknown> =
     // Gemma is loaded through LiteRT-LM on both iOS and Android (`@capgo/capacitor-llm`
     // >= 8.1.0). The legacy MediaPipe engine is unavailable in our SPM iOS build, so we
     // pin the model type explicitly rather than letting it be inferred from the path.
-    return { path, modelType: 'litertlm' as const, ...extra }
+    // Enforce a context window large enough for the analysis prompt (the plugin
+    // default of 2048 is too small); never shrink below GEMMA_CONTEXT_TOKENS.
+    const { maxTokens: requested, ...rest } = extra
+    const maxTokens = Math.max(
+      typeof requested === 'number' ? requested : 0,
+      GEMMA_CONTEXT_TOKENS,
+    )
+    return { path, modelType: 'litertlm' as const, maxTokens, ...rest }
   }
   return { path: 'Apple Intelligence', ...extra }
 }

@@ -132,6 +132,17 @@ describe('generateLocalText', () => {
     )
   })
 
+  it('gives Gemma a context window large enough for the analysis prompt', async () => {
+    setPlatform('android', true)
+    localStorage.setItem(STORAGE_KEYS.LOCAL_MODEL_PATH, '/models/gemma-4-E2B-it.litertlm')
+    setLocalBackend(GEMMA_MODEL_ID)
+    // Default (no explicit maxTokens): must exceed the plugin's 2048 default that
+    // the ~2900-token analysis prompt overran.
+    await generateLocalText('Say hi')
+    const call = CapgoLLM.setModel.mock.calls.at(-1)?.[0] as { maxTokens?: number }
+    expect(call?.maxTokens).toBeGreaterThanOrEqual(4096)
+  })
+
   it('rejects a stale pre-LiteRT-LM `.task` path as not downloaded (migration)', async () => {
     setPlatform('android', true)
     localStorage.setItem(STORAGE_KEYS.LOCAL_MODEL_PATH, '/models/gemma-4-E2B-it-web.task')
