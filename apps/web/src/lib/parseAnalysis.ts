@@ -279,16 +279,6 @@ export function matchSectionHeader(
  * formatted output still renders as separate cards instead of collapsing.
  */
 export function parseStructuredAnalysis(text: string): ParsedSection[] {
-  // TEMPORARY DIAGNOSTIC (remove after format debugging): dump the untouched
-  // raw LLM analysis output so it can be copied from the console. Covers every
-  // runtime and model because both ExpertAnalysisView and LlmAnalysisModal call
-  // this function with the raw analysis string.
-  console.log(
-    "===== RAW ANALYSIS OUTPUT (start) =====\n" +
-      text +
-      "\n===== RAW ANALYSIS OUTPUT (end) =====",
-  );
-
   // Strip the recommendations JSON (delimited or bare) before parsing sections
   // so it never leaks into prose as garbage bullet points.
   let cleanText = text;
