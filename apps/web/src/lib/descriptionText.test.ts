@@ -36,4 +36,15 @@ describe('resolveDescriptionPlaceholders', () => {
     expect(resolveDescriptionPlaceholders('', vars)).toBe('')
     expect(resolveDescriptionPlaceholders(null)).toBe('')
   })
+
+  it('collapses whitespace and trims space before punctuation without catastrophic backtracking', () => {
+    expect(resolveDescriptionPlaceholders('word   .', vars)).toBe('word.')
+    expect(resolveDescriptionPlaceholders('a\t\tb ,c', vars)).toBe('a b,c')
+    // A long run of whitespace with no trailing punctuation must resolve
+    // quickly (guards against the previously polynomial regex).
+    const input = `x${' '.repeat(20000)}y`
+    const start = Date.now()
+    expect(resolveDescriptionPlaceholders(input, vars)).toBe('x y')
+    expect(Date.now() - start).toBeLessThan(500)
+  })
 })

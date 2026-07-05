@@ -41,7 +41,9 @@ export function resolveDescriptionPlaceholders(
   }
   // Strip any remaining paired $...$ placeholder tokens the model invented.
   out = out.replace(/\$[^\s$]{1,60}\$/g, '')
-  // Tidy whitespace left behind by removals.
-  out = out.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+([.,;:)])/g, '$1')
+  // Tidy whitespace left behind by removals. The preceding collapse guarantees
+  // at most a single space/tab before punctuation, so match exactly one char
+  // (no `+`) to avoid polynomial backtracking on long whitespace runs.
+  out = out.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]([.,;:)])/g, '$1')
   return out
 }

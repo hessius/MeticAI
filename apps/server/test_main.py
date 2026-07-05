@@ -17510,6 +17510,20 @@ class TestAITags:
         assert resolve_description_placeholders("", []) == ""
         assert resolve_description_placeholders(None, []) == ""
 
+    def test_resolve_description_placeholders_tidies_whitespace_linearly(self):
+        import time
+
+        from services.analysis_service import resolve_description_placeholders
+
+        assert resolve_description_placeholders("word   .", []) == "word."
+        assert resolve_description_placeholders("a\t\tb ,c", []) == "a b,c"
+        # A long whitespace run with no trailing punctuation must resolve quickly
+        # (guards against the previously polynomial regex on many tabs/spaces).
+        text = "x" + (" " * 20000) + "y"
+        start = time.perf_counter()
+        assert resolve_description_placeholders(text, []) == "x y"
+        assert time.perf_counter() - start < 0.5
+
     def test_strip_tags_line_removes_trailing_line(self):
         from services.analysis_service import strip_tags_line
 

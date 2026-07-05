@@ -134,9 +134,11 @@ def resolve_description_placeholders(
         out = out.replace(f"${key}$", val).replace(f"${key}", val)
     # Strip any remaining paired $...$ placeholder tokens the model invented.
     out = _PAIRED_PLACEHOLDER_RE.sub("", out)
-    # Tidy whitespace left behind by removals.
+    # Tidy whitespace left behind by removals. The preceding collapse guarantees
+    # at most a single space/tab before punctuation, so match exactly one char
+    # (no `+`) to avoid polynomial backtracking on long whitespace runs.
     out = re.sub(r"[ \t]{2,}", " ", out)
-    out = re.sub(r"[ \t]+([.,;:)])", r"\1", out)
+    out = re.sub(r"[ \t]([.,;:)])", r"\1", out)
     return out
 
 
