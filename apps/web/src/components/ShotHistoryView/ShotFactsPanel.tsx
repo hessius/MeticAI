@@ -36,11 +36,12 @@ export function ShotFactsPanel({ facts, taste }: Props) {
         {reached.map((s, i) => (
           <li key={`${s.stage_name}-${i}`} className="flex flex-col gap-1 border-b border-border/50 pb-2 last:border-0 last:pb-0">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-foreground">{s.stage_name}</span>
+              <span className="text-sm font-medium text-foreground min-w-0 truncate">{s.stage_name}</span>
               {s.trigger_class && (
                 <span
+                  title={s.trigger_class.label}
                   className={
-                    'text-xs px-2 py-0.5 rounded-full ' +
+                    'text-xs px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 ' +
                     (s.trigger_class.kind === 'targeted'
                       ? 'bg-emerald-500/15 text-emerald-400'
                       : s.trigger_class.kind === 'failsafe'
@@ -48,7 +49,7 @@ export function ShotFactsPanel({ facts, taste }: Props) {
                         : 'bg-muted text-muted-foreground')
                   }
                 >
-                  {s.trigger_class.label}
+                  {t(`analysis.facts.signal.${s.trigger_class.kind}`)}
                 </span>
               )}
             </div>

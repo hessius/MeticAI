@@ -28,12 +28,14 @@ const facts: ShotFacts = {
 }
 
 describe('ShotFactsPanel', () => {
-  it('renders a row per stage with its trigger label', () => {
+  it('renders a row per stage with a short signal label and full detail in the title', () => {
     render(<ShotFactsPanel facts={facts} />)
     expect(screen.getByText('Infusion')).toBeInTheDocument()
     expect(screen.getByText('Decline')).toBeInTheDocument()
-    expect(screen.getByText('Targeted (yield reached)')).toBeInTheDocument()
-    expect(screen.getByText('Failsafe (caught channeling or choking)')).toBeInTheDocument()
+    expect(screen.getByText('analysis.facts.signal.targeted')).toBeInTheDocument()
+    expect(screen.getByText('analysis.facts.signal.failsafe')).toBeInTheDocument()
+    expect(screen.getByTitle('Targeted (yield reached)')).toBeInTheDocument()
+    expect(screen.getByTitle('Failsafe (caught channeling or choking)')).toBeInTheDocument()
   })
   it('shows stall and channeling flags when present', () => {
     render(<ShotFactsPanel facts={facts} />)

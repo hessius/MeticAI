@@ -45,6 +45,7 @@ export {
   isAppleIntelligenceSupported,
   isLocalLLMConfigured,
   refreshLocalReadiness,
+  resolveGemmaModelPath,
   getCachedLocalReadiness,
   generateLocalText,
   APPLE_INTELLIGENCE_MODEL_ID,

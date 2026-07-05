@@ -1861,7 +1861,12 @@
       "curveDelta": "Kurva Δ {{delta}}",
       "adjustmentsTitle": "Föreslagna justeringar",
       "infoLabel": "Om stegsignaler",
-      "curveDeltaInfo": "Curve Δ visar hur långt ett stegs uppmätta medelvärde låg från dess börvärde (bar eller ml/s). Positivt betyder över målet, negativt under."
+      "curveDeltaInfo": "Curve Δ visar hur långt ett stegs uppmätta medelvärde låg från dess börvärde (bar eller ml/s). Positivt betyder över målet, negativt under.",
+      "signal": {
+        "targeted": "Enligt mål",
+        "failsafe": "Skyddsutlöst",
+        "unknown": "Okänt"
+      }
     },
     "taste": {
       "gateTitle": "Förfina med smak (valfritt)",

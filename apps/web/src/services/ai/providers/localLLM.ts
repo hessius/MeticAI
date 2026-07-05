@@ -17,6 +17,7 @@
  */
 
 import { CapgoLLM } from '@capgo/capacitor-llm'
+import { Filesystem, Directory } from '@capacitor/filesystem'
 import { isNativePlatform } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { AIServiceError } from '../aiErrors'
@@ -88,6 +89,14 @@ function removeLS(key: string): void {
   }
 }
 
+function writeLS(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * The selected on-device backend. Defaults to Apple Intelligence on iOS (no
  * download) and Gemma on Android (the only local option there).
@@ -129,6 +138,65 @@ export function getGemmaModelPath(): string | null {
     return null
   }
   return trimmed
+}
+
+function fileBasename(p: string): string {
+  const norm = p.replace(/[\\/]+$/, '')
+  const idx = Math.max(norm.lastIndexOf('/'), norm.lastIndexOf('\\'))
+  return idx >= 0 ? norm.slice(idx + 1) : norm
+}
+
+async function nativeFileExists(path: string): Promise<boolean> {
+  // Filesystem.stat accepts either a full file:// URI or a plain absolute path
+  // in `path`; try both forms so we work regardless of how the plugin stored it.
+  const candidates = path.startsWith('file://') ? [path] : [`file://${path}`, path]
+  for (const candidate of candidates) {
+    try {
+      await Filesystem.stat({ path: candidate })
+      return true
+    } catch {
+      /* try next form */
+    }
+  }
+  return false
+}
+
+/**
+ * Resolve the stored Gemma model to a path that actually exists in the *current*
+ * app container, healing the persisted path when the file has moved.
+ *
+ * iOS does not guarantee a stable absolute path to the app's Documents
+ * directory: the `…/Application/<UUID>/Documents/…` container UUID can be
+ * reassigned across app updates, so an absolute path persisted at download time
+ * can dangle after a TestFlight/App Store update even though the model file was
+ * preserved. When the stored path no longer resolves, re-resolve the filename
+ * against the current Documents directory and heal the stored value; if the
+ * file is genuinely gone, clear the entry so the UI prompts a fresh download.
+ *
+ * Returns the usable absolute path, or null when the model is missing.
+ */
+export async function resolveGemmaModelPath(): Promise<string | null> {
+  const stored = getGemmaModelPath()
+  if (!stored) return null
+  // No native filesystem on web — trust the stored string.
+  if (!isLocalLLMSupported()) return stored
+  if (await nativeFileExists(stored)) return stored
+  // Heal a changed container path by re-resolving the filename against the
+  // current Documents directory.
+  try {
+    const { uri } = await Filesystem.getUri({ directory: Directory.Documents, path: fileBasename(stored) })
+    if (await nativeFileExists(uri)) {
+      const plain = uri.replace(/^file:\/\//, '')
+      writeLS(STORAGE_KEYS.LOCAL_MODEL_PATH, plain)
+      return plain
+    }
+  } catch {
+    /* fall through to clearing the stale entry */
+  }
+  removeLS(STORAGE_KEYS.LOCAL_MODEL_PATH)
+  cachedReady = false
+  cachedReadiness = 'not-downloaded'
+  return null
 }
 
 /**
@@ -182,7 +250,7 @@ export async function refreshLocalReadiness(): Promise<{ ready: boolean; readine
     return { ready: false, readiness: 'unsupported' }
   }
   const backend = getLocalBackend()
-  if (backend === GEMMA_MODEL_ID && !getGemmaModelPath()) {
+  if (backend === GEMMA_MODEL_ID && !(await resolveGemmaModelPath())) {
     cachedReady = false
     cachedReadiness = 'not-downloaded'
     return { ready: false, readiness: 'not-downloaded' }
@@ -219,6 +287,12 @@ function isOutOfMemoryError(message: string): boolean {
 
 async function runGeneration(prompt: string, opts: GenerateOptions): Promise<string> {
   const backend = getLocalBackend()
+  // Validate/heal the Gemma model path against the current container before
+  // loading it, so a stale iOS Documents path (changed container UUID after an
+  // app update) is repaired rather than failing with an opaque "engine" error.
+  if (backend === GEMMA_MODEL_ID && !(await resolveGemmaModelPath())) {
+    throw new AIServiceError('LOCAL_MODEL_NOT_DOWNLOADED')
+  }
   try {
     await CapgoLLM.setModel(
       modelOptionsFor(backend, {

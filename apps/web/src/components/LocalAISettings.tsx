@@ -29,6 +29,7 @@ import {
   getModelStatus,
   getRouteForMethod,
   refreshLocalReadiness,
+  resolveGemmaModelPath,
   setLocalBackend,
   setRouteForMethod,
   type AIMethod,
@@ -73,10 +74,17 @@ export function LocalAISettings({ mode }: { mode: AIMode }) {
     void Promise.resolve().then(() => probeReadiness())
   }, [backend, probeReadiness])
 
-  // Surface device capability when Gemma is the active backend.
+  // Surface device capability when Gemma is the active backend, and validate the
+  // stored model path against the current container so a dangling path (e.g. an
+  // iOS Documents path invalidated by an app update) is healed or reported as
+  // not-downloaded instead of falsely showing "ready".
   useEffect(() => {
-    if (backend === GEMMA_MODEL_ID) {
-      void checkDeviceCapability().then(setCapability)
+    if (backend !== GEMMA_MODEL_ID) return
+    void checkDeviceCapability().then(setCapability)
+    if (getModelStatus() === 'ready') {
+      void resolveGemmaModelPath().then((path) => {
+        if (!path) setModelStatus('not-downloaded')
+      })
     }
   }, [backend])
 

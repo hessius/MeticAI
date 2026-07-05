@@ -1861,7 +1861,12 @@
       "curveDelta": "Curva Δ {{delta}}",
       "adjustmentsTitle": "Ajustes sugeridos",
       "infoLabel": "Acerca de las señales de fase",
-      "curveDeltaInfo": "Curve Δ muestra cuánto se desvió el promedio medido de una etapa respecto a su valor objetivo (bar o ml/s). Positivo significa por encima del objetivo, negativo por debajo."
+      "curveDeltaInfo": "Curve Δ muestra cuánto se desvió el promedio medido de una etapa respecto a su valor objetivo (bar o ml/s). Positivo significa por encima del objetivo, negativo por debajo.",
+      "signal": {
+        "targeted": "Según objetivo",
+        "failsafe": "Seguridad",
+        "unknown": "Desconocido"
+      }
     },
     "taste": {
       "gateTitle": "Refinar con el sabor (opcional)",

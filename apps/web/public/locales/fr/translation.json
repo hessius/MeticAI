@@ -1861,7 +1861,12 @@
       "curveDelta": "Courbe Δ {{delta}}",
       "adjustmentsTitle": "Ajustements suggérés",
       "infoLabel": "À propos des signaux de phase",
-      "curveDeltaInfo": "Curve Δ indique l'écart entre la moyenne mesurée d'une étape et sa consigne cible (bar ou ml/s). Positif signifie au-dessus de la cible, négatif en dessous."
+      "curveDeltaInfo": "Curve Δ indique l'écart entre la moyenne mesurée d'une étape et sa consigne cible (bar ou ml/s). Positif signifie au-dessus de la cible, négatif en dessous.",
+      "signal": {
+        "targeted": "Comme prévu",
+        "failsafe": "Sécurité",
+        "unknown": "Inconnu"
+      }
     },
     "taste": {
       "gateTitle": "Affiner avec le goût (facultatif)",

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock the native plugin and platform detection before importing the modules.
-const { listeners, CapgoLLM } = vi.hoisted(() => {
+const { listeners, CapgoLLM, Filesystem } = vi.hoisted(() => {
   const sharedListeners: Record<string, Array<(e: unknown) => void>> = {
     textFromAi: [],
     aiFinished: [],
@@ -25,9 +25,18 @@ const { listeners, CapgoLLM } = vi.hoisted(() => {
       }
     }),
   }
-  return { listeners: sharedListeners, CapgoLLM: plugin }
+  // By default the model file exists (stat resolves); tests override `stat` to
+  // simulate a missing/dangling path.
+  const fs = {
+    stat: vi.fn().mockResolvedValue({ type: 'file', size: 1 }),
+    getUri: vi.fn(async ({ path }: { directory: string; path: string }) => ({
+      uri: `file:///var/mobile/Containers/Data/Application/NEW-UUID/Documents/${path}`,
+    })),
+  }
+  return { listeners: sharedListeners, CapgoLLM: plugin, Filesystem: fs }
 })
 vi.mock('@capgo/capacitor-llm', () => ({ CapgoLLM }))
+vi.mock('@capacitor/filesystem', () => ({ Filesystem, Directory: { Documents: 'DOCUMENTS' } }))
 
 let nativeSupported = true
 vi.mock('@/lib/machineMode', () => ({
@@ -38,6 +47,7 @@ import {
   isLocalLLMSupported,
   isLocalLLMConfigured,
   refreshLocalReadiness,
+  resolveGemmaModelPath,
   generateLocalText,
   getGemmaModelPath,
   setLocalBackend,
@@ -63,6 +73,12 @@ beforeEach(() => {
   localStorage.clear()
   __resetLocalLLMCacheForTests()
   vi.clearAllMocks()
+  // Restore default Filesystem behaviour (model file present) — some tests set
+  // persistent rejections/implementations that would otherwise leak.
+  Filesystem.stat.mockResolvedValue({ type: 'file', size: 1 })
+  Filesystem.getUri.mockImplementation(async ({ path }: { directory: string; path: string }) => ({
+    uri: `file:///var/mobile/Containers/Data/Application/NEW-UUID/Documents/${path}`,
+  }))
   setPlatform('ios', true)
 })
 
@@ -152,6 +168,45 @@ describe('generateLocalText', () => {
     // ...so generation reports the model as not downloaded rather than crashing.
     await expect(generateLocalText('Say hi')).rejects.toThrow(AIServiceError)
     expect(CapgoLLM.setModel).not.toHaveBeenCalled()
+  })
+
+  it('heals a dangling Gemma path when the iOS container UUID changed', async () => {
+    setPlatform('ios', true)
+    const stale = '/var/mobile/Containers/Data/Application/OLD-UUID/Documents/gemma-4-E2B-it.litertlm'
+    localStorage.setItem(STORAGE_KEYS.LOCAL_MODEL_PATH, stale)
+    setLocalBackend(GEMMA_MODEL_ID)
+    // The stored (old-container) path no longer exists, but the re-resolved
+    // current-container path does.
+    Filesystem.stat.mockImplementation(async ({ path }: { path: string }) => {
+      if (path.includes('OLD-UUID')) throw new Error('No such file')
+      if (path.includes('NEW-UUID')) return { type: 'file', size: 1 }
+      throw new Error('No such file')
+    })
+    await generateLocalText('Say hi')
+    const healed = '/var/mobile/Containers/Data/Application/NEW-UUID/Documents/gemma-4-E2B-it.litertlm'
+    expect(localStorage.getItem(STORAGE_KEYS.LOCAL_MODEL_PATH)).toBe(healed)
+    expect(CapgoLLM.setModel).toHaveBeenCalledWith(
+      expect.objectContaining({ path: healed, modelType: 'litertlm' }),
+    )
+  })
+
+  it('reports not-downloaded and clears the entry when the model file is truly gone', async () => {
+    setPlatform('ios', true)
+    localStorage.setItem(STORAGE_KEYS.LOCAL_MODEL_PATH, '/var/mobile/gone/gemma-4-E2B-it.litertlm')
+    setLocalBackend(GEMMA_MODEL_ID)
+    Filesystem.stat.mockRejectedValue(new Error('No such file'))
+    await expect(generateLocalText('Say hi')).rejects.toThrow(AIServiceError)
+    expect(CapgoLLM.setModel).not.toHaveBeenCalled()
+    expect(localStorage.getItem(STORAGE_KEYS.LOCAL_MODEL_PATH)).toBeNull()
+  })
+
+  it('resolveGemmaModelPath returns the stored path unchanged when the file exists', async () => {
+    setPlatform('ios', true)
+    localStorage.setItem(STORAGE_KEYS.LOCAL_MODEL_PATH, '/models/gemma-4-E2B-it.litertlm')
+    setLocalBackend(GEMMA_MODEL_ID)
+    Filesystem.stat.mockResolvedValue({ type: 'file', size: 1 })
+    expect(await resolveGemmaModelPath()).toBe('/models/gemma-4-E2B-it.litertlm')
+    expect(Filesystem.getUri).not.toHaveBeenCalled()
   })
 
   it('reconstructs cumulative snapshot streams without duplication (Apple Intelligence)', async () => {

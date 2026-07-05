@@ -1861,7 +1861,12 @@
       "curveDelta": "Curva Δ {{delta}}",
       "adjustmentsTitle": "Regolazioni suggerite",
       "infoLabel": "Informazioni sui segnali di fase",
-      "curveDeltaInfo": "Curve Δ mostra quanto la media misurata di una fase si è discostata dal valore target (bar o ml/s). Positivo significa sopra il target, negativo sotto."
+      "curveDeltaInfo": "Curve Δ mostra quanto la media misurata di una fase si è discostata dal valore target (bar o ml/s). Positivo significa sopra il target, negativo sotto.",
+      "signal": {
+        "targeted": "Come previsto",
+        "failsafe": "Sicurezza",
+        "unknown": "Sconosciuto"
+      }
     },
     "taste": {
       "gateTitle": "Affina con il gusto (facoltativo)",

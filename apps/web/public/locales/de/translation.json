@@ -1861,7 +1861,12 @@
       "curveDelta": "Kurve Δ {{delta}}",
       "adjustmentsTitle": "Vorgeschlagene Anpassungen",
       "infoLabel": "Über Phasensignale",
-      "curveDeltaInfo": "Curve Δ zeigt, wie weit der gemessene Durchschnitt einer Phase vom Zielwert abwich (bar oder ml/s). Positiv bedeutet über dem Ziel, negativ darunter."
+      "curveDeltaInfo": "Curve Δ zeigt, wie weit der gemessene Durchschnitt einer Phase vom Zielwert abwich (bar oder ml/s). Positiv bedeutet über dem Ziel, negativ darunter.",
+      "signal": {
+        "targeted": "Wie geplant",
+        "failsafe": "Notabschaltung",
+        "unknown": "Unbekannt"
+      }
     },
     "taste": {
       "gateTitle": "Mit Geschmack verfeinern (optional)",

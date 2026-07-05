@@ -1861,7 +1861,12 @@
       "curveDelta": "Curve Δ {{delta}}",
       "adjustmentsTitle": "Suggested adjustments",
       "infoLabel": "About stage signals",
-      "curveDeltaInfo": "Curve Δ shows how far a stage's measured average ran from its target setpoint (bar or ml/s). Positive means above target, negative means below."
+      "curveDeltaInfo": "Curve Δ shows how far a stage's measured average ran from its target setpoint (bar or ml/s). Positive means above target, negative means below.",
+      "signal": {
+        "targeted": "As targeted",
+        "failsafe": "Failsafe",
+        "unknown": "Unknown"
+      }
     },
     "taste": {
       "gateTitle": "Refine with taste (optional)",
