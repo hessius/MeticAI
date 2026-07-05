@@ -188,6 +188,82 @@ function parseJsonArrayLoose(json: string): unknown[] | null {
   }
 }
 
+// ---- Section header detection ----
+
+/**
+ * Canonical analysis sections and their default numbers. Used to recognize a
+ * section header even when a (usually small on-device) model drops the leading
+ * "## " marker or omits the number.
+ */
+const KNOWN_SECTION_KEYS: { key: string; number: string }[] = [
+  { key: "shot performance", number: "1" },
+  { key: "root cause", number: "2" },
+  { key: "setup recommendation", number: "3" },
+  { key: "profile recommendation", number: "4" },
+  { key: "profile design", number: "5" },
+];
+
+function findKnownSection(title: string): { key: string; number: string } | null {
+  const lower = title.toLowerCase();
+  return KNOWN_SECTION_KEYS.find((k) => lower.includes(k.key)) ?? null;
+}
+
+/**
+ * Tolerantly decide whether a single line is a section header and, if so,
+ * return its number and title.
+ *
+ * Models routinely emit the first header as `## 1. Shot Performance` but then
+ * drop the `## ` prefix, switch to `###`, wrap the title in bold, or omit the
+ * number for later sections. The strict `^## (\d+)\. ` regex used previously
+ * matched only the first header, collapsing every later section into the first
+ * card. This accepts the common variants while rejecting bullets, subsection
+ * labels (`**What Happened:**`), and numbered prose lines.
+ */
+export function matchSectionHeader(
+  rawLine: string,
+): { number: string; title: string } | null {
+  let s = rawLine.trim();
+  if (!s) return null;
+  // Bulleted lines are never section headers.
+  if (/^[-•*]\s/.test(s)) return null;
+
+  const hashMatch = /^(#{1,6})\s+/.exec(s);
+  const hadHash = hashMatch !== null;
+  if (hadHash) s = s.slice(hashMatch![0].length).trim();
+
+  // Only treat a line as bold-wrapped if the *entire* line is bold, so that
+  // "**Assessment:** Good" (trailing prose) is not mistaken for a header.
+  const boldMatch = /^\*\*(.+?)\*\*$/.exec(s) ?? /^__(.+?)__$/.exec(s);
+  const hadBold = boldMatch !== null;
+  if (hadBold) s = boldMatch![1].trim();
+
+  // Drop a trailing colon a model may append ("Root Cause Analysis:").
+  s = s.replace(/:$/, "").trim();
+
+  let number: string | null = null;
+  let title = s;
+  const numMatch = /^(\d+)[.)]\s+(.+)$/.exec(s);
+  if (numMatch) {
+    number = numMatch[1];
+    title = numMatch[2].trim();
+  }
+
+  const known = findKnownSection(title);
+
+  // Acceptance rules:
+  //  - a heading marker (#) with either a number or a known title
+  //  - a fully bold-wrapped line with either a number or a known title
+  //  - an unmarked line ONLY if it is a numbered, known section (the common
+  //    "dropped ##" case) — this prevents numbered prose from matching.
+  const accept =
+    (hadHash && (number !== null || known !== null)) ||
+    (hadBold && (number !== null || known !== null)) ||
+    (!hadHash && !hadBold && number !== null && known !== null);
+  if (!accept) return null;
+
+  return { number: number ?? known?.number ?? "0", title };
+}
+
 // ---- Parser ----
 
 /**
@@ -198,13 +274,15 @@ function parseJsonArrayLoose(json: string): unknown[] | null {
  *   **Subsection:**
  *   - bullet
  *   **Assessment:** [Good/Acceptable/Needs Improvement/Problematic]
+ *
+ * Header detection is tolerant (see {@link matchSectionHeader}) so loosely
+ * formatted output still renders as separate cards instead of collapsing.
  */
 export function parseStructuredAnalysis(text: string): ParsedSection[] {
   // TEMPORARY DIAGNOSTIC (remove after format debugging): dump the untouched
   // raw LLM analysis output so it can be copied from the console. Covers every
   // runtime and model because both ExpertAnalysisView and LlmAnalysisModal call
   // this function with the raw analysis string.
-  // eslint-disable-next-line no-console
   console.log(
     "===== RAW ANALYSIS OUTPUT (start) =====\n" +
       text +
@@ -232,16 +310,38 @@ export function parseStructuredAnalysis(text: string): ParsedSection[] {
 
   const sections: ParsedSection[] = [];
 
-  const sectionRegex = /^## (\d+)\.\s+(.+)$/gm;
-  const matches = [...cleanText.matchAll(sectionRegex)];
+  // Scan line by line for tolerant section headers rather than a single strict
+  // "## N. Title" regex, so dropped/loose markers do not collapse sections.
+  interface HeaderHit {
+    index: number;
+    length: number;
+    number: string;
+    title: string;
+  }
+  const headers: HeaderHit[] = [];
+  const lineRegex = /^.*$/gm;
+  let lineMatch: RegExpExecArray | null;
+  while ((lineMatch = lineRegex.exec(cleanText)) !== null) {
+    const parsed = matchSectionHeader(lineMatch[0]);
+    if (parsed) {
+      headers.push({
+        index: lineMatch.index,
+        length: lineMatch[0].length,
+        number: parsed.number,
+        title: parsed.title,
+      });
+    }
+    // Guard against zero-length matches (empty lines) causing an infinite loop.
+    if (lineMatch.index === lineRegex.lastIndex) lineRegex.lastIndex++;
+  }
 
-  for (let i = 0; i < matches.length; i++) {
-    const match = matches[i];
-    const number = match[1];
-    const title = `${number}. ${match[2].trim()}`;
-    const startIndex = match.index! + match[0].length;
+  for (let i = 0; i < headers.length; i++) {
+    const header = headers[i];
+    const number = header.number;
+    const title = `${number}. ${header.title}`;
+    const startIndex = header.index + header.length;
     const endIndex =
-      i < matches.length - 1 ? matches[i + 1].index! : cleanText.length;
+      i < headers.length - 1 ? headers[i + 1].index : cleanText.length;
     const sectionContent = cleanText.slice(startIndex, endIndex).trim();
 
     // Parse subsections (bold headers like **What Happened:**)

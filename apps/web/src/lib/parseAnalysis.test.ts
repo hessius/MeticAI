@@ -234,3 +234,93 @@ END_RECOMMENDATIONS_JSON`;
     expect(hasRecommendations(text)).toBe(false);
   });
 });
+
+describe("tolerant section-header detection", () => {
+  it("splits sections when a model drops the '##' prefix on later headers", () => {
+    const text = `## 1. Shot Performance
+
+**What Happened:**
+- Good extraction overall
+
+2. Root Cause Analysis
+
+**Primary Factors:**
+- Slight over-extraction
+
+3. Setup Recommendations
+
+**Priority Changes:**
+- Grind 1 step finer
+`;
+    const sections = parseStructuredAnalysis(text);
+    expect(sections).toHaveLength(3);
+    expect(sections[0].title).toContain("Shot Performance");
+    expect(sections[1].title).toContain("Root Cause");
+    expect(sections[2].title).toContain("Setup Recommendations");
+    // The Root Cause content must NOT be swallowed into the first card.
+    expect(sections[0].content).not.toContain("Slight over-extraction");
+    expect(sections[1].subsections[0].items).toEqual(["Slight over-extraction"]);
+  });
+
+  it("recognizes '###' and bold headers, numbered or not", () => {
+    const text = `### 1. Shot Performance
+
+**What Happened:**
+- Even extraction
+
+**Root Cause Analysis**
+
+**Primary Factors:**
+- Channeling suspected
+
+## Profile Design Observations
+
+**Strengths:**
+- Clean ramp
+`;
+    const sections = parseStructuredAnalysis(text);
+    expect(sections).toHaveLength(3);
+    expect(sections[0].title).toContain("Shot Performance");
+    expect(sections[1].title).toContain("Root Cause");
+    expect(sections[2].title).toContain("Profile Design");
+  });
+
+  it("does not treat bullets, subsection labels, or numbered prose as headers", () => {
+    const text = `## 1. Shot Performance
+
+**What Happened:**
+- The flow was stable at 2.5 ml/s
+- 1. This bullet looks numbered but is content
+
+**Steps To Try:**
+- Adjust grind
+
+**Assessment:** Good
+`;
+    const sections = parseStructuredAnalysis(text);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].title).toContain("Shot Performance");
+    // "**What Happened:**" and "**Steps To Try:**" are subsections, not sections.
+    const subTitles = sections[0].subsections.map((s) => s.title);
+    expect(subTitles).toContain("What Happened");
+    expect(subTitles).toContain("Steps To Try");
+    expect(sections[0].assessment?.status).toBe("Good");
+  });
+
+  it("splits sections when a model wraps headers in bold instead of '##'", () => {
+    const text = `**1. Shot Performance**
+
+**What Happened:**
+- Solid shot
+
+**2. Root Cause Analysis**
+
+**Primary Factors:**
+- Grind slightly coarse
+`;
+    const sections = parseStructuredAnalysis(text);
+    expect(sections).toHaveLength(2);
+    expect(sections[0].title).toContain("Shot Performance");
+    expect(sections[1].title).toContain("Root Cause");
+  });
+});
