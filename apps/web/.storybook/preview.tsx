@@ -28,6 +28,15 @@ const preview: Preview = {
   },
   decorators: [
     (Story, context) => {
+      if (context.parameters?.disableAnimation) {
+        const style = document.createElement('style')
+        style.setAttribute('data-test-no-anim', '')
+        style.innerHTML = `*,*::before,*::after{animation:none!important;transition:none!important;}`
+        document.head.appendChild(style)
+      }
+      return <Story />
+    },
+    (Story, context) => {
       const locale = context.globals.locale || 'en';
       useEffect(() => {
         i18n.changeLanguage(locale);
