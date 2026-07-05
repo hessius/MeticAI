@@ -27,6 +27,7 @@
         "@google/genai": "^1.52.0",
         "@heroicons/react": "^2.2.0",
         "@hookform/resolvers": "^5.4.0",
+        "@metic/core": "file:../../packages/core",
         "@meticulous-home/espresso-api": "^0.11.1",
         "@meticulous-home/espresso-profile": "^0.4.2",
         "@octokit/core": "^7.0.6",
@@ -671,6 +672,8 @@
     "@mdx-js/react": ["@mdx-js/react@3.1.1", "", { "dependencies": { "@types/mdx": "^2.0.0" }, "peerDependencies": { "@types/react": ">=16", "react": ">=16" } }, "sha512-f++rKLQgUVYDAtECQ6fn/is15GkEH9+nZPM3MS0RcxVqoTfawHvDlSCH7JbMhAM6uJ32v3eXLvLmLvjGu7PTQw=="],
 
     "@mediapipe/tasks-genai": ["@mediapipe/tasks-genai@0.10.27", "", {}, "sha512-cv69CPPAtEDBUs6dGZft2S+sBqde1XvEMST367siSyxrhffdWtm4uQIsfdedAbhJ33BwAjuMnAdxDrO9WrzIAQ=="],
+
+    "@metic/core": ["@metic/core@file:../../packages/core", { "devDependencies": { "typescript": "^6.0.3", "vitest": "4.1.5" } }],
 
     "@meticulous-home/espresso-api": ["@meticulous-home/espresso-api@0.11.1", "", { "dependencies": { "@meticulous-home/espresso-profile": "^0.4.2", "axios": "^1.6.8", "socket.io-client": "^4.7.5" } }, "sha512-YKFOt6Ei3AlAhqfvFrIhaiuv+UBhC2uxdRcp2jDePHPm88F3o8fBxP6xre7zrgn/NYRFPbho9NzbO4dCUOyKyw=="],
 
