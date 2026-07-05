@@ -1,5 +1,9 @@
 # .gitignore
 
+# Node
+node_modules/
+packages/*/dist/
+
 # Secrets
 .env
 tasks.md
