@@ -15,7 +15,7 @@ import {
   deriveStructuralTags,
   type AnalyzableProfile,
   type ProfileStage,
-} from './profileAnalysis'
+} from '../../src/logic/profileAnalysis'
 
 // ── Helpers (mirrors Python _make_stage / _make_profile) ───────────────────
 

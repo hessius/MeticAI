@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { classifyTrigger, detectStall, detectChanneling, buildShotFacts, effectiveControlMode } from './shotFacts'
+import { classifyTrigger, detectStall, detectChanneling, buildShotFacts, effectiveControlMode } from '../../src/logic/shotFacts'
 
 describe('classifyTrigger (#423)', () => {
   it('weight is always targeted', () => {

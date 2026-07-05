@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectDecentFormat, convertDecentToMeticulous } from './decentConverter'
+import { detectDecentFormat, convertDecentToMeticulous } from '../../src/logic/decentConverter'
 
 const VALID_DECENT = {
   title: 'Londinium',

@@ -10,7 +10,7 @@ import {
   AI_TAG_LABELS,
   parseAiTags,
   stripTagsLine
-} from './tags'
+} from '../../src/logic/tags'
 
 describe('tags', () => {
   describe('PRESET_TAGS', () => {

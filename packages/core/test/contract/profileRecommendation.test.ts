@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { findSimilarProfiles, getRecommendations } from './profileRecommendation'
+import { findSimilarProfiles, getRecommendations } from '../../src/logic/profileRecommendation'
 import {
   makeProfile,
   PRESSURE_PROFILE,

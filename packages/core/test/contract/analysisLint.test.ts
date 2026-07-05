@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { lintShotAnalysis, repairShotAnalysis, validateAgainstFacts, checkStructure } from './analysisLint'
-import { REQUIRED_ANALYSIS_SECTIONS } from './analysisSchema'
-import type { ShotFacts } from './shotFacts'
+import { lintShotAnalysis, repairShotAnalysis, validateAgainstFacts, checkStructure } from '../../src/logic/analysisLint'
+import { REQUIRED_ANALYSIS_SECTIONS } from '../../src/logic/analysisSchema'
+import type { ShotFacts } from '../../src/logic/shotFacts'
 
 const wellFormed = `## 1. Overall Assessment
 **Summary:** A balanced, well-extracted shot with good temperature stability.

@@ -8,7 +8,15 @@
   "exports": {
     ".": "./src/index.ts",
     "./platform": "./src/platform.ts",
-    "./logic/compass": "./src/logic/compass.ts"
+    "./logic/compass": "./src/logic/compass.ts",
+    "./logic/analysisSchema": "./src/logic/analysisSchema.ts",
+    "./logic/shotFacts": "./src/logic/shotFacts.ts",
+    "./logic/analysisLint": "./src/logic/analysisLint.ts",
+    "./logic/uuid": "./src/logic/uuid.ts",
+    "./logic/decentConverter": "./src/logic/decentConverter.ts",
+    "./logic/tags": "./src/logic/tags.ts",
+    "./logic/profileAnalysis": "./src/logic/profileAnalysis.ts",
+    "./logic/profileRecommendation": "./src/logic/profileRecommendation.ts"
   },
   "scripts": {
     "test": "vitest run",
