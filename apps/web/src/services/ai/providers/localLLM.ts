@@ -160,6 +160,10 @@ export async function refreshLocalReadiness(): Promise<{ ready: boolean; readine
   } catch (err) {
     cachedReady = false
     cachedReadiness = err instanceof Error ? err.message : String(err)
+    // Surface the native failure reason (model-format mismatch, MediaPipe
+    // unavailable, OOM, …) so beta reports capture why on-device AI reports
+    // "unavailable" instead of only the generic user-facing message.
+    console.error('[LocalLLM] readiness check failed', { backend, reason: cachedReadiness })
     return { ready: false, readiness: cachedReadiness }
   }
 }
@@ -189,6 +193,9 @@ async function runGeneration(prompt: string, opts: GenerateOptions): Promise<str
   } catch (err) {
     if (err instanceof AIServiceError) throw err
     const message = err instanceof Error ? err.message : String(err)
+    // Log the raw native error so beta reports can distinguish a model-format
+    // mismatch from a genuinely unsupported device or memory pressure.
+    console.error('[LocalLLM] setModel failed during generation', { backend, message })
     if (isOutOfMemoryError(message)) throw new AIServiceError('LOCAL_OUT_OF_MEMORY', err)
     throw new AIServiceError('LOCAL_UNAVAILABLE', err)
   }
