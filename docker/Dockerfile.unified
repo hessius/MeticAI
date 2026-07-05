@@ -20,15 +20,22 @@ FROM oven/bun:1.3.14-alpine AS web-builder
 
 WORKDIR /build
 
-# Copy web app source
-COPY apps/web/package.json apps/web/bun.lock* ./
+# The frontend depends on @metic/core via a file: workspace dependency
+# (file:../../packages/core), so the monorepo layout must be preserved inside
+# the build context: packages/core sits two levels up from apps/web.
+COPY packages/core /build/packages/core
 
-# Install dependencies (--no-save prevents lockfile changes, fallback if lock issue)
+# Copy web app manifest + lockfile
+COPY apps/web/package.json apps/web/bun.lock* /build/apps/web/
+
+WORKDIR /build/apps/web
+
+# Install dependencies (frozen when the lockfile is valid, fallback otherwise)
 RUN bun install --frozen-lockfile 2>/dev/null || bun install
 
 # Copy source and build
-COPY apps/web/ ./
-COPY VERSION /VERSION
+COPY apps/web/ /build/apps/web/
+COPY VERSION /build/VERSION
 RUN bun run build
 
 
@@ -100,7 +107,7 @@ ENV PYTHONUNBUFFERED=1
 RUN mkdir -p /app/server /app/mcp-server /var/www/html /data
 
 # Copy built web frontend
-COPY --from=web-builder /build/dist /var/www/html
+COPY --from=web-builder /build/apps/web/dist /var/www/html
 
 # Ensure config.json exists (gitignored in source, needed at runtime)
 RUN echo '{"serverUrl":""}' > /var/www/html/config.json
