@@ -450,6 +450,7 @@
     "localModelGemmaTitle": "Gemma 4-modell",
     "localModelGemmaReady": "Gemma 4 redo",
     "localModelDownloading": "Laddar ner … {{percent}} %",
+    "localModelDownloadingIndeterminate": "Laddar ner… det kan ta några minuter",
     "localModelGemmaError": "Nedladdningen misslyckades",
     "localModelGemmaNotDownloaded": "Inte nedladdad ({{size}})",
     "localModelGemmaDescription": "Gemma 4 körs helt på din enhet efter en engångsnedladdning. Cirka 4 GB RAM rekommenderas; Wi-Fi rekommenderas för nedladdningen.",

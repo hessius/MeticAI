@@ -450,6 +450,7 @@
     "localModelGemmaTitle": "Gemma-4-Modell",
     "localModelGemmaReady": "Gemma 4 bereit",
     "localModelDownloading": "Wird heruntergeladen … {{percent}} %",
+    "localModelDownloadingIndeterminate": "Wird heruntergeladen… dies kann einige Minuten dauern",
     "localModelGemmaError": "Download fehlgeschlagen",
     "localModelGemmaNotDownloaded": "Nicht heruntergeladen ({{size}})",
     "localModelGemmaDescription": "Gemma 4 läuft nach einem einmaligen Download vollständig auf deinem Gerät. Etwa 4 GB RAM werden empfohlen; für den Download wird WLAN empfohlen.",

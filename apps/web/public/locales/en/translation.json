@@ -450,6 +450,7 @@
     "localModelGemmaTitle": "Gemma 4 model",
     "localModelGemmaReady": "Gemma 4 ready",
     "localModelDownloading": "Downloading… {{percent}}%",
+    "localModelDownloadingIndeterminate": "Downloading… this can take a few minutes",
     "localModelGemmaError": "Download failed",
     "localModelGemmaNotDownloaded": "Not downloaded ({{size}})",
     "localModelGemmaDescription": "Gemma 4 runs entirely on your device after a one-time download. Around 4 GB of RAM is recommended; Wi-Fi is advised for the download.",

@@ -450,6 +450,7 @@
     "localModelGemmaTitle": "Modelo Gemma 4",
     "localModelGemmaReady": "Gemma 4 listo",
     "localModelDownloading": "Descargando… {{percent}} %",
+    "localModelDownloadingIndeterminate": "Descargando… esto puede tardar unos minutos",
     "localModelGemmaError": "La descarga falló",
     "localModelGemmaNotDownloaded": "No descargado ({{size}})",
     "localModelGemmaDescription": "Gemma 4 se ejecuta por completo en tu dispositivo tras una descarga única. Se recomiendan unos 4 GB de RAM; se aconseja usar Wi-Fi para la descarga.",

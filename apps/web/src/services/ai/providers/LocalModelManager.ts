@@ -29,8 +29,8 @@ import {
 export type ModelStatus = 'not-downloaded' | 'downloading' | 'ready' | 'error'
 
 export interface DownloadProgress {
-  /** 0–100. */
-  percent: number
+  /** 0–100, or `null` when the total size is unknown (indeterminate). */
+  percent: number | null
   downloadedBytes?: number
   totalBytes?: number
 }
@@ -177,15 +177,22 @@ export async function downloadModel(
     ) {
       percent = (downloadedBytes / GEMMA_DOWNLOAD_BYTES) * 100
     }
-    const clampedPercent = Math.max(0, Math.min(100, percent ?? 0))
+    // When neither a real percentage nor a byte count is available (e.g. the
+    // iOS delegate never fires incremental events for a chunk-transfer CDN
+    // download), report `null` so the UI shows an indeterminate spinner rather
+    // than a stuck 0%.
+    const hasMeaningfulPercent = typeof percent === 'number' && percent > 0
+    const reportedPercent = hasMeaningfulPercent
+      ? Math.max(0, Math.min(100, percent as number))
+      : null
     console.log('[LocalModelManager] downloadProgress', {
       rawProgress: event.progress,
       downloadedBytes,
       totalBytes,
-      computedPercent: clampedPercent,
+      computedPercent: reportedPercent,
     })
     onProgress?.({
-      percent: clampedPercent,
+      percent: reportedPercent,
       downloadedBytes,
       totalBytes,
     })
