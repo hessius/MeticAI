@@ -967,6 +967,39 @@ describe('DirectModeInterceptor regression harness', () => {
       expect(choco?.ai_tags).toEqual([])
     })
 
+    it('paginates /api/shots/by-profile via the limit query param over full history', async () => {
+      // Three Turbo Bloom shots + one other, returned newest-first by the
+      // machine search endpoint. The short-listing GET is intentionally left
+      // unregistered so the test proves the POST search (with max_results) is
+      // what supplies the full history.
+      const fullHistory = [
+        { id: 's1', time: Date.parse('2026-01-01T10:00:00Z') / 1000, name: 'Turbo Bloom', file: 's1.json', profile: { id: 'profile-1', name: 'Turbo Bloom', final_weight: 36 }, data: null },
+        { id: 's2', time: Date.parse('2026-01-02T10:00:00Z') / 1000, name: 'Turbo Bloom', file: 's2.json', profile: { id: 'profile-1', name: 'Turbo Bloom', final_weight: 37 }, data: null },
+        { id: 's3', time: Date.parse('2026-01-03T10:00:00Z') / 1000, name: 'Turbo Bloom', file: 's3.json', profile: { id: 'profile-1', name: 'Turbo Bloom', final_weight: 38 }, data: null },
+        { id: 's4', time: Date.parse('2026-01-04T10:00:00Z') / 1000, name: 'Chocolate Cruise', file: 's4.json', profile: { id: 'profile-2', name: 'Chocolate Cruise', final_weight: 40 }, data: null },
+      ]
+      const historySearch = vi.fn(() => jsonResponse({ history: fullHistory }))
+      installInterceptor(createMachineFetch({
+        'POST /api/v1/history': historySearch,
+      }))
+      vi.useRealTimers()
+
+      // First page: limit=2 returns the two newest Turbo Bloom shots.
+      const page1 = await window.fetch(`/api/shots/by-profile/${encodeURIComponent('Turbo Bloom')}?limit=2`)
+      const body1 = await readJson<{ shots: Array<{ filename: string }>; count: number; limit: number }>(page1)
+      expect(historySearch).toHaveBeenCalled()
+      expect(body1.limit).toBe(2)
+      expect(body1.count).toBe(2)
+      expect(body1.shots.map((s) => s.filename)).toEqual(['s3.json', 's2.json'])
+
+      // "Load more": limit=20 returns all three Turbo Bloom shots (the other
+      // profile's shot is filtered out), newest-first.
+      const page2 = await window.fetch(`/api/shots/by-profile/${encodeURIComponent('Turbo Bloom')}?limit=20`)
+      const body2 = await readJson<{ shots: Array<{ filename: string }>; count: number }>(page2)
+      expect(body2.count).toBe(3)
+      expect(body2.shots.map((s) => s.filename)).toEqual(['s3.json', 's2.json', 's1.json'])
+    })
+
     it('applies variable overrides and runs the profile via ephemeral load', async () => {
       const profileData = nestedMachineProfiles()[0].profile
       installInterceptor(createMachineFetch({

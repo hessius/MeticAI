@@ -1495,6 +1495,35 @@ export function installDirectModeInterceptor(): void {
   }
 
   async function _loadHistory(): Promise<MachineHistoryEntry[]> {
+    // The machine's GET /history short-listing is capped to a small set of the
+    // most-recent shots, which made direct mode show only ~20 shots regardless
+    // of how deep the profile's history went. Use the search endpoint with a
+    // generous max_results (metadata-only, dump_data:false) to retrieve the
+    // full history, falling back to the short-listing if the search fails.
+    try {
+      const searchResponse = await _fetch('/api/v1/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: '',
+          ids: [],
+          start_date: '',
+          end_date: '',
+          order_by: ['date'],
+          sort: 'desc',
+          max_results: 1000,
+          dump_data: false,
+        }),
+      })
+      if (searchResponse.ok) {
+        const raw = await searchResponse.json()
+        const entries = Array.isArray(raw)
+          ? raw as MachineHistoryEntry[]
+          : (isRecord(raw) && Array.isArray(raw.history) ? raw.history as MachineHistoryEntry[] : null)
+        if (entries) return entries
+      }
+    } catch { /* fall through to the short-listing */ }
+
     const response = await _fetch('/api/v1/history')
     if (!response.ok) return []
     const raw = await response.json()
@@ -2928,10 +2957,16 @@ export function installDirectModeInterceptor(): void {
     const byProfileMatch = url.match(/\/api\/shots\/by-profile\/([^?]+)/)
     if (byProfileMatch) {
       const profileName = decodeURIComponent(byProfileMatch[1])
+      const limitParam = Number(new URL(url, 'http://x').searchParams.get('limit'))
+      const limit = Number.isFinite(limitParam) && limitParam > 0 ? limitParam : 20
       return (async () => {
           const all = await _loadVisibleHistory()
-          const filtered = all.filter(e => getHistoryProfileName(e) === profileName)
-          const shots = filtered.map(e => {
+          const filtered = all
+            .filter(e => getHistoryProfileName(e) === profileName)
+            // Newest first so pagination reveals older shots as the limit grows.
+            .sort((a, b) => (Number(b.time) || 0) - (Number(a.time) || 0))
+          const paged = filtered.slice(0, limit)
+          const shots = paged.map(e => {
             const metrics = getHistoryMetrics(e)
             return {
               date: getHistoryEntryDate(e),
@@ -2942,8 +2977,10 @@ export function installDirectModeInterceptor(): void {
               total_time: metrics.total_time,
             }
           })
-          return jsonResponse({ profile_name: profileName, shots, count: shots.length, limit: 20 })
-      })().catch(() => jsonResponse({ profile_name: profileName, shots: [], count: 0, limit: 20 }))
+          // Mirror the server: count reflects the returned page so the client's
+          // "Load more" (hasMore = count >= requestedLimit) works identically.
+          return jsonResponse({ profile_name: profileName, shots, count: shots.length, limit })
+      })().catch(() => jsonResponse({ profile_name: profileName, shots: [], count: 0, limit }))
     }
 
     // GET /api/shots/data/:date/:filename → /api/v1/history (find entry and convert data)
