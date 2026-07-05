@@ -5,6 +5,12 @@ on:
     branches: [main, develop, "version/*"]
   pull_request:
     branches: [main, develop, "version/*"]
+  workflow_dispatch:
+    inputs:
+      update_visual_baselines:
+        description: "Regenerate & upload Storybook visual-regression baselines"
+        type: boolean
+        default: false
 
 jobs:
   # ============================================================================
@@ -411,6 +417,14 @@ jobs:
       - name: Run visual snapshots
         env:
           SB_VIEWPORT: ${{ matrix.viewport }}
+          # jest-image-snapshot refuses to WRITE new baselines when CI is set
+          # (so a missing baseline fails rather than silently passing). On a
+          # manual `workflow_dispatch` with update_visual_baselines=true we clear
+          # CI for this step so baselines are (re)generated, then uploaded as the
+          # `visual-baselines-<viewport>` artifact to be downloaded and committed
+          # under apps/web/__image_snapshots__/. Normal push/PR runs keep CI set
+          # and compare against the committed baselines.
+          CI: ${{ (github.event_name == 'workflow_dispatch' && inputs.update_visual_baselines) && '' || 'true' }}
         run: |
           bunx http-server storybook-static -p 6006 --silent &
           bunx wait-on tcp:6006
