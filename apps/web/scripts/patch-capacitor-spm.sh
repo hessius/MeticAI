@@ -340,6 +340,67 @@ PYEOF
     patch_swift_file "$ZEROCONF_PLUGIN"
 fi
 
+# ─── @capgo/capacitor-llm: prefer CPU backend for LiteRT-LM on iOS ──
+# The plugin hardcodes a GPU-first engine config and only falls back to CPU when
+# GPU *initialization* fails. On some devices (e.g. iPhone 17 Pro) the GPU
+# (ML Drift) backend initializes fine but then crashes with EXC_BAD_ACCESS
+# mid-decode on long generations — a runtime crash that the init-only fallback
+# can't catch. CPU (XNNPack) is the plugin's own default and the stable path, so
+# we reorder the configs to CPU-first (GPU kept only as a last-resort fallback).
+CAPGO_LLM_PLUGIN="$NODE_MODULES/@capgo/capacitor-llm/ios/Sources/LLMPlugin/LLMPlugin.swift"
+if [ -f "$CAPGO_LLM_PLUGIN" ]; then
+    python3 - "$CAPGO_LLM_PLUGIN" << 'PYEOF'
+import sys
+path = sys.argv[1]
+with open(path, 'r') as f:
+    content = f.read()
+
+marker = "MeticAI patch: prefer CPU"
+if marker in content:
+    print("  Already patched: @capgo/capacitor-llm (CPU-first)")
+else:
+    gpu_first = """        let configs = [
+            try LiteRTLM.EngineConfig(
+                modelPath: modelURL.path,
+                backend: .gpu,
+                maxNumTokens: maxTokens,
+                cacheDir: cacheDirectory.path
+            ),
+            try LiteRTLM.EngineConfig(
+                modelPath: modelURL.path,
+                backend: .cpu(),
+                maxNumTokens: maxTokens,
+                cacheDir: cacheDirectory.path
+            )
+        ]"""
+    cpu_first = """        // MeticAI patch: prefer CPU (XNNPack) over GPU on iOS. The GPU (ML Drift)
+        // backend can crash with EXC_BAD_ACCESS mid-decode on some devices (e.g.
+        // iPhone 17 Pro) for long generations; CPU is the stable path. GPU is kept
+        // as a fallback only for the case where CPU initialization fails.
+        let configs = [
+            try LiteRTLM.EngineConfig(
+                modelPath: modelURL.path,
+                backend: .cpu(),
+                maxNumTokens: maxTokens,
+                cacheDir: cacheDirectory.path
+            ),
+            try LiteRTLM.EngineConfig(
+                modelPath: modelURL.path,
+                backend: .gpu,
+                maxNumTokens: maxTokens,
+                cacheDir: cacheDirectory.path
+            )
+        ]"""
+    if gpu_first in content:
+        content = content.replace(gpu_first, cpu_first)
+        with open(path, 'w') as f:
+            f.write(content)
+        print("  Patched: @capgo/capacitor-llm (LiteRT-LM CPU-first)")
+    else:
+        print("  WARNING: @capgo/capacitor-llm config block not found; upstream may have changed")
+PYEOF
+fi
+
 # ─── Add -ObjC linker flag if missing ──────────────────────────────
 # Required so the linker keeps ObjC classes from SPM static libraries,
 # allowing NSClassFromString() to find them at runtime.

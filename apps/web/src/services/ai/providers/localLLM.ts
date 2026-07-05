@@ -39,8 +39,12 @@ export const GEMMA_CONTEXT_TOKENS = 4096
 /** The plugin reports this exact readiness string when the model is usable. */
 const READY = 'ready'
 
-/** Hard ceiling for a single on-device generation before we give up (ms). */
-const GENERATION_TIMEOUT_MS = 120_000
+/**
+ * Hard ceiling for a single on-device generation before we give up (ms).
+ * Gemma runs on the CPU (XNNPack) backend on iOS for stability, which is slower
+ * than GPU, so a long analysis prompt can take a few minutes on-device.
+ */
+const GENERATION_TIMEOUT_MS = 240_000
 
 function getCapacitorPlatform(): string {
   const cap = (globalThis as { Capacitor?: { getPlatform?: () => string } }).Capacitor
