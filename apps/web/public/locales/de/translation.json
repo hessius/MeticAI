@@ -223,12 +223,12 @@
     "uploaded": "Hochgeladen!",
     "uploading": "Wird hochgeladen...",
     "useImagePrompt": "Möchten Sie dieses Bild für Ihr Profil verwenden?",
-    "generateAiDescription": "KI-Erklärung generieren",
-    "generatingAiDescription": "KI-Erklärung wird generiert...",
-    "regenerateAiDescription": "KI-Erklärung neu generieren",
-    "regeneratingAiDescription": "KI-Erklärung wird neu generiert...",
-    "aiDescriptionGenerated": "KI-Erklärung erfolgreich generiert",
-    "aiDescriptionFailed": "KI-Erklärung konnte nicht generiert werden",
+    "generateAiDescription": "KI-Beschreibung generieren",
+    "generatingAiDescription": "KI-Beschreibung wird generiert...",
+    "regenerateAiDescription": "KI-Beschreibung neu generieren",
+    "regeneratingAiDescription": "KI-Beschreibung wird neu generiert...",
+    "aiDescriptionGenerated": "KI-Beschreibung erfolgreich generiert",
+    "aiDescriptionFailed": "KI-Beschreibung konnte nicht generiert werden",
     "notes": "Notizen",
     "notesPlaceholder": "Notizen zu diesem Profil hinzufügen…",
     "notesSaveFailed": "Notizen konnten nicht gespeichert werden",
@@ -1859,7 +1859,8 @@
       "channeling": "Mögliches Channeling",
       "curveDelta": "Kurve Δ {{delta}}",
       "adjustmentsTitle": "Vorgeschlagene Anpassungen",
-      "infoLabel": "Über Phasensignale"
+      "infoLabel": "Über Phasensignale",
+      "curveDeltaInfo": "Curve Δ zeigt, wie weit der gemessene Durchschnitt einer Phase vom Zielwert abwich (bar oder ml/s). Positiv bedeutet über dem Ziel, negativ darunter."
     },
     "taste": {
       "gateTitle": "Mit Geschmack verfeinern (optional)",

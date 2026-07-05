@@ -223,12 +223,12 @@
       "vintage": "Vintage",
       "vintageDesc": "Retroestetik"
     },
-    "generateAiDescription": "Generera AI-förklaring",
-    "generatingAiDescription": "Genererar AI-förklaring...",
-    "regenerateAiDescription": "Generera om AI-förklaring",
-    "regeneratingAiDescription": "Genererar om AI-förklaring...",
-    "aiDescriptionGenerated": "AI-förklaring genererad",
-    "aiDescriptionFailed": "Kunde inte generera AI-förklaring",
+    "generateAiDescription": "Generera AI-beskrivning",
+    "generatingAiDescription": "Genererar AI-beskrivning...",
+    "regenerateAiDescription": "Generera om AI-beskrivning",
+    "regeneratingAiDescription": "Genererar om AI-beskrivning...",
+    "aiDescriptionGenerated": "AI-beskrivning genererad",
+    "aiDescriptionFailed": "Kunde inte generera AI-beskrivning",
     "notes": "Anteckningar",
     "notesPlaceholder": "Lägg till anteckningar om denna profil…",
     "notesSaveFailed": "Kunde inte spara anteckningar",
@@ -1859,7 +1859,8 @@
       "channeling": "Möjlig kanalbildning",
       "curveDelta": "Kurva Δ {{delta}}",
       "adjustmentsTitle": "Föreslagna justeringar",
-      "infoLabel": "Om stegsignaler"
+      "infoLabel": "Om stegsignaler",
+      "curveDeltaInfo": "Curve Δ visar hur långt ett stegs uppmätta medelvärde låg från dess börvärde (bar eller ml/s). Positivt betyder över målet, negativt under."
     },
     "taste": {
       "gateTitle": "Förfina med smak (valfritt)",

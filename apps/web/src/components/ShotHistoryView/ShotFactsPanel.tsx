@@ -26,8 +26,9 @@ export function ShotFactsPanel({ facts, taste }: Props) {
           >
             <Info className="h-3.5 w-3.5" />
           </PopoverTrigger>
-          <PopoverContent side="top" align="start" className="max-w-xs text-xs text-muted-foreground">
-            {t('analysis.facts.subtitle')}
+          <PopoverContent side="top" align="start" className="max-w-xs text-xs text-muted-foreground space-y-2">
+            <p>{t('analysis.facts.subtitle')}</p>
+            <p>{t('analysis.facts.curveDeltaInfo')}</p>
           </PopoverContent>
         </Popover>
       </div>

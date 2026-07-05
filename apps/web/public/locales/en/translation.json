@@ -227,12 +227,12 @@
     "notesPlaceholder": "Add your tasting notes, grinder settings, or other observations...",
     "notesSaved": "Notes saved",
     "notesSaveFailed": "Failed to save notes",
-    "generateAiDescription": "Generate AI Explanation",
-    "generatingAiDescription": "Generating AI explanation...",
-    "regenerateAiDescription": "Regenerate AI Explanation",
-    "regeneratingAiDescription": "Regenerating AI explanation...",
-    "aiDescriptionGenerated": "AI explanation generated successfully",
-    "aiDescriptionFailed": "Failed to generate AI explanation",
+    "generateAiDescription": "Generate AI Description",
+    "generatingAiDescription": "Generating AI description...",
+    "regenerateAiDescription": "Regenerate AI Description",
+    "regeneratingAiDescription": "Regenerating AI description...",
+    "aiDescriptionGenerated": "AI description generated successfully",
+    "aiDescriptionFailed": "Failed to generate AI description",
     "fetchFailed": "Failed to load history",
     "fetchEntryFailed": "Failed to load entry",
     "deleteEntryFailed": "Failed to delete entry",
@@ -1859,7 +1859,8 @@
       "channeling": "Possible channeling",
       "curveDelta": "Curve Δ {{delta}}",
       "adjustmentsTitle": "Suggested adjustments",
-      "infoLabel": "About stage signals"
+      "infoLabel": "About stage signals",
+      "curveDeltaInfo": "Curve Δ shows how far a stage's measured average ran from its target setpoint (bar or ml/s). Positive means above target, negative means below."
     },
     "taste": {
       "gateTitle": "Refine with taste (optional)",

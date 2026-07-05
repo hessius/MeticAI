@@ -147,7 +147,7 @@ export function buildStaticProfileDescription(profileJson: ProfileJson): string 
     `• Expected Time: ${expectedTime}\n\n` +
     `Why This Works:\n` +
     `This is a summary generated from the profile's stage structure and metadata. ` +
-    `Enable AI features in Settings and configure a Gemini API key for a detailed ` +
+    `Enable AI features in Settings for a detailed ` +
     `barista-level analysis with expert brewing recommendations.\n\n` +
     `Special Notes:\n` +
     `This description was generated without AI assistance and may not capture ` +

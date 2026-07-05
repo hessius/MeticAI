@@ -223,12 +223,12 @@
     "uploaded": "¡Subido!",
     "uploading": "Subiendo...",
     "useImagePrompt": "¿Desea usar esta imagen para su perfil?",
-    "generateAiDescription": "Generar explicación IA",
-    "generatingAiDescription": "Generando explicación IA...",
-    "regenerateAiDescription": "Regenerar explicación IA",
-    "regeneratingAiDescription": "Regenerando explicación IA...",
-    "aiDescriptionGenerated": "Explicación IA generada correctamente",
-    "aiDescriptionFailed": "Error al generar la explicación IA",
+    "generateAiDescription": "Generar descripción IA",
+    "generatingAiDescription": "Generando descripción IA...",
+    "regenerateAiDescription": "Regenerar descripción IA",
+    "regeneratingAiDescription": "Regenerando descripción IA...",
+    "aiDescriptionGenerated": "Descripción IA generada correctamente",
+    "aiDescriptionFailed": "Error al generar la descripción IA",
     "notes": "Notas",
     "notesPlaceholder": "Agregar notas sobre este perfil…",
     "notesSaveFailed": "Error al guardar notas",
@@ -1859,7 +1859,8 @@
       "channeling": "Posible canalización",
       "curveDelta": "Curva Δ {{delta}}",
       "adjustmentsTitle": "Ajustes sugeridos",
-      "infoLabel": "Acerca de las señales de fase"
+      "infoLabel": "Acerca de las señales de fase",
+      "curveDeltaInfo": "Curve Δ muestra cuánto se desvió el promedio medido de una etapa respecto a su valor objetivo (bar o ml/s). Positivo significa por encima del objetivo, negativo por debajo."
     },
     "taste": {
       "gateTitle": "Refinar con el sabor (opcional)",
