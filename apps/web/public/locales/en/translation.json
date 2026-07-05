@@ -1298,7 +1298,9 @@
     "deselectAll": "Deselect all",
     "globalSettings": "Global Settings",
     "applyFailed": "Failed to apply recommendations",
-    "classifyFailed": "Classification failed"
+    "classifyFailed": "Classification failed",
+    "noneApplied": "No recommendations could be applied: {{reason}}",
+    "partiallyApplied": "Applied {{applied}}, skipped {{skipped}}"
   },
   "taste": {
     "compass": {

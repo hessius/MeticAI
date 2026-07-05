@@ -13,6 +13,7 @@ import { SectionCard } from "@/components/SectionCard";
 import { RecommendationSelectionDialog } from "@/components/RecommendationSelectionDialog";
 import { getServerUrl } from "@/lib/config";
 import { useNativeShare } from "@/hooks/useNativeShare";
+import { toast } from "sonner";
 
 interface ExpertAnalysisViewProps {
   isLoading: boolean;
@@ -117,9 +118,34 @@ export function ExpertAnalysisView({
         `${serverUrl}/api/profile/${encodeURIComponent(profileName)}/apply-recommendations`,
         { method: "POST", body: form },
       );
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         throw new Error(body.detail?.message || body.detail || t('recommendations.applyFailed'));
+      }
+      // A 200 response does not guarantee anything changed: the machine save
+      // succeeds even when every recommendation was skipped (e.g. a variable
+      // the model named could not be resolved). Surface that instead of
+      // reporting a false success.
+      const appliedList = Array.isArray(body.applied) ? body.applied : [];
+      const skippedList = Array.isArray(body.skipped) ? body.skipped : [];
+      if (appliedList.length === 0) {
+        const reason =
+          (skippedList[0] && typeof skippedList[0].reason === "string"
+            ? skippedList[0].reason
+            : null) ?? body.message;
+        throw new Error(
+          reason
+            ? t('recommendations.noneApplied', { reason })
+            : t('recommendations.applyFailed'),
+        );
+      }
+      if (skippedList.length > 0) {
+        toast.info(
+          t('recommendations.partiallyApplied', {
+            applied: appliedList.length,
+            skipped: skippedList.length,
+          }),
+        );
       }
     },
     [profileName, t],

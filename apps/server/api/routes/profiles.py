@@ -3926,6 +3926,78 @@ async def _recurring_schedule_checker():
 # Apply AI Recommendations
 # ============================================================================
 
+_KNOWN_VARIABLE_TYPES = ("pressure", "flow", "temperature", "weight", "time", "volume")
+
+
+def _variable_type_of(raw: str) -> str | None:
+    """Determine which value type a recommendation variable refers to.
+
+    Handles real keys ("pressure_Max Pressure"), invented positional ids
+    ("pressure_2", "flow_0") and bare types ("pressure").
+    """
+    lower = str(raw or "").strip().lower()
+    for vtype in _KNOWN_VARIABLE_TYPES:
+        if lower == vtype or lower.startswith(f"{vtype}_"):
+            return vtype
+    return None
+
+
+def _resolve_fuzzy_variable(variables, raw_variable, current_value, stage):
+    """Recover the real profile variable when a model invents a positional id.
+
+    Models across the board emit ids like "pressure_2" instead of the actual
+    key ("pressure_Max Pressure"). Match by value type, disambiguating on the
+    reported current_value and finally the stage name. Returns ``None`` when
+    ambiguous so the caller surfaces a clear skip instead of guessing.
+    """
+    if not variables:
+        return None
+    vtype = _variable_type_of(raw_variable)
+    if not vtype:
+        return None
+
+    def _is_adjustable(var) -> bool:
+        key = str(getattr(var, "key", "") or "")
+        if key.startswith("info_") or getattr(var, "adjustable", None) is False:
+            return False
+        item_type = str(getattr(var, "type", "") or "").lower() or (
+            _variable_type_of(key) or ""
+        )
+        return item_type == vtype
+
+    candidates = [var for var in variables if _is_adjustable(var)]
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+
+    try:
+        cur = float(current_value)
+    except (TypeError, ValueError):
+        cur = None
+    if cur is not None and math.isfinite(cur):
+        by_value = []
+        for var in candidates:
+            try:
+                if float(getattr(var, "value", None)) == cur:
+                    by_value.append(var)
+            except (TypeError, ValueError):
+                continue
+        if len(by_value) == 1:
+            return by_value[0]
+
+    stage_lower = str(stage or "").strip().lower()
+    if stage_lower and stage_lower != "global":
+        by_stage = [
+            var
+            for var in candidates
+            if stage_lower in str(getattr(var, "name", "") or "").lower()
+            or stage_lower in str(getattr(var, "key", "") or "").lower()
+        ]
+        if len(by_stage) == 1:
+            return by_stage[0]
+    return None
+
 
 @router.post("/profile/{name:path}/apply-recommendations")
 @router.post("/api/profile/{name:path}/apply-recommendations")
@@ -4193,6 +4265,35 @@ async def apply_recommendations(
                             matched_stage = True
                         break
                 if matched_stage:
+                    continue
+
+            # --- fuzzy fallback ---
+            # Models routinely invent positional ids like "pressure_2" / "flow_0"
+            # instead of the real variable key. Recover the intended variable by
+            # type + current_value before giving up.
+            if hasattr(full_profile, "variables") and full_profile.variables:
+                fuzzy_var = _resolve_fuzzy_variable(
+                    full_profile.variables,
+                    variable,
+                    rec.get("current_value"),
+                    stage,
+                )
+                if fuzzy_var is not None:
+                    try:
+                        fuzzy_var.value = float(recommended_value)
+                    except (TypeError, ValueError):
+                        skipped.append(
+                            {"variable": variable, "reason": "invalid value"}
+                        )
+                        continue
+                    applied.append(
+                        {
+                            "variable": getattr(fuzzy_var, "key", variable),
+                            "stage": stage,
+                            "value": fuzzy_var.value,
+                            "matched_from": variable,
+                        }
+                    )
                     continue
 
             skipped.append(

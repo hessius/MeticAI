@@ -1298,7 +1298,9 @@
     "deselectAll": "Avmarkera alla",
     "globalSettings": "Globala inställningar",
     "applyFailed": "Kunde inte tillämpa rekommendationer",
-    "classifyFailed": "Klassificering misslyckades"
+    "classifyFailed": "Klassificering misslyckades",
+    "noneApplied": "Inga rekommendationer kunde tillämpas: {{reason}}",
+    "partiallyApplied": "Tillämpade {{applied}}, hoppade över {{skipped}}"
   },
   "taste": {
     "compass": {

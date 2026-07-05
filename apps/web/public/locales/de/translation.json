@@ -1298,7 +1298,9 @@
     "deselectAll": "Alle abwählen",
     "globalSettings": "Globale Einstellungen",
     "applyFailed": "Empfehlungen konnten nicht angewendet werden",
-    "classifyFailed": "Klassifizierung fehlgeschlagen"
+    "classifyFailed": "Klassifizierung fehlgeschlagen",
+    "noneApplied": "Es konnten keine Empfehlungen angewendet werden: {{reason}}",
+    "partiallyApplied": "{{applied}} angewendet, {{skipped}} übersprungen"
   },
   "taste": {
     "compass": {

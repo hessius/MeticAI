@@ -1312,6 +1312,66 @@ function updateStageValue(
   return { applied: true }
 }
 
+const KNOWN_VARIABLE_TYPES = ['pressure', 'flow', 'temperature', 'weight', 'time', 'volume'] as const
+
+/**
+ * Determine which value type a recommendation's variable refers to. Handles
+ * real keys ("pressure_Max Pressure"), invented positional ids ("pressure_2",
+ * "flow_0") and bare types ("pressure").
+ */
+function variableTypeOf(raw: string): string | null {
+  const lower = raw.trim().toLowerCase()
+  for (const type of KNOWN_VARIABLE_TYPES) {
+    if (lower === type || lower.startsWith(`${type}_`)) return type
+  }
+  return null
+}
+
+/**
+ * Recover the real profile variable a recommendation targets when a model
+ * invents a positional identifier (e.g. "pressure_2" instead of the actual
+ * key "pressure_Max Pressure"). This class of mistake happens across every
+ * model. Matches by value type, disambiguating on the reported current_value
+ * and finally the stage name. Returns null when the match is ambiguous so the
+ * caller can surface a clear "could not resolve" skip instead of guessing.
+ */
+function resolveFuzzyVariable(
+  variables: Array<Record<string, unknown>> | undefined,
+  rawVariable: string,
+  currentValue: unknown,
+  stage: string,
+): Record<string, unknown> | null {
+  if (!Array.isArray(variables) || variables.length === 0) return null
+  const type = variableTypeOf(rawVariable)
+  if (!type) return null
+
+  const adjustable = variables.filter((item) => {
+    const key = String(item.key ?? '')
+    if (key.startsWith('info_') || item.adjustable === false) return false
+    const itemType = String(item.type ?? '').toLowerCase() || variableTypeOf(key)
+    return itemType === type
+  })
+  if (adjustable.length === 0) return null
+  if (adjustable.length === 1) return adjustable[0]
+
+  const cur = optionalNumber(currentValue)
+  if (cur !== null) {
+    const byValue = adjustable.filter((item) => optionalNumber(item.value) === cur)
+    if (byValue.length === 1) return byValue[0]
+  }
+
+  const stageLower = stage.trim().toLowerCase()
+  if (stageLower && stageLower !== 'global') {
+    const byStage = adjustable.filter((item) =>
+      String(item.name ?? '').toLowerCase().includes(stageLower) ||
+      String(item.key ?? '').toLowerCase().includes(stageLower),
+    )
+    if (byStage.length === 1) return byStage[0]
+  }
+  return null
+}
+
+
 
 // ── Exported installer ──────────────────────────────────────────────────────
 
@@ -2537,6 +2597,25 @@ export function installDirectModeInterceptor(): void {
           }
           if (limitResult.reason) {
             skipped.push({ variable, reason: limitResult.reason })
+            continue
+          }
+          // Fuzzy fallback: models routinely invent positional ids like
+          // "pressure_2" / "flow_0" instead of the real variable key. Recover
+          // the intended variable by type + current_value before giving up.
+          const fuzzyVariable = resolveFuzzyVariable(
+            updated.variables,
+            variable,
+            recommendation.current_value,
+            stage,
+          )
+          if (fuzzyVariable) {
+            fuzzyVariable.value = recommendedValue
+            applied.push({
+              variable: String(fuzzyVariable.key ?? variable),
+              stage,
+              value: recommendedValue,
+              matched_from: variable,
+            })
             continue
           }
           skipped.push({ variable, reason: 'variable not found in profile' })

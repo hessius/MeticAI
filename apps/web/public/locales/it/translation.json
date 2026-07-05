@@ -1298,7 +1298,9 @@
     "deselectAll": "Deseleziona tutti",
     "globalSettings": "Impostazioni globali",
     "applyFailed": "Impossibile applicare le raccomandazioni",
-    "classifyFailed": "Classificazione fallita"
+    "classifyFailed": "Classificazione fallita",
+    "noneApplied": "Impossibile applicare alcuna raccomandazione: {{reason}}",
+    "partiallyApplied": "Applicate {{applied}}, saltate {{skipped}}"
   },
   "taste": {
     "compass": {

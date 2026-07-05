@@ -15673,6 +15673,90 @@ class TestApplyRecommendationsEndpoint:
     @patch("api.routes.profiles.async_save_profile", new_callable=AsyncMock)
     @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
     @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
+    def test_apply_resolves_invented_positional_variable(
+        self, mock_list, mock_get, mock_save, client
+    ):
+        """An invented id like 'pressure_2' resolves to the real key by type + value."""
+        profile = self._make_mock_profile()
+        profile.variables = [
+            SimpleNamespace(
+                key="pressure_Max Pressure",
+                name="Max Pressure",
+                value=6.0,
+                type="pressure",
+            ),
+            SimpleNamespace(
+                key="pressure_PreBrew pressure",
+                name="PreBrew pressure",
+                value=1.8,
+                type="pressure",
+            ),
+        ]
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        recs = json.dumps(
+            [
+                {
+                    "variable": "pressure_2",
+                    "current_value": 6,
+                    "recommended_value": 5,
+                    "stage": "Pressure Ramp Up",
+                },
+            ]
+        )
+        response = client.post(
+            "/api/profile/TestProfile/apply-recommendations",
+            data={"recommendations": recs},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert len(data["applied"]) == 1
+        assert data["applied"][0]["variable"] == "pressure_Max Pressure"
+        assert data["applied"][0]["value"] == 5
+        assert data["applied"][0]["matched_from"] == "pressure_2"
+        # The unrelated pressure variable must remain unchanged.
+        assert profile.variables[0].value == 5
+        assert profile.variables[1].value == 1.8
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("api.routes.profiles.async_save_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
+    def test_apply_unresolvable_invented_variable_reports_no_changes(
+        self, mock_list, mock_get, mock_save, client
+    ):
+        """An invented id with no matching variable type is skipped, not silently applied."""
+        profile = self._make_mock_profile()  # only a 'flow' variable
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        recs = json.dumps(
+            [
+                {
+                    "variable": "pressure_2",
+                    "current_value": 6,
+                    "recommended_value": 5,
+                    "stage": "Ghost Stage",
+                },
+            ]
+        )
+        response = client.post(
+            "/api/profile/TestProfile/apply-recommendations",
+            data={"recommendations": recs},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "no_changes"
+        assert data["skipped"][0]["variable"] == "pressure_2"
+
+
+    @patch("api.routes.profiles.async_save_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
     def test_apply_global_temperature(self, mock_list, mock_get, mock_save, client):
         """Global temperature recommendation is applied correctly."""
         profile = self._make_mock_profile()

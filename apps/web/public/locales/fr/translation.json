@@ -1298,7 +1298,9 @@
     "deselectAll": "Tout désélectionner",
     "globalSettings": "Paramètres globaux",
     "applyFailed": "Échec de l'application des recommandations",
-    "classifyFailed": "Échec de la classification"
+    "classifyFailed": "Échec de la classification",
+    "noneApplied": "Aucune recommandation n'a pu être appliquée : {{reason}}",
+    "partiallyApplied": "{{applied}} appliquées, {{skipped}} ignorées"
   },
   "taste": {
     "compass": {

@@ -696,6 +696,86 @@ describe('DirectModeInterceptor regression harness', () => {
       })
     })
 
+    it('resolves an invented positional variable id to the real key by type and current value', async () => {
+      const profileIdent = nestedMachineProfiles()[0]
+      const editableProfile = {
+        ...profileIdent,
+        profile: {
+          ...profileIdent.profile,
+          variables: [
+            { key: 'pressure_Max Pressure', name: 'Max Pressure', type: 'pressure', value: 6, adjustable: true },
+            { key: 'pressure_PreBrew pressure', name: 'PreBrew pressure', type: 'pressure', value: 1.8, adjustable: true },
+          ],
+        },
+      }
+      let savedProfile: Record<string, unknown> | null = null
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': [editableProfile],
+        'POST /api/v1/profile/save': ({ init }: FetchCall) => {
+          savedProfile = JSON.parse(String(init?.body))
+          return jsonResponse({ ok: true })
+        },
+      }))
+      const form = new FormData()
+      // Model invented "pressure_2" instead of the real "pressure_Max Pressure".
+      form.append('recommendations', JSON.stringify([
+        { variable: 'pressure_2', current_value: 6, recommended_value: 5, stage: 'Pressure Ramp Up' },
+      ]))
+
+      const response = await window.fetch('/api/profile/Turbo%20Bloom/apply-recommendations', {
+        method: 'POST',
+        body: form,
+      })
+
+      expect(response.status).toBe(200)
+      await expect(readJson(response)).resolves.toMatchObject({
+        status: 'success',
+        applied: [
+          { variable: 'pressure_Max Pressure', value: 5, matched_from: 'pressure_2' },
+        ],
+      })
+      expect(savedProfile).toMatchObject({
+        variables: expect.arrayContaining([
+          expect.objectContaining({ key: 'pressure_Max Pressure', value: 5 }),
+          expect.objectContaining({ key: 'pressure_PreBrew pressure', value: 1.8 }),
+        ]),
+      })
+    })
+
+    it('reports no_changes (not success) when an invented variable cannot be resolved', async () => {
+      const profileIdent = nestedMachineProfiles()[0]
+      const editableProfile = {
+        ...profileIdent,
+        profile: {
+          ...profileIdent.profile,
+          variables: [
+            { key: 'flow_bloom', name: 'Bloom Flow', type: 'flow', value: 2.1, adjustable: true },
+          ],
+        },
+      }
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': [editableProfile],
+        'POST /api/v1/profile/save': () => jsonResponse({ ok: true }),
+      }))
+      const form = new FormData()
+      // No pressure variable exists, so this cannot be resolved.
+      form.append('recommendations', JSON.stringify([
+        { variable: 'pressure_2', current_value: 6, recommended_value: 5, stage: 'Ghost Stage' },
+      ]))
+
+      const response = await window.fetch('/api/profile/Turbo%20Bloom/apply-recommendations', {
+        method: 'POST',
+        body: form,
+      })
+
+      expect(response.status).toBe(200)
+      await expect(readJson(response)).resolves.toMatchObject({
+        status: 'no_changes',
+        applied: [],
+        skipped: [{ variable: 'pressure_2', reason: 'variable not found in profile' }],
+      })
+    })
+
     it('uploads and caches direct profile images on the machine profile', async () => {
       vi.useRealTimers()
       installInterceptor(createMachineFetch({

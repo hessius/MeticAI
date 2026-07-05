@@ -131,7 +131,8 @@ END_RECOMMENDATIONS_JSON
 
 Rules for recommendations:
 - Only include recommendations where you have a SPECIFIC numeric change to suggest
-- Use actual variable keys from the Profile Variables section above
+- The "variable" MUST be copied verbatim from the "key" field of an entry in the Profile Variables section above (for example "pressure_Max Pressure"). Do NOT invent positional names like "pressure_2" or "flow_0", and do NOT use the display name.
+- Always include the variable's existing value as "current_value" so the change can be verified
 - For top-level settings (temperature, final_weight), use stage="global"
 - For stage-specific changes, use the stage name from Profile Stages
 - confidence: "high" = strong evidence from data, "medium" = likely beneficial, "low" = worth trying

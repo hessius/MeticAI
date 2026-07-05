@@ -1298,7 +1298,9 @@
     "deselectAll": "Deseleccionar todos",
     "globalSettings": "Configuración global",
     "applyFailed": "Error al aplicar recomendaciones",
-    "classifyFailed": "Error en la clasificación"
+    "classifyFailed": "Error en la clasificación",
+    "noneApplied": "No se pudo aplicar ninguna recomendación: {{reason}}",
+    "partiallyApplied": "Se aplicaron {{applied}}, se omitieron {{skipped}}"
   },
   "taste": {
     "compass": {
