@@ -25,8 +25,14 @@ test.describe('AI shot analysis — taste gate', () => {
     const state = await mockAnalysisApi(page, { llmContent: VALID_ANALYSIS })
     await openAnalysis(page)
     await page.getByTestId('taste-gate-analyze').click()
-    // ExpertAnalysisView: "Apply Recommendations" (t('recommendations.apply'))
-    await expect(page.getByRole('button', { name: /apply/i })).toBeVisible()
+    // ExpertAnalysisView renders the "Apply Recommendations" trigger (exact name,
+    // to disambiguate from the dialog title / footer "Apply Recommendations (N)").
+    const applyTrigger = page.getByRole('button', { name: 'Apply Recommendations', exact: true })
+    await expect(applyTrigger).toBeVisible()
+    // Open the selection dialog and confirm the real parsed recommendation from
+    // VALID_ANALYSIS's RECOMMENDATIONS_JSON block actually surfaces as a row.
+    await applyTrigger.click()
+    await expect(page.getByText('pressure_Max Pressure')).toBeVisible()
     expect(state.llmCalls).toBe(1)
   })
 
@@ -52,12 +58,12 @@ test.describe('AI shot analysis — taste gate', () => {
 
 // ---------------------------------------------------------------------------
 // A4 — malformed output
-// NOTES on assertion deviation from the skeleton:
-//   MALFORMED_ANALYSIS contains a RECOMMENDATIONS_JSON block, so
-//   hasRecommendations() returns true (it checks block existence, not quality).
-//   The "Apply Recommendations" button therefore renders even though all parsed
-//   recs have variable:"" and are filtered to []. We can't assert toHaveCount(0)
-//   for the button — instead we verify prose renders and no JS crashes occur.
+// MALFORMED_ANALYSIS contains a RECOMMENDATIONS_JSON block, so hasRecommendations()
+// returns true and the "Apply Recommendations" trigger renders. Every rec in the
+// block is garbage (empty variable / null values) and parseRecommendationsJSON
+// filters them all out, so the selection dialog must show its empty state. This
+// verifies the garbage-drop behavior end-to-end (parser → dialog), not just that
+// prose renders without crashing.
 // ---------------------------------------------------------------------------
 test.describe('AI shot analysis — malformed output', () => {
   test('malformed analysis renders as prose and drops garbage recs', async ({ page }) => {
@@ -68,6 +74,10 @@ test.describe('AI shot analysis — malformed output', () => {
     await page.getByTestId('taste-gate-skip').click()
     // Prose from MALFORMED_ANALYSIS is rendered
     await expect(page.getByText(/channeled/i).first()).toBeVisible()
+    // The Apply trigger renders (block exists), but opening the dialog shows the
+    // empty state because all garbage recs were filtered out.
+    await page.getByRole('button', { name: 'Apply Recommendations', exact: true }).click()
+    await expect(page.getByText(/no actionable recommendations found/i)).toBeVisible()
     // No JS exceptions thrown during rendering
     expect(errors).toEqual([])
   })

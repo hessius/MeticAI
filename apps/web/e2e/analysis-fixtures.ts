@@ -285,10 +285,16 @@ export async function mockAnalysisApi(page: Page, opts: MockAnalysisOptions = {}
     }
     r.fulfill(json({ status: 'success', llm_analysis: opts.llmContent ?? VALID_ANALYSIS, cached: false }))
   })
-  // ExpertAnalysisView POSTs here after rendering recommendations; return empty list
-  // so the component falls back to locally-parsed recs without network errors.
+  // ExpertAnalysisView POSTs here to enrich recs with backend is_patchable flags.
+  // We return a body WITHOUT a `recommendations` array on purpose: the component
+  // only adopts the backend list when `Array.isArray(data.recommendations)` is
+  // true (ExpertAnalysisView.tsx:81), otherwise `classifiedRecs` stays null and
+  // `recommendations = classifiedRecs ?? localRecommendations` uses the real
+  // locally-parsed recs. This lets the tests observe genuine parser output
+  // (valid rec surfaces, garbage filtered to []) in the selection dialog instead
+  // of an empty list the mock would otherwise force.
   await page.route('**/api/shots/analyze-recommendations**', (r) =>
-    r.fulfill(json({ recommendations: [] }))
+    r.fulfill(json({}))
   )
 
   return state
