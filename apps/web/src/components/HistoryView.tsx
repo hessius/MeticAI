@@ -1182,6 +1182,13 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
         }
 
         const data = await response.json()
+        if (data.status === 'error' || typeof data.description !== 'string') {
+          return {
+            ok: false as const,
+            status: response.status,
+            detail: data.message || data.detail || 'Failed to generate AI description',
+          }
+        }
         return {
           ok: true as const,
           description: data.description as string,

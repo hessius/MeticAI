@@ -2,12 +2,14 @@ import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
 import { getActiveProviderId, getActiveHostedProviderId, getProvider, getProviderForMethod, getProviderModel, isAIConfigured, PROVIDERS } from '@/services/ai/providers'
 import { retryWithBackoff, formatGeminiError } from '@/services/ai/retryUtils'
+import { AIServiceError } from '@/services/ai/aiErrors'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { CapacitorHttp } from '@capacitor/core'
 import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './directModeHttp'
 import { deriveStructuralTags } from '@/lib/profileAnalysis'
 import type { AnalyzableProfile } from '@/lib/profileAnalysis'
 import { AI_TAGS_PROMPT, parseAiTags, stripTagsLine } from '@/lib/tags'
+import { resolveDescriptionPlaceholders, type ProfileVariable } from '@/lib/descriptionText'
 import { buildShotFacts } from '@/lib/shotFacts'
 import { lintShotAnalysis, repairShotAnalysis, validateAgainstFacts, checkStructure } from '@/lib/analysisLint'
 import { buildAnalyzeLlmPrompt } from './analyzeLlmPrompt'
@@ -3622,14 +3624,15 @@ export function installDirectModeInterceptor(): void {
           if (aiService.isConfigured()) {
             try {
               const resolvedName = (profileJson as {name?: string}).name || profileName || 'Unknown Profile'
-              const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]${AI_TAGS_PROMPT}`
+              const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]\n\nUse concrete numeric values with units (for example 9 bar, 2.0 ml/s, 30 s). Never output raw variable placeholders such as $name$ and never mention internal stage keys.${AI_TAGS_PROMPT}`
               const response = await getProviderForMethod('generateProfile').generateText({
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
               }) as { text?: string }
               const rawText = response.text?.trim()
               if (rawText && !rawText.includes('generated without AI')) {
                 const aiTags = parseAiTags(rawText)
-                const description = stripTagsLine(rawText)
+                const profileVars = (profileJson as { variables?: ProfileVariable[] }).variables ?? []
+                const description = resolveDescriptionPlaceholders(stripTagsLine(rawText), profileVars)
                 _descriptionCache.set(profileName, description)
                 _persistDescriptionCache()
                 if (aiTags.length) {
@@ -3642,7 +3645,20 @@ export function installDirectModeInterceptor(): void {
                 }
                 return jsonResponse({ status: 'success', description })
               }
-            } catch { /* AI generation failed — fall back to static */ }
+            } catch (err) {
+              // When the user has explicitly selected an on-device model that
+              // is not ready (not downloaded / unavailable), surface a clear
+              // error instead of silently emitting a static description with a
+              // misleading "generated successfully" toast.
+              if (
+                err instanceof AIServiceError &&
+                (err.code === 'LOCAL_MODEL_NOT_DOWNLOADED' ||
+                  err.code === 'LOCAL_UNAVAILABLE')
+              ) {
+                return jsonResponse({ status: 'error', message: formatGeminiError(err) })
+              }
+              /* Other AI failures — fall back to static description below. */
+            }
           }
 
           // Static fallback

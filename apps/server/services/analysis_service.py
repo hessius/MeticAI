@@ -57,7 +57,12 @@ _AI_TAGS_PROMPT = (
     + "]\nOnly use labels from that list; do not invent new ones."
 )
 
-_TAGS_LINE_RE = re.compile(r"^[ \t]*Tags:[ \t]*(.*)$", re.IGNORECASE | re.MULTILINE)
+# Small on-device models often decorate the line with markdown (e.g. "**Tags:**"
+# or "- Tags:"), so tolerate leading bullets/quotes and bold/italic markers.
+_TAGS_LINE_RE = re.compile(
+    r"^[ \t]*(?:[>*+\-#]+[ \t]*)?(?:\*\*|__|\*|_)?[ \t]*Tags[ \t]*(?:\*\*|__|\*|_)?[ \t]*:[ \t]*(.*)$",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 
 def parse_ai_tags(text: Optional[str]) -> list[str]:
@@ -70,7 +75,12 @@ def parse_ai_tags(text: Optional[str]) -> list[str]:
     result: list[str] = []
     seen: set[str] = set()
     for raw in match.group(1).split(","):
-        candidate = raw.replace("[", "").replace("]", "").strip().rstrip(".").strip()
+        candidate = (
+            raw.replace("[", "").replace("]", "").replace("*", "").replace("_", "")
+            .strip()
+            .rstrip(".")
+            .strip()
+        )
         canonical = _AI_TAG_LOOKUP.get(candidate.lower())
         if canonical and canonical not in seen:
             seen.add(canonical)
@@ -83,6 +93,51 @@ def strip_tags_line(text: str) -> str:
     if not text:
         return text
     return re.sub(r"[ \t]*$", "", _TAGS_LINE_RE.sub("", text)).rstrip()
+
+
+_UNIT_BY_TYPE = {
+    "pressure": " bar",
+    "flow": " ml/s",
+    "time": " s",
+    "weight": " g",
+}
+
+_PAIRED_PLACEHOLDER_RE = re.compile(r"\$[^\s$]{1,60}\$")
+
+
+def resolve_description_placeholders(
+    text: Optional[str], variables: Optional[list] = None
+) -> str:
+    """Resolve profile variable references in generated prose and strip invented
+    placeholders. Small models sometimes echo the profile's variable references
+    (``$pressure_Max Pressure``) or invent tokens (``$pressure_1$``) into the
+    text. Mirror of resolveDescriptionPlaceholders in
+    apps/web/src/lib/descriptionText.ts — keep the two in sync.
+    """
+    if not text:
+        return text or ""
+    # Models often markdown-escape underscores inside placeholders ($a\_1$).
+    out = text.replace("\\_", "_").replace("\\*", "*")
+    # Resolve real variable references, longest keys first so a key that is a
+    # prefix of another does not partially replace it.
+    resolved = [
+        v
+        for v in (variables or [])
+        if isinstance(v, dict)
+        and isinstance(v.get("key"), str)
+        and v.get("value") is not None
+    ]
+    for v in sorted(resolved, key=lambda x: len(x["key"]), reverse=True):
+        key = v["key"]
+        unit = _UNIT_BY_TYPE.get(key.split("_")[0], "")
+        val = f"{v['value']}{unit}"
+        out = out.replace(f"${key}$", val).replace(f"${key}", val)
+    # Strip any remaining paired $...$ placeholder tokens the model invented.
+    out = _PAIRED_PLACEHOLDER_RE.sub("", out)
+    # Tidy whitespace left behind by removals.
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = re.sub(r"[ \t]+([.,;:)])", r"\1", out)
+    return out
 
 
 class DescriptionResult(str):
@@ -1653,7 +1708,9 @@ Why This Works:
 Special Notes:
 [Any specific requirements or tips for using this profile]
 
-Be concise but informative. Focus on actionable barista guidance."""
+Be concise but informative. Focus on actionable barista guidance.
+
+Use concrete numeric values with units (for example 9 bar, 2.0 ml/s, 30 s). Never output raw variable placeholders such as $name$ and never mention internal stage keys."""
 
     prompt += _AI_TAGS_PROMPT
 
@@ -1662,7 +1719,13 @@ Be concise but informative. Focus on actionable barista guidance."""
         response = await model.async_generate_content(prompt)
         text = getattr(response, "text", "") if response else ""
         if text and text.strip():
-            return DescriptionResult(strip_tags_line(text.strip()), parse_ai_tags(text))
+            variables = profile_json.get("variables") or []
+            return DescriptionResult(
+                resolve_description_placeholders(
+                    strip_tags_line(text.strip()), variables
+                ),
+                parse_ai_tags(text),
+            )
     except ValueError:
         logger.info(
             "Gemini API key not configured, using static profile description fallback",

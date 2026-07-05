@@ -17457,6 +17457,59 @@ class TestAITags:
         assert parse_ai_tags("Tags: [Chocolate, Sweet]") == ["Chocolate", "Sweet"]
         assert parse_ai_tags("Tags: [Chocolate]") == ["Chocolate"]
 
+    def test_parse_ai_tags_tolerates_markdown_decoration(self):
+        from services.analysis_service import parse_ai_tags
+
+        assert parse_ai_tags("**Tags:** Chocolate, Sweet") == ["Chocolate", "Sweet"]
+        assert parse_ai_tags("**Tags: Chocolate, Sweet**") == ["Chocolate", "Sweet"]
+        assert parse_ai_tags("- Tags: Chocolate, Sweet") == ["Chocolate", "Sweet"]
+        assert parse_ai_tags("* **Tags**: Chocolate, Sweet") == ["Chocolate", "Sweet"]
+        assert parse_ai_tags("# Tags: Chocolate") == ["Chocolate"]
+
+    def test_strip_tags_line_removes_markdown_decorated_line(self):
+        from services.analysis_service import strip_tags_line
+
+        assert strip_tags_line("Great coffee.\n**Tags:** Sweet, Berry").endswith(
+            "Great coffee."
+        )
+        assert "Tags" not in strip_tags_line("Great coffee.\n- Tags: Sweet")
+
+    def test_resolve_description_placeholders_resolves_variables(self):
+        from services.analysis_service import resolve_description_placeholders
+
+        variables = [
+            {"key": "pressure_Max Pressure", "name": "Max Pressure", "value": 6},
+            {"key": "time_PreBrew Duration", "name": "PreBrew Duration", "value": 30},
+        ]
+        assert (
+            resolve_description_placeholders("Peaks at $pressure_Max Pressure.", variables)
+            == "Peaks at 6 bar."
+        )
+        assert (
+            resolve_description_placeholders("Runs $time\\_PreBrew Duration$.", variables)
+            == "Runs 30 s."
+        )
+
+    def test_resolve_description_placeholders_strips_invented_tokens(self):
+        from services.analysis_service import resolve_description_placeholders
+
+        assert (
+            resolve_description_placeholders("Adjust $pressure_1$ upward.", [])
+            == "Adjust upward."
+        )
+        assert (
+            resolve_description_placeholders("See $pressure\\_1$ here.", [])
+            == "See here."
+        )
+
+    def test_resolve_description_placeholders_leaves_prose_untouched(self):
+        from services.analysis_service import resolve_description_placeholders
+
+        text = "A balanced, chocolatey shot with 9 bar peak pressure."
+        assert resolve_description_placeholders(text, []) == text
+        assert resolve_description_placeholders("", []) == ""
+        assert resolve_description_placeholders(None, []) == ""
+
     def test_strip_tags_line_removes_trailing_line(self):
         from services.analysis_service import strip_tags_line
 

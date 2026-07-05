@@ -147,14 +147,19 @@ export const AI_TAGS_PROMPT =
   ']\nOnly use labels from that list; do not invent new ones.'
 
 // Extract and validate sensory tags from a generated description's `Tags:` line.
+// Small on-device models often decorate the line with markdown (e.g. "**Tags:**"
+// or "- Tags:"), so tolerate leading bullets/quotes and bold/italic markers.
+const TAGS_LINE_RE = /^[ \t]*(?:[>*+\-#]+[ \t]*)?(?:\*\*|__|\*|_)?[ \t]*Tags[ \t]*(?:\*\*|__|\*|_)?[ \t]*:[ \t]*(.*)$/im
+const TAGS_LINE_STRIP_RE = /^[ \t]*(?:[>*+\-#]+[ \t]*)?(?:\*\*|__|\*|_)?[ \t]*Tags[ \t]*(?:\*\*|__|\*|_)?[ \t]*:[ \t]*.*$/gim
+
 export function parseAiTags(text: string | null | undefined): string[] {
   if (!text) return []
-  const match = text.match(/^[ \t]*Tags:[ \t]*(.*)$/im)
+  const match = text.match(TAGS_LINE_RE)
   if (!match) return []
   const result: string[] = []
   const seen = new Set<string>()
   for (const raw of match[1].split(',')) {
-    const candidate = raw.replace(/[[\]]/g, '').trim().replace(/\.+$/, '').trim()
+    const candidate = raw.replace(/[[\]*_]/g, '').trim().replace(/\.+$/, '').trim()
     const canonical = AI_TAG_LOOKUP.get(candidate.toLowerCase())
     if (canonical && !seen.has(canonical)) {
       seen.add(canonical)
@@ -167,7 +172,7 @@ export function parseAiTags(text: string | null | undefined): string[] {
 // Remove the trailing `Tags:` line from a generated description body.
 export function stripTagsLine(text: string): string {
   if (!text) return text
-  return text.replace(/^[ \t]*Tags:[ \t]*.*$/gim, '').replace(/\s+$/, '')
+  return text.replace(TAGS_LINE_STRIP_RE, '').replace(/\s+$/, '')
 }
 
 // Map a match reason string from the recommendation engine to a tag color class.

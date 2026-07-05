@@ -284,12 +284,25 @@ describe('tags', () => {
       expect(parseAiTags('Tags: [Chocolate, Sweet]')).toEqual(['Chocolate', 'Sweet'])
       expect(parseAiTags('Tags: [Chocolate]')).toEqual(['Chocolate'])
     })
+
+    it('tolerates markdown decoration from small on-device models', () => {
+      expect(parseAiTags('**Tags:** Chocolate, Sweet')).toEqual(['Chocolate', 'Sweet'])
+      expect(parseAiTags('**Tags: Chocolate, Sweet**')).toEqual(['Chocolate', 'Sweet'])
+      expect(parseAiTags('- Tags: Chocolate, Sweet')).toEqual(['Chocolate', 'Sweet'])
+      expect(parseAiTags('* **Tags**: Chocolate, Sweet')).toEqual(['Chocolate', 'Sweet'])
+      expect(parseAiTags('# Tags: Chocolate')).toEqual(['Chocolate'])
+    })
   })
 
   describe('stripTagsLine', () => {
     it('removes the Tags line and trailing whitespace', () => {
       const text = 'Special Notes: none\nTags: Chocolate, Sweet'
       expect(stripTagsLine(text)).toBe('Special Notes: none')
+    })
+
+    it('removes a markdown-decorated Tags line', () => {
+      expect(stripTagsLine('Special Notes: none\n**Tags:** Chocolate, Sweet')).toBe('Special Notes: none')
+      expect(stripTagsLine('Special Notes: none\n- Tags: Chocolate')).toBe('Special Notes: none')
     })
 
     it('leaves descriptions without a Tags line unchanged', () => {
