@@ -33,6 +33,22 @@ describe('classifyTrigger (#423)', () => {
   it('unknown combo returns unknown', () => {
     expect(classifyTrigger('power', 'weird', 1).kind).toBe('unknown')
   })
+  it('final stage with no exit trigger that hits weight is targeted yield', () => {
+    const r = classifyTrigger('pressure', '', 0, { isTerminalStage: true, weightOnTarget: true })
+    expect(r.kind).toBe('targeted')
+    expect(r.label).toBe('Targeted (yield reached)')
+  })
+  it('final stage with no exit trigger that misses weight is unknown', () => {
+    expect(classifyTrigger('pressure', '', 0, { isTerminalStage: true, weightOnTarget: false }).kind).toBe('unknown')
+  })
+  it('intermediate stage with no exit trigger is a planned transition', () => {
+    const r = classifyTrigger('flow', '', 0, { isTerminalStage: false })
+    expect(r.kind).toBe('targeted')
+    expect(r.label).toBe('Targeted (planned transition)')
+  })
+  it('stage with triggers defined but none fired is unknown', () => {
+    expect(classifyTrigger('pressure', '', 2, { isTerminalStage: true, weightOnTarget: true }).kind).toBe('unknown')
+  })
 })
 
 describe('detectStall / detectChanneling', () => {
@@ -211,5 +227,21 @@ describe('puck-failure detection (#423)', () => {
     const r = classifyTrigger('pressure', 'weight', 1)
     expect(r.kind).toBe('targeted')
     expect(r.label.toLowerCase()).toContain('yield')
+  })
+
+  it('final stage exiting on global weight (no per-stage trigger) is targeted yield', () => {
+    const stage = (name: string, triggers: Array<{ type: string }>) => ({
+      stage_name: name, stage_type: 'flow', exit_triggers: triggers,
+      exit_trigger_result: triggers.length ? { triggered: { type: triggers[0].type } } : null,
+      execution_data: { duration: 10, weight_gain: 30, end_weight: 36, start_pressure: 6, end_pressure: 6, avg_pressure: 6, max_pressure: 6, min_pressure: 6, start_flow: 2, end_flow: 2, avg_flow: 2, max_flow: 2 },
+    })
+    const facts = buildShotFacts({
+      weight_analysis: { actual: 36, target: 36 },
+      stage_analyses: [stage('PreBrew', [{ type: 'time' }]), stage('Extraction', [])],
+    })
+    expect(facts.stages[0].trigger_class?.kind).toBe('targeted')
+    const ext = facts.stages[1].trigger_class
+    expect(ext?.kind).toBe('targeted')
+    expect(ext?.label).toBe('Targeted (yield reached)')
   })
 })

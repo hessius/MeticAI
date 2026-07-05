@@ -60,6 +60,8 @@ export interface ClassifyTriggerOptions {
   triggerValue?: number | null
   globalTargetWeight?: number | null
   onTarget?: boolean | null
+  isTerminalStage?: boolean
+  weightOnTarget?: boolean | null
 }
 
 export function classifyTrigger(
@@ -68,7 +70,23 @@ export function classifyTrigger(
   totalTriggers: number,
   opts: ClassifyTriggerOptions = {},
 ): TriggerClass {
-  const { triggerValue = null, globalTargetWeight = null, onTarget = null } = opts
+  const { triggerValue = null, globalTargetWeight = null, onTarget = null, isTerminalStage = false, weightOnTarget = null } = opts
+  if (!triggerType) {
+    // No exit trigger fired. A stage with no exit triggers defined transitions
+    // on its planned dynamics duration (intermediate stage) or ends when the
+    // shot reaches its global target weight (final stage) — both intentional.
+    if (totalTriggers === 0) {
+      if (isTerminalStage) {
+        if (weightOnTarget) {
+          return { kind: 'targeted', label: 'Targeted (yield reached)', reason: 'The final stage ended when the shot reached its target weight.' }
+        }
+        return { kind: 'unknown', label: 'Unknown', reason: 'The final stage has no exit trigger and the shot did not reach its target weight (likely a manual stop).' }
+      }
+      return { kind: 'targeted', label: 'Targeted (planned transition)', reason: 'The stage has no exit trigger; it transitions to the next stage on its planned dynamics duration.' }
+    }
+    // Exit triggers were defined but none of them fired.
+    return { kind: 'unknown', label: 'Unknown', reason: 'The stage defined exit triggers but none of them fired.' }
+  }
   if (triggerType === 'weight') {
     const nearFinal =
       globalTargetWeight != null && globalTargetWeight > 0 &&
@@ -229,7 +247,14 @@ export function buildShotFacts(analysis: {
 }): ShotFacts {
   const stages = analysis.stage_analyses ?? []
   const globalTargetWeight = analysis.weight_analysis?.target ?? null
-  const stagesOut: ShotFactStage[] = stages.map(s => {
+  const actualWeight = analysis.weight_analysis?.actual ?? null
+  const weightOnTarget =
+    actualWeight != null && globalTargetWeight != null && globalTargetWeight > 0
+      ? actualWeight >= globalTargetWeight * (1 - YIELD_THRESHOLD)
+      : null
+  let lastExecutedIdx = -1
+  stages.forEach((s, i) => { if (s.execution_data) lastExecutedIdx = i })
+  const stagesOut: ShotFactStage[] = stages.map((s, i) => {
     if (!s.execution_data) return { stage_name: s.stage_name, reached: false }
     const trigType = s.exit_trigger_result?.triggered?.type ?? ''
     const trigValue = s.exit_trigger_result?.triggered?.target ?? null
@@ -248,6 +273,8 @@ export function buildShotFacts(analysis: {
         triggerValue: trigValue,
         globalTargetWeight,
         onTarget,
+        isTerminalStage: i === lastExecutedIdx,
+        weightOnTarget,
       }),
       stall: detectStall(s),
       channeling: detectChanneling(s.execution_data),

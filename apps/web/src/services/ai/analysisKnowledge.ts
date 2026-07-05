@@ -13,6 +13,8 @@ EXIT TRIGGER CLASSIFICATION (critical — do not confuse intent with failure):
     stage ran for its planned duration), a flow-controlled stage hitting its target pressure
     (puck resistance achieved) or its target flow, a pressure-controlled stage hitting target
     pressure, or a pressure-controlled stage whose ONLY trigger is flow (planned flow transition).
+    A stage with NO exit triggers is also Targeted: an intermediate one transitions on its planned
+    dynamics duration, and the final one ends when the shot reaches its global target weight (yield reached).
   - Failsafe: a backstop fired instead of the real target. Examples: a weight target reached
     off-curve without building intended pressure (puck failure), or a pressure-controlled stage
     exiting on a flow backstop when other triggers exist (caught channeling or choking).

@@ -17599,6 +17599,68 @@ class TestShotFactsClassify:
         assert r["kind"] == "targeted"
         assert "resistance" in r["label"].lower()
 
+    def test_terminal_stage_no_trigger_hits_weight_is_targeted_yield(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger(
+            "pressure", "", total_triggers=0,
+            is_terminal_stage=True, weight_on_target=True,
+        )
+        assert r["kind"] == "targeted"
+        assert r["label"] == "Targeted (yield reached)"
+
+    def test_terminal_stage_no_trigger_misses_weight_is_unknown(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger(
+            "pressure", "", total_triggers=0,
+            is_terminal_stage=True, weight_on_target=False,
+        )
+        assert r["kind"] == "unknown"
+
+    def test_intermediate_stage_no_trigger_is_planned_transition(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("flow", "", total_triggers=0, is_terminal_stage=False)
+        assert r["kind"] == "targeted"
+        assert r["label"] == "Targeted (planned transition)"
+
+    def test_triggers_defined_but_none_fired_is_unknown(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger(
+            "pressure", "", total_triggers=2,
+            is_terminal_stage=True, weight_on_target=True,
+        )
+        assert r["kind"] == "unknown"
+
+    def test_build_shot_facts_terminal_stage_no_trigger_is_targeted_yield(self):
+        from services.shot_facts import build_shot_facts
+        ed = {
+            "duration": 10, "weight_gain": 30, "end_weight": 36,
+            "start_pressure": 6, "end_pressure": 6, "avg_pressure": 6,
+            "max_pressure": 6, "min_pressure": 6,
+            "start_flow": 2, "end_flow": 2, "avg_flow": 2, "max_flow": 2,
+        }
+        analysis = {
+            "weight_analysis": {"actual": 36, "target": 36},
+            "stage_analyses": [
+                {
+                    "stage_name": "PreBrew", "stage_type": "flow",
+                    "exit_triggers": [{"type": "time"}],
+                    "exit_trigger_result": {"triggered": {"type": "time"}},
+                    "execution_data": ed,
+                },
+                {
+                    "stage_name": "Extraction", "stage_type": "flow",
+                    "exit_triggers": [],
+                    "exit_trigger_result": None,
+                    "execution_data": ed,
+                },
+            ],
+        }
+        facts = build_shot_facts(analysis)
+        assert facts["stages"][0]["trigger_class"]["kind"] == "targeted"
+        ext = facts["stages"][1]["trigger_class"]
+        assert ext["kind"] == "targeted"
+        assert ext["label"] == "Targeted (yield reached)"
+
 
 class TestEffectiveControlMode:
     """#423 effective-mode detection (declared type vs true control intent)."""

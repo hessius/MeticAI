@@ -15,6 +15,8 @@ def classify_trigger(
     trigger_value: float | None = None,
     global_target_weight: float | None = None,
     on_target: bool | None = None,
+    is_terminal_stage: bool = False,
+    weight_on_target: bool | None = None,
 ) -> dict:
     """Classify a stage's exit trigger as Targeted vs Failsafe (#423).
 
@@ -33,6 +35,35 @@ def classify_trigger(
     Returns:
         {'kind': 'targeted'|'failsafe'|'unknown', 'label': str, 'reason': str}
     """
+    if not trigger_type:
+        # No exit trigger fired. A stage with no exit triggers defined
+        # transitions on its planned dynamics duration (intermediate stage) or
+        # ends when the shot reaches its global target weight (final stage) —
+        # both are intentional.
+        if total_triggers == 0:
+            if is_terminal_stage:
+                if weight_on_target:
+                    return {
+                        "kind": "targeted",
+                        "label": "Targeted (yield reached)",
+                        "reason": "The final stage ended when the shot reached its target weight.",
+                    }
+                return {
+                    "kind": "unknown",
+                    "label": "Unknown",
+                    "reason": "The final stage has no exit trigger and the shot did not reach its target weight (likely a manual stop).",
+                }
+            return {
+                "kind": "targeted",
+                "label": "Targeted (planned transition)",
+                "reason": "The stage has no exit trigger; it transitions to the next stage on its planned dynamics duration.",
+            }
+        # Exit triggers were defined but none of them fired.
+        return {
+            "kind": "unknown",
+            "label": "Unknown",
+            "reason": "The stage defined exit triggers but none of them fired.",
+        }
     if trigger_type == "weight":
         near_final = (
             global_target_weight is not None
@@ -313,7 +344,20 @@ def build_shot_facts(local_analysis: dict) -> dict:
     stages_out: list[dict] = []
     wa = local_analysis.get("weight_analysis", {})
     global_target_weight = wa.get("target")
-    for s in local_analysis.get("stage_analyses", []):
+    actual_weight = wa.get("actual")
+    weight_on_target = (
+        actual_weight >= global_target_weight * (1 - YIELD_THRESHOLD)
+        if actual_weight is not None
+        and global_target_weight is not None
+        and global_target_weight > 0
+        else None
+    )
+    all_stages = local_analysis.get("stage_analyses", [])
+    last_executed_idx = -1
+    for i, s in enumerate(all_stages):
+        if s.get("execution_data"):
+            last_executed_idx = i
+    for i, s in enumerate(all_stages):
         ed = s.get("execution_data")
         if not ed:
             stages_out.append({"stage_name": s.get("stage_name"), "reached": False})
@@ -340,6 +384,8 @@ def build_shot_facts(local_analysis: dict) -> dict:
                     trigger_value=trig_value,
                     global_target_weight=global_target_weight,
                     on_target=on_target,
+                    is_terminal_stage=(i == last_executed_idx),
+                    weight_on_target=weight_on_target,
                 ),
                 "stall": detect_stall(s),
                 "channeling": detect_channeling(ed),
