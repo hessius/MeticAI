@@ -421,15 +421,16 @@ jobs:
         run: |
           bunx http-server storybook-static -p 6006 --silent &
           bunx wait-on tcp:6006
-          # jest (via test-storybook) enters --ci mode when CI is set, which makes
-          # jest-image-snapshot FAIL on a missing baseline instead of writing it
-          # (so normal push/PR runs correctly flag missing/changed baselines). On a
-          # manual workflow_dispatch with update_visual_baselines=true, unset CI so
-          # baselines are (re)generated on the same ubuntu-latest image the advisory
-          # job uses; they are uploaded as the visual-baselines-<viewport> artifact
+          # jest (via test-storybook) enters --ci mode when a CI env is detected
+          # (is-ci checks CI, GITHUB_ACTIONS, etc.), which makes jest-image-snapshot
+          # FAIL on a missing baseline instead of writing it — correct for normal
+          # push/PR runs. On a manual workflow_dispatch with
+          # update_visual_baselines=true, pass jest's -u (update) flag, which is
+          # the explicit override jest-image-snapshot requires to (re)generate
+          # baselines. They are uploaded as the visual-baselines-<viewport> artifact
           # to download and commit under apps/web/__image_snapshots__/.
           if [ "$UPDATE_BASELINES" = "true" ]; then
-            env -u CI bunx test-storybook --url http://127.0.0.1:6006
+            bunx test-storybook --url http://127.0.0.1:6006 -u
           else
             bunx test-storybook --url http://127.0.0.1:6006
           fi
