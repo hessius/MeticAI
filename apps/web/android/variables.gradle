@@ -1,5 +1,8 @@
 ext {
-    minSdkVersion = 24
+    // minSdk 26 (Android 8.0): required by com.google.mlkit:genai-prompt, pulled in
+    // by @capgo/capacitor-llm >= 8.1.0 for on-device AI. The manifest merger rejects
+    // a lower minSdk against that library.
+    minSdkVersion = 26
     compileSdkVersion = 36
     targetSdkVersion = 36
     androidxActivityVersion = '1.11.0'
