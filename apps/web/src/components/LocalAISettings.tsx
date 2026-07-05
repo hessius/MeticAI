@@ -203,24 +203,30 @@ export function LocalAISettings({ mode }: { mode: AIMode }) {
           </div>
 
           {modelStatus === 'downloading' && (
-            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-              {progress === null ? (
-                <div
-                  className="h-full w-2/5 rounded-full bg-primary animate-pulse"
-                  role="progressbar"
-                  aria-label={t('settings.localModelDownloadingIndeterminate')}
-                />
-              ) : (
-                <div
-                  className="h-full bg-primary transition-all"
-                  style={{ width: `${progress}%` }}
-                  role="progressbar"
-                  aria-valuenow={Math.round(progress)}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                />
-              )}
-            </div>
+            <>
+              <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
+                {progress === null ? (
+                  <div
+                    className="indeterminate-bar"
+                    role="progressbar"
+                    aria-label={t('settings.localModelDownloadingIndeterminate')}
+                  />
+                ) : (
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{ width: `${progress}%` }}
+                    role="progressbar"
+                    aria-valuenow={Math.round(progress)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  />
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Warning size={12} weight="fill" className="text-amber-500 shrink-0" />
+                {t('settings.localModelDownloadKeepOpen')}
+              </p>
+            </>
           )}
 
           {capability && !capability.enoughStorage && (

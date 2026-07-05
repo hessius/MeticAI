@@ -637,7 +637,8 @@
     "aiSettings": "AI-inställningar",
     "versionAndChangelog": "Version och ändringslogg",
     "mqttBridge": "MQTT-brygga",
-    "disclaimer": "Metic är ett oberoende open source-projekt och är inte anslutet till, godkänt av eller kopplat till Meticulous Home, tillverkaren av Meticulous espressomaskinen."
+    "disclaimer": "Metic är ett oberoende open source-projekt och är inte anslutet till, godkänt av eller kopplat till Meticulous Home, tillverkaren av Meticulous espressomaskinen.",
+    "localModelDownloadKeepOpen": "Håll appen öppen och stanna på den här skärmen tills nedladdningen är klar."
   },
   "profileBreakdown": {
     "title": "Profildetaljer",

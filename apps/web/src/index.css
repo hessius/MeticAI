@@ -336,6 +336,42 @@
   animation: shimmer 1.5s ease-in-out infinite;
 }
 
+/* Indeterminate progress: a bar segment sliding continuously across the
+   track. Used when a download reports no measurable percentage. */
+@keyframes indeterminate-slide {
+  0% {
+    left: -40%;
+    right: 100%;
+  }
+  60% {
+    left: 100%;
+    right: -40%;
+  }
+  100% {
+    left: 100%;
+    right: -40%;
+  }
+}
+
+.indeterminate-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  border-radius: 9999px;
+  background: var(--primary);
+  animation: indeterminate-slide 1.4s cubic-bezier(0.65, 0.05, 0.36, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .indeterminate-bar {
+    animation: none;
+    left: 0;
+    width: 100%;
+    opacity: 0.6;
+  }
+}
+
 /* Force all toasts to bottom — defensive override for WKWebView/Capacitor */
 [data-sonner-toaster] {
   top: unset !important;
