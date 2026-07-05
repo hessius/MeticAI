@@ -1639,6 +1639,7 @@
     "localTimeout": "AI på enheten tog för lång tid att svara. Försök igen.",
     "localModelNotDownloaded": "Modellen på enheten har inte laddats ner ännu. Ladda ner den i Inställningar.",
     "localOutOfMemory": "Din enhet har inte tillräckligt med ledigt minne. Stäng andra appar och försök igen, eller byt till moln-AI.",
+    "localGenerationFailed": "AI på enheten avbröts oväntat under genereringen. Försök igen, eller byt till moln-AI.",
     "aiNoCompatibleModel": "Ingen kompatibel AI-modell är tillgänglig för din API-nyckel. Kontrollera din Gemini-åtkomst eller uppdatera Metic till senaste versionen.",
     "analysisFailed": "Analys misslyckades"
   },

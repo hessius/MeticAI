@@ -50,6 +50,7 @@ export function formatGeminiError(err: unknown): string {
     if (err.code === 'LOCAL_TIMEOUT') return i18n.t('error.localTimeout')
     if (err.code === 'LOCAL_MODEL_NOT_DOWNLOADED') return i18n.t('error.localModelNotDownloaded')
     if (err.code === 'LOCAL_OUT_OF_MEMORY') return i18n.t('error.localOutOfMemory')
+    if (err.code === 'LOCAL_GENERATION_FAILED') return i18n.t('error.localGenerationFailed')
   }
   const raw = err instanceof Error ? err.message : String(err)
   if (raw.includes('503') || raw.includes('UNAVAILABLE') || raw.includes('overloaded'))

@@ -1639,6 +1639,7 @@
     "localTimeout": "On-device AI took too long to respond. Please try again.",
     "localModelNotDownloaded": "The on-device model hasn't been downloaded yet. Download it in Settings.",
     "localOutOfMemory": "Your device doesn't have enough free memory. Close other apps and try again, or switch to Cloud AI.",
+    "localGenerationFailed": "On-device AI stopped unexpectedly during generation. Please try again, or switch to Cloud AI.",
     "aiNoCompatibleModel": "No compatible AI model is available for your API key. Please check your Gemini access or update Metic to the latest version.",
     "analysisFailed": "Analysis failed"
   },

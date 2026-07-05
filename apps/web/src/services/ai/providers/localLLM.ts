@@ -342,6 +342,22 @@ async function runGeneration(prompt: string, opts: GenerateOptions): Promise<str
   const finishSub = await CapgoLLM.addListener('aiFinished', (event) => {
     if (event.chatId === chatId) resolveDone()
   })
+  // The plugin emits `generationError` for native failures that happen *after*
+  // streaming has started (e.g. the LiteRT-LM engine aborting mid-decode). Without
+  // this listener such failures would hang until GENERATION_TIMEOUT_MS. A hard
+  // native crash (EXC_BAD_ACCESS) still terminates the process before this fires,
+  // but soft engine errors are surfaced immediately with a localized message.
+  const errorSub = await CapgoLLM.addListener('generationError', (event) => {
+    if (event.chatId !== undefined && event.chatId !== chatId) return
+    const message = event.error ?? ''
+    console.error('[LocalLLM] generationError', { backend, message })
+    rejectDone(
+      new AIServiceError(
+        isOutOfMemoryError(message) ? 'LOCAL_OUT_OF_MEMORY' : 'LOCAL_GENERATION_FAILED',
+        event.error,
+      ),
+    )
+  })
 
   const timeout = setTimeout(
     () => rejectDone(new AIServiceError('LOCAL_TIMEOUT')),
@@ -356,6 +372,7 @@ async function runGeneration(prompt: string, opts: GenerateOptions): Promise<str
     clearTimeout(timeout)
     await textSub.remove().catch(() => {})
     await finishSub.remove().catch(() => {})
+    await errorSub.remove().catch(() => {})
   }
 }
 

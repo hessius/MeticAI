@@ -1639,6 +1639,7 @@
     "localTimeout": "La IA en el dispositivo tardó demasiado en responder. Inténtalo de nuevo.",
     "localModelNotDownloaded": "El modelo en el dispositivo aún no se ha descargado. Descárgalo en Ajustes.",
     "localOutOfMemory": "Tu dispositivo no tiene suficiente memoria libre. Cierra otras apps e inténtalo de nuevo, o cambia a la IA en la nube.",
+    "localGenerationFailed": "La IA en el dispositivo se detuvo inesperadamente durante la generación. Inténtalo de nuevo o cambia a la IA en la nube.",
     "aiNoCompatibleModel": "No hay ningún modelo de IA compatible disponible para tu clave de API. Comprueba tu acceso a Gemini o actualiza Metic a la última versión.",
     "analysisFailed": "Análisis fallido"
   },

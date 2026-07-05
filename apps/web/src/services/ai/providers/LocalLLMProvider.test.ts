@@ -5,6 +5,7 @@ const { listeners, CapgoLLM, Filesystem } = vi.hoisted(() => {
   const sharedListeners: Record<string, Array<(e: unknown) => void>> = {
     textFromAi: [],
     aiFinished: [],
+    generationError: [],
   }
   const plugin = {
     setModel: vi.fn().mockResolvedValue(undefined),
@@ -70,6 +71,7 @@ function setPlatform(platform: string, native = true) {
 beforeEach(() => {
   listeners.textFromAi = []
   listeners.aiFinished = []
+  listeners.generationError = []
   localStorage.clear()
   __resetLocalLLMCacheForTests()
   vi.clearAllMocks()
@@ -157,6 +159,26 @@ describe('generateLocalText', () => {
     await generateLocalText('Say hi')
     const call = CapgoLLM.setModel.mock.calls.at(-1)?.[0] as { maxTokens?: number }
     expect(call?.maxTokens).toBeGreaterThanOrEqual(4096)
+  })
+
+  it('rejects with a generation-failed error when the engine emits generationError', async () => {
+    CapgoLLM.sendMessage.mockImplementationOnce(async ({ chatId }: { chatId: string }) => {
+      listeners.textFromAi.forEach(fn => fn({ chatId, text: 'partial' }))
+      listeners.generationError.forEach(fn => fn({ chatId, error: 'engine aborted mid-decode' }))
+    })
+    await expect(generateLocalText('Say hi')).rejects.toMatchObject({
+      name: 'AIServiceError',
+      code: 'LOCAL_GENERATION_FAILED',
+    })
+  })
+
+  it('maps an out-of-memory generationError to LOCAL_OUT_OF_MEMORY', async () => {
+    CapgoLLM.sendMessage.mockImplementationOnce(async ({ chatId }: { chatId: string }) => {
+      listeners.generationError.forEach(fn => fn({ chatId, error: 'failed to allocate: out of memory' }))
+    })
+    await expect(generateLocalText('Say hi')).rejects.toMatchObject({
+      code: 'LOCAL_OUT_OF_MEMORY',
+    })
   })
 
   it('rejects a stale pre-LiteRT-LM `.task` path as not downloaded (migration)', async () => {

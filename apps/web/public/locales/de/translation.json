@@ -1639,6 +1639,7 @@
     "localTimeout": "Die KI auf dem Gerät hat zu lange für eine Antwort gebraucht. Bitte versuche es erneut.",
     "localModelNotDownloaded": "Das Modell auf dem Gerät wurde noch nicht heruntergeladen. Lade es in den Einstellungen herunter.",
     "localOutOfMemory": "Dein Gerät hat nicht genug freien Speicher. Schließe andere Apps und versuche es erneut oder wechsle zur Cloud-KI.",
+    "localGenerationFailed": "Die KI auf dem Gerät wurde während der Generierung unerwartet beendet. Bitte versuche es erneut oder wechsle zur Cloud-KI.",
     "aiNoCompatibleModel": "Für deinen API-Schlüssel ist kein kompatibles KI-Modell verfügbar. Bitte prüfe deinen Gemini-Zugang oder aktualisiere Metic auf die neueste Version.",
     "analysisFailed": "Analyse fehlgeschlagen"
   },
