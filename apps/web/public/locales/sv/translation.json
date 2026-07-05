@@ -1854,11 +1854,12 @@
   "analysis": {
     "facts": {
       "title": "Stegsignaler",
-      "subtitle": "Hur varje steg avslutades (vilket villkor som utlöstes) — en beskrivning av avsikt, inte ett godkänt/underkänt-omdöme. Se Steganalys för måluppfyllelse.",
+      "subtitle": "Hur varje steg avslutades (vilket villkor som utlöstes). Det beskriver avsikt, inte ett godkänt/underkänt-omdöme. Se Steganalys för måluppfyllelse.",
       "stalled": "Avstannade",
       "channeling": "Möjlig kanalbildning",
       "curveDelta": "Kurva Δ {{delta}}",
-      "adjustmentsTitle": "Föreslagna justeringar"
+      "adjustmentsTitle": "Föreslagna justeringar",
+      "infoLabel": "Om stegsignaler"
     },
     "taste": {
       "gateTitle": "Förfina med smak (valfritt)",

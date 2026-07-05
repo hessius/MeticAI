@@ -1854,11 +1854,12 @@
   "analysis": {
     "facts": {
       "title": "Segnali di fase",
-      "subtitle": "Come è terminata ogni fase (quale condizione si è attivata): una descrizione dell'intento, non un verdetto superato/non superato. Vedi Analisi delle fasi per i risultati.",
+      "subtitle": "Come è terminata ogni fase (quale condizione si è attivata). È una descrizione dell'intento, non un verdetto superato/non superato. Vedi Analisi delle fasi per i risultati.",
       "stalled": "Bloccato",
       "channeling": "Possibile canalizzazione",
       "curveDelta": "Curva Δ {{delta}}",
-      "adjustmentsTitle": "Regolazioni suggerite"
+      "adjustmentsTitle": "Regolazioni suggerite",
+      "infoLabel": "Informazioni sui segnali di fase"
     },
     "taste": {
       "gateTitle": "Affina con il gusto (facoltativo)",

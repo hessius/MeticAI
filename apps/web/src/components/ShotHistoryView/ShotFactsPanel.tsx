@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next'
+import { Info } from 'lucide-react'
 import type { ShotFacts } from '../../lib/shotFacts'
 import { compassAdjustments } from '../../lib/compassRules'
 import type { StoredTaste } from '../../lib/shotTasteStore'
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 
 interface Props {
   facts: ShotFacts
@@ -15,8 +17,20 @@ export function ShotFactsPanel({ facts, taste }: Props) {
 
   return (
     <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-foreground">{t('analysis.facts.title')}</h3>
-      <p className="-mt-2 text-xs text-muted-foreground">{t('analysis.facts.subtitle')}</p>
+      <div className="flex items-center gap-1.5">
+        <h3 className="text-sm font-semibold text-foreground">{t('analysis.facts.title')}</h3>
+        <Popover>
+          <PopoverTrigger
+            className="text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-full"
+            aria-label={t('analysis.facts.infoLabel')}
+          >
+            <Info className="h-3.5 w-3.5" />
+          </PopoverTrigger>
+          <PopoverContent side="top" align="start" className="max-w-xs text-xs text-muted-foreground">
+            {t('analysis.facts.subtitle')}
+          </PopoverContent>
+        </Popover>
+      </div>
       <ul className="space-y-2">
         {reached.map((s, i) => (
           <li key={`${s.stage_name}-${i}`} className="flex flex-col gap-1 border-b border-border/50 pb-2 last:border-0 last:pb-0">
@@ -62,7 +76,7 @@ export function ShotFactsPanel({ facts, taste }: Props) {
             <ul className="space-y-1">
               {adj.map((a, i) => (
                 <li key={`${a.kind}-${i}`} className="text-xs text-muted-foreground">
-                  <span className="font-mono">{a.kind}</span> — {a.reason}
+                  <span className="font-mono">{a.kind}</span>: {a.reason}
                 </li>
               ))}
             </ul>

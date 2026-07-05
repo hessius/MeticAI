@@ -1854,11 +1854,12 @@
   "analysis": {
     "facts": {
       "title": "Stage signals",
-      "subtitle": "How each stage exited (which condition fired) — a description of intent, not a pass/fail verdict. See Stage analysis for goal outcomes.",
+      "subtitle": "How each stage exited (which condition fired). This describes intent, not a pass/fail verdict. See Stage analysis for goal outcomes.",
       "stalled": "Stalled",
       "channeling": "Possible channeling",
       "curveDelta": "Curve Δ {{delta}}",
-      "adjustmentsTitle": "Suggested adjustments"
+      "adjustmentsTitle": "Suggested adjustments",
+      "infoLabel": "About stage signals"
     },
     "taste": {
       "gateTitle": "Refine with taste (optional)",

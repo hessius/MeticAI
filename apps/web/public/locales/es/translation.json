@@ -1854,11 +1854,12 @@
   "analysis": {
     "facts": {
       "title": "Señales de fase",
-      "subtitle": "Cómo terminó cada etapa (qué condición se activó): una descripción de la intención, no un veredicto de aprobado/reprobado. Consulta Análisis de etapas para ver los resultados.",
+      "subtitle": "Cómo terminó cada etapa (qué condición se activó). Es una descripción de la intención, no un veredicto de aprobado/reprobado. Consulta Análisis de etapas para ver los resultados.",
       "stalled": "Estancado",
       "channeling": "Posible canalización",
       "curveDelta": "Curva Δ {{delta}}",
-      "adjustmentsTitle": "Ajustes sugeridos"
+      "adjustmentsTitle": "Ajustes sugeridos",
+      "infoLabel": "Acerca de las señales de fase"
     },
     "taste": {
       "gateTitle": "Refinar con el sabor (opcional)",

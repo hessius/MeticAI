@@ -49,4 +49,13 @@ describe('ShotFactsPanel', () => {
     expect(screen.getByText('analysis.facts.adjustmentsTitle')).toBeInTheDocument()
     expect(screen.getByText(/grind_finer/i)).toBeInTheDocument()
   })
+  it('hides the explanation behind an info button by default', () => {
+    render(<ShotFactsPanel facts={facts} />)
+    // The heading stays visible; the wordy explanation is tucked into a popover.
+    expect(screen.getByText('analysis.facts.title')).toBeInTheDocument()
+    expect(screen.queryByText('analysis.facts.subtitle')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'analysis.facts.infoLabel' }),
+    ).toBeInTheDocument()
+  })
 })
