@@ -44,7 +44,7 @@
     "@capacitor/network": "^8.0.1",
     "@capacitor/preferences": "^8.0.1",
     "@capacitor/share": "^8.0.1",
-    "@capgo/capacitor-llm": "^8.0.19",
+    "@capgo/capacitor-llm": "^8.1.0",
     "@google/genai": "^1.52.0",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^5.4.0",

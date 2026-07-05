@@ -39,11 +39,15 @@ import {
   isLocalLLMConfigured,
   refreshLocalReadiness,
   generateLocalText,
+  getGemmaModelPath,
+  setLocalBackend,
+  GEMMA_MODEL_ID,
   __resetLocalLLMCacheForTests,
 } from './localLLM'
 import { LocalLLMProvider, contentsToPrompt } from './LocalLLMProvider'
 import type { AIProvider } from './AIProvider'
 import { AIServiceError } from '../aiErrors'
+import { STORAGE_KEYS } from '@/lib/constants'
 
 function setPlatform(platform: string, native = true) {
   nativeSupported = native
@@ -56,6 +60,7 @@ function setPlatform(platform: string, native = true) {
 beforeEach(() => {
   listeners.textFromAi = []
   listeners.aiFinished = []
+  localStorage.clear()
   __resetLocalLLMCacheForTests()
   vi.clearAllMocks()
   setPlatform('ios', true)
@@ -106,8 +111,36 @@ describe('generateLocalText', () => {
     const text = await generateLocalText('Say hi')
     expect(text).toBe('Hello world')
     expect(CapgoLLM.setModel).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'Apple Intelligence', engine: 'apple' }),
+      expect.objectContaining({ path: 'Apple Intelligence' }),
     )
+  })
+
+  it('loads Gemma through LiteRT-LM (modelType litertlm), not MediaPipe', async () => {
+    setPlatform('android', true)
+    localStorage.setItem(STORAGE_KEYS.LOCAL_MODEL_PATH, '/models/gemma-4-E2B-it.litertlm')
+    setLocalBackend(GEMMA_MODEL_ID)
+    await generateLocalText('Say hi')
+    expect(CapgoLLM.setModel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/models/gemma-4-E2B-it.litertlm',
+        modelType: 'litertlm',
+      }),
+    )
+    // The removed MediaPipe engine must never be requested.
+    expect(CapgoLLM.setModel).not.toHaveBeenCalledWith(
+      expect.objectContaining({ engine: 'mediapipe' }),
+    )
+  })
+
+  it('rejects a stale pre-LiteRT-LM `.task` path as not downloaded (migration)', async () => {
+    setPlatform('android', true)
+    localStorage.setItem(STORAGE_KEYS.LOCAL_MODEL_PATH, '/models/gemma-4-E2B-it-web.task')
+    setLocalBackend(GEMMA_MODEL_ID)
+    // The migration-aware accessor discards the stale path...
+    expect(getGemmaModelPath()).toBeNull()
+    // ...so generation reports the model as not downloaded rather than crashing.
+    await expect(generateLocalText('Say hi')).rejects.toThrow(AIServiceError)
+    expect(CapgoLLM.setModel).not.toHaveBeenCalled()
   })
 
   it('reconstructs cumulative snapshot streams without duplication (Apple Intelligence)', async () => {

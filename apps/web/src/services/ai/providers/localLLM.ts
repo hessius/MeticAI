@@ -4,10 +4,10 @@
  * Wraps `@capgo/capacitor-llm` for two local backends:
  *
  * - **Apple Intelligence** — iOS 26+, A17 Pro and later. Zero download, system
- *   model loaded via `setModel({ path: 'Apple Intelligence', engine: 'apple' })`.
+ *   model loaded via `setModel({ path: 'Apple Intelligence' })`.
  * - **Gemma 4 E2B-IT** — iOS and Android. Requires a ~2.6 GB model download
- *   (managed by {@link LocalModelManager}); loaded via MediaPipe GenAI from the
- *   downloaded file path.
+ *   (managed by {@link LocalModelManager}); loaded via LiteRT-LM from the
+ *   downloaded `.litertlm` file path (`modelType: 'litertlm'`).
  *
  * The plugin is event-driven: `sendMessage` resolves immediately and the
  * generated text arrives as a stream of `textFromAi` events terminated by an
@@ -72,6 +72,14 @@ function readLS(key: string): string | null {
   }
 }
 
+function removeLS(key: string): void {
+  try {
+    localStorage.removeItem(key)
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * The selected on-device backend. Defaults to Apple Intelligence on iOS (no
  * download) and Gemma on Android (the only local option there).
@@ -102,7 +110,17 @@ export function setLocalBackend(backend: LocalBackend): void {
 /** Path to the downloaded Gemma model, or null when not yet downloaded. */
 export function getGemmaModelPath(): string | null {
   const path = readLS(STORAGE_KEYS.LOCAL_MODEL_PATH)
-  return path?.trim() ? path.trim() : null
+  const trimmed = path?.trim()
+  if (!trimmed) return null
+  // Migration: builds before the LiteRT-LM switch downloaded a MediaPipe
+  // `-web.task` asset on iOS that can never load natively. Discard any stored
+  // path that is not a `.litertlm` bundle so the user is prompted to re-download
+  // the correct model instead of hitting a load failure on every generation.
+  if (!trimmed.toLowerCase().endsWith('.litertlm')) {
+    removeLS(STORAGE_KEYS.LOCAL_MODEL_PATH)
+    return null
+  }
+  return trimmed
 }
 
 /**
@@ -122,9 +140,12 @@ function modelOptionsFor(backend: LocalBackend, extra: Record<string, unknown> =
   if (backend === GEMMA_MODEL_ID) {
     const path = getGemmaModelPath()
     if (!path) throw new AIServiceError('LOCAL_MODEL_NOT_DOWNLOADED')
-    return { path, engine: 'mediapipe' as const, ...extra }
+    // Gemma is loaded through LiteRT-LM on both iOS and Android (`@capgo/capacitor-llm`
+    // >= 8.1.0). The legacy MediaPipe engine is unavailable in our SPM iOS build, so we
+    // pin the model type explicitly rather than letting it be inferred from the path.
+    return { path, modelType: 'litertlm' as const, ...extra }
   }
-  return { path: 'Apple Intelligence', engine: 'apple' as const, ...extra }
+  return { path: 'Apple Intelligence', ...extra }
 }
 
 /** Best-effort sync answer used by the AI gate and provider selection. */

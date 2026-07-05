@@ -7,7 +7,7 @@ const { CapgoLLM, Filesystem, Device, listeners } = vi.hoisted(() => {
   return {
     listeners: sharedListeners,
     CapgoLLM: {
-      downloadModel: vi.fn().mockResolvedValue({ path: '/models/gemma.task' }),
+      downloadModel: vi.fn().mockResolvedValue({ path: '/models/gemma.litertlm' }),
       addListener: vi.fn(async (event: string, fn: (e: unknown) => void) => {
         sharedListeners[event] = sharedListeners[event] ?? []
         sharedListeners[event].push(fn)
@@ -33,6 +33,17 @@ vi.mock('./localLLM', () => ({
   isLocalLLMSupported: () => supported,
   isAppleIntelligenceSupported: () => appleSupported,
   setLocalBackend: vi.fn(),
+  // Mirror the real migration-aware accessor: only `.litertlm` bundles count as
+  // a valid downloaded model; stale pre-LiteRT-LM `.task` paths are discarded.
+  getGemmaModelPath: () => {
+    const path = localStorage.getItem('meticai-local-model-path')?.trim()
+    if (!path) return null
+    if (!path.toLowerCase().endsWith('.litertlm')) {
+      localStorage.removeItem('meticai-local-model-path')
+      return null
+    }
+    return path
+  },
 }))
 
 import { STORAGE_KEYS } from '@/lib/constants'
@@ -81,8 +92,16 @@ describe('getModelStatus', () => {
     expect(getModelStatus()).toBe('not-downloaded')
   })
   it('is ready when a path is persisted', () => {
-    localStorage.setItem(STORAGE_KEYS.LOCAL_MODEL_PATH, '/models/gemma.task')
+    localStorage.setItem(STORAGE_KEYS.LOCAL_MODEL_PATH, '/models/gemma.litertlm')
     expect(getModelStatus()).toBe('ready')
+  })
+  it('treats a stale pre-LiteRT-LM `.task` path as not-downloaded (migration)', () => {
+    // Builds before the LiteRT-LM switch persisted a MediaPipe `-web.task` asset
+    // on iOS that can never load natively; it must not report as ready.
+    localStorage.setItem(STORAGE_KEYS.LOCAL_MODEL_PATH, '/models/gemma-4-E2B-it-web.task')
+    expect(getModelStatus()).toBe('not-downloaded')
+    // The stale path is cleared so the user is prompted to re-download.
+    expect(localStorage.getItem(STORAGE_KEYS.LOCAL_MODEL_PATH)).toBeNull()
   })
 })
 
@@ -113,10 +132,16 @@ describe('downloadModel', () => {
     // Emit a progress event mid-flight.
     listeners.downloadProgress.forEach(fn => fn({ progress: 42 }))
     await promise
-    expect(localStorage.getItem(STORAGE_KEYS.LOCAL_MODEL_PATH)).toBe('/models/gemma.task')
+    expect(localStorage.getItem(STORAGE_KEYS.LOCAL_MODEL_PATH)).toBe('/models/gemma.litertlm')
     expect(progress).toContain(42)
     expect(progress).toContain(100)
     expect(getModelStatus()).toBe('ready')
+  })
+  it('downloads the LiteRT-LM `.litertlm` bundle (not the MediaPipe web `.task`)', async () => {
+    await downloadModel()
+    const url = CapgoLLM.downloadModel.mock.calls[0][0].url as string
+    expect(url).toContain('.litertlm')
+    expect(url).not.toContain('-web.task')
   })
   it('derives progress from bytes when the stream omits a percentage', async () => {
     const progress: number[] = []
@@ -150,19 +175,19 @@ describe('downloadModel', () => {
   it('discards a cancelled download and leaves the model un-persisted', async () => {
     CapgoLLM.downloadModel.mockImplementationOnce(async () => {
       cancelDownload()
-      return { path: '/models/gemma.task' }
+      return { path: '/models/gemma.litertlm' }
     })
     await downloadModel()
     expect(localStorage.getItem(STORAGE_KEYS.LOCAL_MODEL_PATH)).toBeNull()
-    expect(Filesystem.deleteFile).toHaveBeenCalledWith({ path: '/models/gemma.task' })
+    expect(Filesystem.deleteFile).toHaveBeenCalledWith({ path: '/models/gemma.litertlm' })
   })
 })
 
 describe('deleteModel', () => {
   it('removes the file and clears the persisted path', async () => {
-    localStorage.setItem(STORAGE_KEYS.LOCAL_MODEL_PATH, '/models/gemma.task')
+    localStorage.setItem(STORAGE_KEYS.LOCAL_MODEL_PATH, '/models/gemma.litertlm')
     await deleteModel()
-    expect(Filesystem.deleteFile).toHaveBeenCalledWith({ path: '/models/gemma.task' })
+    expect(Filesystem.deleteFile).toHaveBeenCalledWith({ path: '/models/gemma.litertlm' })
     expect(localStorage.getItem(STORAGE_KEYS.LOCAL_MODEL_PATH)).toBeNull()
     expect(getModelStatus()).toBe('not-downloaded')
   })

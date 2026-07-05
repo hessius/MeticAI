@@ -20,6 +20,7 @@ import { STORAGE_KEYS } from '@/lib/constants'
 import { AIServiceError } from '../aiErrors'
 import {
   GEMMA_MODEL_ID,
+  getGemmaModelPath,
   isAppleIntelligenceSupported,
   isLocalLLMSupported,
   setLocalBackend,
@@ -45,12 +46,13 @@ export interface DeviceCapability {
 }
 
 /**
- * Approximate Gemma 4 E2B download size (~2.0 GB, measured from the HF LFS
- * redirect Content-Length). Used as a denominator for progress % when the
- * download stream does not report a total size (the HF xet CDN often omits
- * Content-Length, leaving the native delegate unable to compute a percentage).
+ * Approximate Gemma 4 E2B download size (~2.6 GB, measured from the HF LFS
+ * `x-linked-size` for the LiteRT-LM `.litertlm` bundle). Used as a denominator
+ * for progress % when the download stream does not report a total size (the HF
+ * xet CDN often omits Content-Length, leaving the native delegate unable to
+ * compute a percentage).
  */
-export const GEMMA_DOWNLOAD_BYTES = 2_003_697_664
+export const GEMMA_DOWNLOAD_BYTES = 2_588_147_712
 /** Require ≥ 3 GB free before downloading. */
 export const MIN_FREE_STORAGE_BYTES = 3_000_000_000
 /** Recommend ≥ 4 GB total RAM. */
@@ -59,8 +61,14 @@ export const MIN_RAM_BYTES = 4_000_000_000
 // `?download=true` forces the HuggingFace LFS endpoint to serve the file as an
 // attachment (Content-Disposition), which some CDN paths need to expose a size
 // and to avoid an inline-render redirect that can stall native downloaders.
+//
+// Both iOS and Android load the LiteRT-LM `.litertlm` bundle. `@capgo/capacitor-llm`
+// >= 8.1.0 links the official LiteRT-LM xcframework via Swift Package Manager on iOS
+// (the MediaPipe `.task` path is CocoaPods-only and unavailable in our SPM build),
+// so the previous iOS `-web.task` asset (a MediaPipe *web* build) could never load
+// natively and made on-device Gemma unusable on iOS.
 const GEMMA_URLS = {
-  ios: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task?download=true',
+  ios: 'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm?download=true',
   android:
     'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm?download=true',
 } as const
@@ -113,7 +121,9 @@ export function getAvailableBackends(): LocalBackend[] {
 /** Current Gemma model status. */
 export function getModelStatus(): ModelStatus {
   if (downloading) return 'downloading'
-  return readLS(STORAGE_KEYS.LOCAL_MODEL_PATH)?.trim() ? 'ready' : 'not-downloaded'
+  // Use the migration-aware accessor so a stale pre-LiteRT-LM `.task` path is
+  // treated as not-downloaded (prompting a re-download of the correct bundle).
+  return getGemmaModelPath() ? 'ready' : 'not-downloaded'
 }
 
 /** Device RAM/storage capability for the Gemma download. */
