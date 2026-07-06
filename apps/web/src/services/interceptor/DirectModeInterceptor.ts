@@ -2679,11 +2679,22 @@ export function installDirectModeInterceptor(): void {
         const name = decodeURIComponent(targetCurvesMatch[1])
         // Prefer the active override profile so the live graph reflects the
         // temporary variables actually being brewed.
-        const profile =
+        let profile =
           _activeOverrideProfile && _activeOverrideProfile.name === name
             ? _activeOverrideProfile.profile
             : await _findProfileByName(name)
         if (!profile) return jsonResponse({ detail: `Profile '${name}' not found` }, 404)
+        // The machine's profile list omits stages; fetch the full profile so the
+        // estimated curves are non-empty (the active override already has stages).
+        if (!Array.isArray(profile.stages) || profile.stages.length === 0) {
+          try {
+            const fullResp = await _fetch(`/api/v1/profile/get/${profile.id}`)
+            if (fullResp.ok) {
+              const full = await fullResp.json() as CachedProfile
+              if (Array.isArray(full?.stages)) profile = full
+            }
+          } catch { /* fall back to the cached profile */ }
+        }
         return jsonResponse({
           status: 'success',
           target_curves: generateEstimatedTargetCurves(profile),

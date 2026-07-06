@@ -1492,6 +1492,61 @@ describe('DirectModeInterceptor regression harness', () => {
       )
     })
 
+    it('fetches full stages by id for target-curves when the profile list omits them', async () => {
+      // Real machines return profile/list entries without stages, so the
+      // target-curves overlay must fall back to the get-by-id endpoint rather
+      // than returning an empty curve set.
+      const listWithoutStages = [
+        {
+          change_id: 'change-1',
+          profile: {
+            id: 'profile-1',
+            name: 'Turbo Bloom',
+            author: 'MeticAI',
+            author_id: 'author-1',
+            previous_authors: [],
+            display: { description: 'Bright fruit profile' },
+            temperature: 93,
+            final_weight: 36,
+            variables: [],
+            stages: [],
+          },
+        },
+      ] as unknown as ProfileIdent[]
+
+      const fullProfile = {
+        id: 'profile-1',
+        name: 'Turbo Bloom',
+        temperature: 93,
+        final_weight: 36,
+        variables: [],
+        stages: [
+          {
+            name: 'Bloom',
+            type: 'flow',
+            key: 'flow_bloom',
+            dynamics: { points: [[0, 2.1]], over: 'time', interpolation: 'linear' },
+            exit_triggers: [{ type: 'time', value: 10 }],
+            limits: [],
+          },
+        ],
+      }
+
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': listWithoutStages,
+        'GET /api/v1/profile/get/profile-1': fullProfile,
+      }))
+
+      const response = await window.fetch('/api/profile/Turbo%20Bloom/target-curves')
+      expect(response.status).toBe(200)
+      const body = await readJson<{ status: string; target_curves: Array<Record<string, unknown>> }>(response)
+      expect(body.status).toBe('success')
+      expect(body.target_curves.length).toBeGreaterThan(0)
+      expect(body.target_curves).toEqual(
+        expect.arrayContaining([expect.objectContaining({ stage_name: 'Bloom', target_flow: 2.1 })]),
+      )
+    })
+
     it('renders a short dynamics ramp over real time instead of compressing it to instant (#483)', async () => {
       const rampProfile = [
         {
