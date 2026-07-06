@@ -36,7 +36,7 @@ describe("proxyToMachine", () => {
   test("forwards method, path, query and body upstream and mirrors the response", async () => {
     const captured: { url?: string; method?: string; body?: string } = {};
     const original = globalThis.fetch;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = (async (input: Request | string | URL, init?: RequestInit) => {
       captured.url = String(input);
       captured.method = init?.method;
       captured.body = init?.body ? String(init.body) : undefined;
@@ -44,7 +44,7 @@ describe("proxyToMachine", () => {
         status: 201,
         headers: { "content-type": "application/json", "x-custom": "1" },
       });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     try {
       const res = await proxyToMachine(
@@ -65,7 +65,7 @@ describe("proxyToMachine", () => {
     const original = globalThis.fetch;
     globalThis.fetch = (async () => {
       throw new Error("ECONNREFUSED");
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
     try {
       const res = await proxyToMachine(
         new Request("http://localhost/api/v1/machine"),

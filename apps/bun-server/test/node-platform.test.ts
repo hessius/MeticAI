@@ -59,12 +59,9 @@ describe("createNodePlatform storage", () => {
   });
 
   test("aiCache honors TTL expiry", async () => {
-    let now = 1_000;
     const platform = createNodePlatform({ dataDir: await tempDir() });
-    // Override clock indirectly is not exposed; use a short real TTL instead.
     await platform.storage.aiCache.set("k", { v: 1 }, 10_000);
-    expect(await platform.storage.aiCache.get("k")).toEqual({ v: 1 });
-    void now;
+    expect(await platform.storage.aiCache.get<{ v: number }>("k")).toEqual({ v: 1 });
   });
 
   test("blob store round-trips bytes", async () => {
