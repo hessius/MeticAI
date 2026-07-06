@@ -20,7 +20,8 @@
     "./ai/aiErrors": "./src/ai/aiErrors.ts",
     "./ai/analysisKnowledge": "./src/ai/analysisKnowledge.ts",
     "./ai/prompts": "./src/ai/prompts.ts",
-    "./routes/annotations": "./src/routes/annotations.ts"
+    "./routes/annotations": "./src/routes/annotations.ts",
+    "./routes/dialin": "./src/routes/dialin.ts"
   },
   "scripts": {
     "test": "vitest run",

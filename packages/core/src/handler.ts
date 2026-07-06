@@ -1,6 +1,7 @@
 import type { Platform } from "./platform";
 import { jsonResponse, notFound } from "./http";
 import { handleAnnotationRoutes } from "./routes/annotations";
+import { handleDialInRoutes } from "./routes/dialin";
 
 /**
  * The single shared request handler for the unified TS core.
@@ -22,6 +23,9 @@ export async function handle(req: Request, platform: Platform): Promise<Response
 
   const annotation = await handleAnnotationRoutes(req, platform);
   if (annotation) return annotation;
+
+  const dialIn = await handleDialInRoutes(req, platform);
+  if (dialIn) return dialIn;
 
   return notFound(`No route for ${req.method} ${pathname}`);
 }
