@@ -10,6 +10,10 @@ import { test, expect } from '@playwright/test'
  *
  * Run against a served app:
  *   BASE_URL=http://localhost:35590 bunx playwright test e2e/fullapp-sweep.spec.ts --project=chromium
+ *
+ * LOCAL-ONLY: this spec requires the unified Bun server (port 35590) and a
+ * real machine on the LAN, so it is excluded from CI (see playwright.config.ts
+ * testIgnore). Run it manually during server live-verification.
  */
 
 const BASE = process.env.BASE_URL || 'http://localhost:35590'
