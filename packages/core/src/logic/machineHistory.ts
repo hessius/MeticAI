@@ -115,3 +115,10 @@ export function parseMachineHistory(raw: unknown): MachineHistoryEntry[] {
   if (isRecord(raw) && Array.isArray(raw.history)) return raw.history as MachineHistoryEntry[];
   return [];
 }
+
+/** Whether an annotation summary marks the shot as annotated (text or rating). */
+export function hasRecentShotAnnotation(
+  annotation?: { has_annotation: boolean; rating: number | null },
+): boolean {
+  return annotation !== undefined && (annotation.has_annotation || annotation.rating !== null);
+}
