@@ -124,6 +124,8 @@ export function makeMockPlatform(overrides: Partial<Platform> = {}): Platform {
       dialInSessions: memRepo(),
       pourOverPrefs: memRepo(),
       schedules: memRepo(),
+      descriptions: memRepo(),
+      aiTags: memRepo(),
       aiCache: memCache(),
       images: memBlobStore(),
     },

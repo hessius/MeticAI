@@ -17,6 +17,7 @@
     "./logic/decentConverter": "./src/logic/decentConverter.ts",
     "./logic/tags": "./src/logic/tags.ts",
     "./logic/profileAnalysis": "./src/logic/profileAnalysis.ts",
+    "./logic/profileDescription": "./src/logic/profileDescription.ts",
     "./logic/profileRecommendation": "./src/logic/profileRecommendation.ts",
     "./logic/recommendationsParse": "./src/logic/recommendationsParse.ts",
     "./ai/aiErrors": "./src/ai/aiErrors.ts",
@@ -29,7 +30,8 @@
     "./routes/pourover": "./src/routes/pourover.ts",
     "./routes/shots": "./src/routes/shots.ts",
     "./routes/profiles": "./src/routes/profiles.ts",
-    "./routes/profileApply": "./src/routes/profileApply.ts"
+    "./routes/profileApply": "./src/routes/profileApply.ts",
+    "./routes/profileDescription": "./src/routes/profileDescription.ts"
   },
   "scripts": {
     "test": "vitest run",

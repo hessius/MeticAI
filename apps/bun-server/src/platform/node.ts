@@ -298,6 +298,8 @@ export function createNodePlatform(options: NodePlatformOptions = {}): Platform 
       dialInSessions: fsKeyedMapRepo(join(dataDir, "dialin_sessions.json")),
       pourOverPrefs: fsSingletonRepo(join(dataDir, "pour_over_preferences.json")),
       schedules: fsRepo(join(dataDir, "schedules")),
+      descriptions: fsKeyedMapRepo(join(dataDir, "profile_descriptions.json")),
+      aiTags: fsKeyedMapRepo(join(dataDir, "profile_ai_tags.json")),
       aiCache: memoryCache(clock),
       images: fsBlobStore(join(dataDir, "images")),
     },

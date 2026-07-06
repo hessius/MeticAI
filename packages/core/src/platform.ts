@@ -73,6 +73,10 @@ export interface PlatformStorage {
   dialInSessions: Repo<unknown>;
   pourOverPrefs: Repo<unknown>;
   schedules: Repo<unknown>;
+  /** AI-generated profile descriptions, keyed by profile name. */
+  descriptions: Repo<string>;
+  /** AI-generated profile tag lists, keyed by profile name. */
+  aiTags: Repo<string[]>;
   aiCache: Cache;
   images: BlobStore;
 }
