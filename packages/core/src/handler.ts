@@ -9,6 +9,7 @@ import { handleApplyRecommendationsRoute } from "./routes/profileApply";
 import { handleRegenerateDescriptionRoute } from "./routes/profileDescription";
 import { handleAnalyzeAndProfileRoute } from "./routes/analyzeAndProfile";
 import { handleSystemRoutes } from "./routes/system";
+import { handleHistoryRoutes } from "./routes/history";
 
 /**
  * The single shared request handler for the unified TS core.
@@ -54,6 +55,9 @@ export async function handle(req: Request, platform: Platform): Promise<Response
 
   const system = await handleSystemRoutes(req, platform);
   if (system) return system;
+
+  const history = await handleHistoryRoutes(req, platform);
+  if (history) return history;
 
   return notFound(`No route for ${req.method} ${pathname}`);
 }
