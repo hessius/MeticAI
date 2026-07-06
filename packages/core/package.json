@@ -27,7 +27,8 @@
     "./routes/dialinPrompt": "./src/routes/dialinPrompt.ts",
     "./routes/analyzeLlmPrompt": "./src/routes/analyzeLlmPrompt.ts",
     "./routes/pourover": "./src/routes/pourover.ts",
-    "./routes/shots": "./src/routes/shots.ts"
+    "./routes/shots": "./src/routes/shots.ts",
+    "./routes/profiles": "./src/routes/profiles.ts"
   },
   "scripts": {
     "test": "vitest run",
