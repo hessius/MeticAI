@@ -72,6 +72,16 @@ export function createServer(options: CreateServerOptions = {}): Server<WsData> 
         return handle(request, platform);
       }
 
+      // The Bun server IS the frontend origin, so the app must talk to it via
+      // same-origin relative URLs. Override the build-time config.json (which
+      // ships a dev serverUrl) with an empty serverUrl. Mirrors the behaviour
+      // the legacy nginx deployment provided.
+      if (pathname === "/config.json") {
+        return new Response(JSON.stringify({ serverUrl: "" }), {
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-cache" },
+        });
+      }
+
       return serveStatic(pathname);
     },
 
