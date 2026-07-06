@@ -105,3 +105,60 @@ describe("system: GET /api/version", () => {
     expect(body.version).toBe("unknown");
   });
 });
+
+describe("system: GET /api/available-models", () => {
+  test("returns discovered models with the current model when configured", async () => {
+    const p = makeMockPlatform({
+      ai: {
+        isConfigured: () => true,
+        generateText: async () => ({ text: "" }),
+        listModels: async () => [
+          { id: "gemini-3.1-pro", display_name: "Gemini 3.1 Pro", description: "" },
+        ],
+        currentModel: () => "gemini-3.1-pro",
+      },
+    });
+    const body = await (await handle(get("/api/available-models"), p)).json();
+    expect(body.current).toBe("gemini-3.1-pro");
+    expect(body.models).toEqual([
+      { id: "gemini-3.1-pro", display_name: "Gemini 3.1 Pro", description: "" },
+    ]);
+  });
+
+  test("falls back to the static list when unconfigured", async () => {
+    const body = await (await handle(get("/api/available-models"), makeMockPlatform())).json();
+    expect(body.models.length).toBeGreaterThan(0);
+    expect(body.models[0].id).toContain("gemini");
+  });
+
+  test("falls back to the static list when discovery throws", async () => {
+    const p = makeMockPlatform({
+      ai: {
+        isConfigured: () => true,
+        generateText: async () => ({ text: "" }),
+        listModels: async () => {
+          throw new Error("boom");
+        },
+      },
+    });
+    const body = await (await handle(get("/api/available-models"), p)).json();
+    expect(body.models.length).toBeGreaterThan(0);
+  });
+});
+
+describe("system: admin stubs", () => {
+  test("update-method reports manual with no self-update", async () => {
+    const body = await (await handle(get("/api/update-method"), makeMockPlatform())).json();
+    expect(body).toEqual({ method: "manual", can_trigger_update: false });
+  });
+
+  test("tailscale-status reports disabled/uninstalled", async () => {
+    const body = await (await handle(get("/api/tailscale-status"), makeMockPlatform())).json();
+    expect(body).toEqual({ enabled: false, installed: false });
+  });
+
+  test("restart is not available (501)", async () => {
+    const res = await handle(post("/api/restart", {}), makeMockPlatform());
+    expect(res.status).toBe(501);
+  });
+});

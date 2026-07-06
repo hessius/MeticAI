@@ -15,7 +15,12 @@
  * contract tests hold on both hosts.
  */
 
-import { getProviderForMethod, isAIConfigured } from "@/services/ai/providers";
+import {
+  getProviderForMethod,
+  isAIConfigured,
+  getActiveHostedProviderId,
+  getProviderModel,
+} from "@/services/ai/providers";
 import type { AIProvider } from "@/services/ai/providers/AIProvider";
 import { getDefaultMachineUrl } from "@/lib/machineMode";
 import {
@@ -180,6 +185,12 @@ function providerAI(getProvider: () => AIProvider, configured: () => boolean): P
       }
       const blob = await provider.generateImage(prompt);
       return new Uint8Array(await blob.arrayBuffer());
+    },
+    async listModels() {
+      return getProvider().listModels();
+    },
+    currentModel() {
+      return getProviderModel(getActiveHostedProviderId());
     },
   };
 }

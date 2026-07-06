@@ -18,10 +18,15 @@
  *   POST /api/settings    -> persist author/model/mqtt/key, returns { status }
  *   GET  /api/network-ip  -> configured machine host
  *   GET  /api/version     -> app version + runtime mode
+ *   GET  /api/available-models -> served text models (live discovery + fallback)
+ *   GET  /api/changelog   -> recent GitHub releases (best-effort)
+ *   GET  /api/update-method / /api/tailscale-status -> admin stubs
+ *   /api/check-updates | /restart | /beta-channel | /feedback -> 501
  */
 
 import type { Platform } from "../platform";
 import { jsonResponse } from "../http";
+import { STATIC_FALLBACK_MODELS } from "../ai/modelResolver";
 
 const SETTINGS_KEY = "settings";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
@@ -115,6 +120,70 @@ export async function handleSystemRoutes(
       version: platform.appVersion || "unknown",
       mode: "server",
     });
+  }
+
+  // GET /api/available-models -> live discovery, static fallback when offline.
+  if (pathname === "/api/available-models" && req.method === "GET") {
+    const current =
+      platform.ai.currentModel?.() ||
+      platform.secrets.getAIConfig().model ||
+      DEFAULT_GEMINI_MODEL;
+    try {
+      if (platform.ai.isConfigured() && platform.ai.listModels) {
+        const models = await platform.ai.listModels();
+        if (models.length) return jsonResponse({ models, current });
+      }
+    } catch {
+      // fall through to the static fallback
+    }
+    return jsonResponse({ models: STATIC_FALLBACK_MODELS, current });
+  }
+
+  // GET /api/changelog -> recent GitHub releases (best-effort).
+  if (pathname === "/api/changelog" && req.method === "GET") {
+    try {
+      const resp = await fetch(
+        "https://api.github.com/repos/hessius/MeticAI/releases?per_page=5",
+        { signal: AbortSignal.timeout(8000), headers: { Accept: "application/vnd.github+json" } },
+      );
+      if (resp.ok) {
+        const releases = (await resp.json()) as Array<{
+          tag_name: string;
+          published_at: string;
+          body: string;
+        }>;
+        return jsonResponse({
+          releases: releases.map((r) => ({
+            version: r.tag_name,
+            date: r.published_at,
+            body: r.body || "No release notes available.",
+          })),
+        });
+      }
+      return jsonResponse({ releases: [], error: "Failed to fetch releases" });
+    } catch {
+      return jsonResponse({ releases: [], error: "Failed to fetch releases" });
+    }
+  }
+
+  // Backend-only admin routes -> sensible stubs (parity with native direct mode).
+  if (pathname === "/api/update-method" && req.method === "GET") {
+    return jsonResponse({ method: "manual", can_trigger_update: false });
+  }
+  if (pathname === "/api/tailscale-status" && req.method === "GET") {
+    return jsonResponse({ enabled: false, installed: false });
+  }
+  if (
+    (pathname === "/api/check-updates" ||
+      pathname === "/api/restart" ||
+      pathname === "/api/beta-channel" ||
+      pathname === "/api/feedback") &&
+    (req.method === "GET" || req.method === "POST")
+  ) {
+    return jsonResponse(
+      { detail: "Server administration not available in direct/app mode" },
+      501,
+    );
   }
 
   return null;

@@ -12,6 +12,11 @@ import { mkdir, readFile, writeFile, readdir, unlink, rename } from "node:fs/pro
 import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { GoogleGenAI } from "@google/genai";
+import {
+  listAvailableModels,
+  STATIC_FALLBACK_MODELS,
+  type ModelClient,
+} from "@metic/core/ai/modelResolver";
 import type {
   Platform,
   PlatformAI,
@@ -246,6 +251,20 @@ function geminiAI(getConfig: () => AIConfig): PlatformAI {
         ...(req.config ? { config: req.config as Record<string, unknown> } : {}),
       });
       return { text: (response as { text?: string }).text ?? "" };
+    },
+    currentModel() {
+      return getConfig().model || DEFAULT_GEMINI_MODEL;
+    },
+    async listModels() {
+      const { apiKey } = getConfig();
+      if (!apiKey) return STATIC_FALLBACK_MODELS;
+      try {
+        const client = new GoogleGenAI({ apiKey });
+        const models = await listAvailableModels(client as unknown as ModelClient);
+        return models.length ? models : STATIC_FALLBACK_MODELS;
+      } catch {
+        return STATIC_FALLBACK_MODELS;
+      }
     },
   };
 }

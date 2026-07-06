@@ -63,6 +63,13 @@ export interface PlatformAI {
   generateText(req: { contents: unknown; config?: unknown }): Promise<{ text: string }>;
   /** Optional image generation; absent on hosts/providers without the capability. */
   generateImage?(prompt: string): Promise<Uint8Array>;
+  /**
+   * List the served text models for the model-picker UI, best-first. Optional:
+   * hosts without discovery omit it and the route falls back to a static list.
+   */
+  listModels?(): Promise<Array<{ id: string; display_name: string; description: string }>>;
+  /** The currently-configured model id, surfaced by GET /api/available-models. */
+  currentModel?(): string;
 }
 
 
