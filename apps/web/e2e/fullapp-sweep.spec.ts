@@ -84,6 +84,14 @@ test.describe('Full-app sweep (unified Bun server)', () => {
     await page.waitForLoadState('networkidle').catch(() => {})
     await page.waitForTimeout(1000)
 
+    // Explicitly open Settings (the update-status card + tailscale live here).
+    const settingsBtn = page.getByRole('button', { name: /Settings/i }).first()
+    if (await settingsBtn.isVisible().catch(() => false)) {
+      await settingsBtn.click().catch(() => {})
+      await page.waitForTimeout(2500)
+      await page.waitForLoadState('networkidle').catch(() => {})
+    }
+
     const noRoute = apiIssues.filter((i) => i.noRoute)
 
     // Report everything for diagnosis.
