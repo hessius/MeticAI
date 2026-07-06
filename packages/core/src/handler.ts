@@ -11,6 +11,7 @@ import { handleAnalyzeAndProfileRoute } from "./routes/analyzeAndProfile";
 import { handleSystemRoutes } from "./routes/system";
 import { handleHistoryRoutes } from "./routes/history";
 import { handleShotsReadRoutes } from "./routes/shotsRead";
+import { handleMachineCommandRoutes } from "./routes/machineCommands";
 
 /**
  * The single shared request handler for the unified TS core.
@@ -62,6 +63,9 @@ export async function handle(req: Request, platform: Platform): Promise<Response
 
   const shotsRead = await handleShotsReadRoutes(req, platform);
   if (shotsRead) return shotsRead;
+
+  const machineCommands = await handleMachineCommandRoutes(req, platform);
+  if (machineCommands) return machineCommands;
 
   return notFound(`No route for ${req.method} ${pathname}`);
 }
