@@ -42,7 +42,7 @@ test.describe('Full-app sweep (unified Bun server)', () => {
       if (/\/api\/v\d+\//.test(url)) return
       const status = res.status()
       if (status < 400) return
-      let body = ''
+      let body: string
       try {
         body = await res.text()
       } catch {
