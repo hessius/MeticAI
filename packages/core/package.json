@@ -22,6 +22,7 @@
     "./ai/prompts": "./src/ai/prompts.ts",
     "./routes/annotations": "./src/routes/annotations.ts",
     "./routes/dialin": "./src/routes/dialin.ts",
+    "./routes/dialinPrompt": "./src/routes/dialinPrompt.ts",
     "./routes/pourover": "./src/routes/pourover.ts"
   },
   "scripts": {

@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { makeMockPlatform } from "../mockPlatform";
+import { makeMockPlatform, scriptedAI, throwingAI } from "../mockPlatform";
 import { handle } from "../../src/handler";
 import type { Platform } from "../../src/platform";
 
@@ -186,6 +186,68 @@ describe("dial-in: rule-based recommendations", () => {
   test("recommend for a missing session returns 404", async () => {
     const res = await handle(req("POST", `${SESSIONS}/missing/recommend`), makeMockPlatform());
     expect(res.status).toBe(404);
+  });
+});
+
+describe("dial-in: AI-backed recommendations", () => {
+  async function seededSession(p: Platform): Promise<string> {
+    const s = await createSession(p);
+    await handle(req("POST", `${SESSIONS}/${s.id}/iterations`, { taste: { x: -0.5, y: -0.5 } }), p);
+    return s.id as string;
+  }
+
+  test("uses the AI provider when configured and returns source 'ai'", async () => {
+    const p = makeMockPlatform({
+      ai: scriptedAI(JSON.stringify({ recommendations: ["Grind 2 steps finer", "Raise temp 1C"] })),
+    });
+    const id = await seededSession(p);
+    const res = await handle(req("POST", `${SESSIONS}/${id}/recommend`), p);
+    const body = await res.json();
+    expect(body.source).toBe("ai");
+    expect(body.recommendations).toEqual(["Grind 2 steps finer", "Raise temp 1C"]);
+
+    const session = await (await handle(req("GET", `${SESSIONS}/${id}`), p)).json();
+    expect(session.iterations[0].recommendations).toEqual(body.recommendations);
+  });
+
+  test("parses a markdown-fenced JSON response and caps at 6 items", async () => {
+    const seven = Array.from({ length: 7 }, (_, i) => `rec ${i + 1}`);
+    const fenced = "```json\n" + JSON.stringify({ recommendations: seven }) + "\n```";
+    const p = makeMockPlatform({ ai: scriptedAI(fenced) });
+    const id = await seededSession(p);
+    const res = await handle(req("POST", `${SESSIONS}/${id}/recommend`), p);
+    const body = await res.json();
+    expect(body.source).toBe("ai");
+    expect(body.recommendations).toHaveLength(6);
+    expect(body.recommendations[0]).toBe("rec 1");
+  });
+
+  test("falls back to rules when the AI returns an empty list", async () => {
+    const p = makeMockPlatform({ ai: scriptedAI(JSON.stringify({ recommendations: [] })) });
+    const id = await seededSession(p);
+    const res = await handle(req("POST", `${SESSIONS}/${id}/recommend`), p);
+    const body = await res.json();
+    expect(body.source).toBe("rules");
+    expect(body.recommendations).toEqual([
+      "Grind finer (2-3 steps)",
+      "Increase temperature by 1-2°C",
+      "Increase dose by 0.3-0.5g",
+    ]);
+  });
+
+  test("falls back to rules when the AI throws", async () => {
+    const p = makeMockPlatform({ ai: throwingAI("provider down") });
+    const id = await seededSession(p);
+    const res = await handle(req("POST", `${SESSIONS}/${id}/recommend`), p);
+    const body = await res.json();
+    expect(body.source).toBe("rules");
+  });
+
+  test("falls back to rules when the AI returns non-JSON", async () => {
+    const p = makeMockPlatform({ ai: scriptedAI("sorry, I cannot help with that") });
+    const id = await seededSession(p);
+    const res = await handle(req("POST", `${SESSIONS}/${id}/recommend`), p);
+    expect((await res.json()).source).toBe("rules");
   });
 });
 

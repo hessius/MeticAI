@@ -11,8 +11,10 @@
 import { mkdir, readFile, writeFile, readdir, unlink, rename } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { GoogleGenAI } from "@google/genai";
 import type {
   Platform,
+  PlatformAI,
   Repo,
   Cache,
   BlobStore,
@@ -222,6 +224,32 @@ function consoleLogger(): Logger {
   };
 }
 
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+
+/**
+ * Gemini-backed PlatformAI. Mirrors the frontend GeminiProvider's generateText:
+ * a `models.generateContent({ model, contents, config })` call returning `{ text }`.
+ * A bare string prompt is accepted as `contents` (the SDK wraps it).
+ */
+function geminiAI(getConfig: () => AIConfig): PlatformAI {
+  return {
+    isConfigured() {
+      return !!getConfig().apiKey;
+    },
+    async generateText(req) {
+      const { apiKey, model } = getConfig();
+      if (!apiKey) throw new Error("AI not configured");
+      const client = new GoogleGenAI({ apiKey });
+      const response = await client.models.generateContent({
+        model: model || DEFAULT_GEMINI_MODEL,
+        contents: req.contents as Parameters<typeof client.models.generateContent>[0]["contents"],
+        ...(req.config ? { config: req.config as Record<string, unknown> } : {}),
+      });
+      return { text: (response as { text?: string }).text ?? "" };
+    },
+  };
+}
+
 export interface NodePlatformOptions {
   /** Root directory for persisted JSON/blobs. Defaults to $DATA_DIR or ./data. */
   dataDir?: string;
@@ -251,6 +279,17 @@ export function createNodePlatform(options: NodePlatformOptions = {}): Platform 
     join(dataDir, "settings.json"),
   );
 
+  const getAIConfig = (): AIConfig => {
+    // Env var takes precedence (container/12-factor); settings.json is the
+    // fallback so the UI-configured key keeps working without a restart.
+    const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
+    return {
+      provider: "gemini",
+      apiKey,
+      model: process.env.GEMINI_MODEL?.trim() || undefined,
+    };
+  };
+
   return {
     storage: {
       settings,
@@ -263,20 +302,12 @@ export function createNodePlatform(options: NodePlatformOptions = {}): Platform 
       images: fsBlobStore(join(dataDir, "images")),
     },
     secrets: {
-      getAIConfig(): AIConfig {
-        // Env var takes precedence (container/12-factor); settings.json is the
-        // fallback so the UI-configured key keeps working without a restart.
-        const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
-        return {
-          provider: "gemini",
-          apiKey,
-          model: process.env.GEMINI_MODEL?.trim() || undefined,
-        };
-      },
+      getAIConfig,
     },
     machine: {
       getBaseUrl: () => machineBaseUrl,
     },
+    ai: geminiAI(getAIConfig),
     scheduler: timerScheduler(logger),
     clock,
     logger,

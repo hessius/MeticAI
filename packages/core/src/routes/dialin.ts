@@ -31,6 +31,7 @@
 import type { Platform, Repo } from "../platform";
 import { jsonResponse } from "../http";
 import { safeRandomUUID } from "../logic/uuid";
+import { buildDialInRecommendationPrompt } from "./dialinPrompt";
 
 export type DialInStatus = "active" | "completed" | "abandoned";
 
@@ -264,15 +265,59 @@ export function buildDialInRecommendations(taste: TasteFeedback): string[] {
   return recommendations;
 }
 
+/**
+ * Strip a single leading/trailing markdown code fence from an AI response,
+ * matching the Python route's cleanup before JSON parsing.
+ */
+function stripCodeFence(text: string): string {
+  let cleaned = text.trim();
+  if (cleaned.startsWith("```")) cleaned = cleaned.split("\n").slice(1).join("\n");
+  if (cleaned.endsWith("```")) cleaned = cleaned.split("\n").slice(0, -1).join("\n");
+  return cleaned;
+}
+
+/**
+ * Generate recommendations for the latest iteration. Tries the AI provider
+ * first (when configured), parsing a `{ recommendations: [...] }` JSON object
+ * and storing up to 6 strings; on any failure or when AI is unavailable, falls
+ * back to the deterministic rule-based guidance. Mirrors the Python route.
+ */
 export async function generateRecommendations(
   platform: Platform,
   sessionId: string,
-): Promise<{ recommendations: string[]; source: "rules" }> {
+): Promise<{ recommendations: string[]; source: "ai" | "rules" }> {
   const repo = sessionRepo(platform);
   const session = await repo.read(sessionId);
   if (!session) throw new DialInValidationError("Session not found", 404);
   if (!session.iterations.length) throw new DialInValidationError("No iterations to recommend from", 400);
   const latest = session.iterations[session.iterations.length - 1]!;
+
+  if (platform.ai.isConfigured()) {
+    try {
+      const coffee = session.coffee ?? {};
+      const prompt = buildDialInRecommendationPrompt({
+        roastLevel: String(coffee.roast_level ?? ""),
+        origin: typeof coffee.origin === "string" ? coffee.origin : null,
+        process: typeof coffee.process === "string" ? coffee.process : null,
+        roastDate: typeof coffee.roast_date === "string" ? coffee.roast_date : null,
+        profileName: session.profile_name ?? null,
+        iterations: session.iterations,
+      });
+      const { text } = await platform.ai.generateText({ contents: prompt });
+      const data = JSON.parse(stripCodeFence(text ?? "")) as { recommendations?: unknown };
+      const recommendations = data.recommendations;
+      if (Array.isArray(recommendations) && recommendations.length > 0) {
+        const recs = recommendations.slice(0, 6).map((r) => String(r));
+        latest.recommendations = recs;
+        session.updated_at = isoNow(platform);
+        await repo.write(session.id, session);
+        return { recommendations: recs, source: "ai" };
+      }
+    } catch (err) {
+      platform.logger.debug("Dial-in AI recommendation failed, falling back to rules", err);
+    }
+  }
+
   latest.recommendations = buildDialInRecommendations(latest.taste);
   session.updated_at = isoNow(platform);
   await repo.write(session.id, session);

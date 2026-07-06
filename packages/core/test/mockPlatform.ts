@@ -1,4 +1,4 @@
-import type { Platform, Repo, Cache, BlobStore } from "../src/platform";
+import type { Platform, Repo, Cache, BlobStore, PlatformAI } from "../src/platform";
 
 /** In-memory Repo backing the mock Platform. */
 function memRepo<T>(): Repo<T> {
@@ -42,6 +42,38 @@ function memBlobStore(): BlobStore {
 }
 
 /**
+ * Default mock AI: not configured, so route families that consult AI fall back
+ * to their non-AI path. Tests exercising an AI path pass a configured `ai`
+ * override (see `scriptedAI`).
+ */
+function unconfiguredAI(): PlatformAI {
+  return {
+    isConfigured: () => false,
+    generateText: async () => {
+      throw new Error("AI not configured");
+    },
+  };
+}
+
+/** A configured mock AI that returns a scripted text response. */
+export function scriptedAI(text: string): PlatformAI {
+  return {
+    isConfigured: () => true,
+    generateText: async () => ({ text }),
+  };
+}
+
+/** A configured mock AI whose generateText always throws (to test fallbacks). */
+export function throwingAI(message = "boom"): PlatformAI {
+  return {
+    isConfigured: () => true,
+    generateText: async () => {
+      throw new Error(message);
+    },
+  };
+}
+
+/**
  * A fully in-memory Platform for contract tests. Every route family's
  * behaviour is verified against this double so the frozen `/api/*` contract is
  * host-independent.
@@ -60,6 +92,7 @@ export function makeMockPlatform(overrides: Partial<Platform> = {}): Platform {
     },
     secrets: { getAIConfig: () => ({ provider: "gemini", apiKey: "test" }) },
     machine: { getBaseUrl: () => "http://machine.test:8080" },
+    ai: unconfiguredAI(),
     clock: () => 0,
     logger: { info() {}, error() {}, debug() {} },
     ...overrides,

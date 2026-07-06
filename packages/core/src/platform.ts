@@ -49,6 +49,23 @@ export interface AIConfig {
   model?: string;
 }
 
+/**
+ * The AI text/image generation primitive, reached through the Platform so the
+ * core's AI orchestration (prompt building, response parsing) stays host-free.
+ * The request/response shape mirrors the frontend's AIProvider.generateText so
+ * the browser Platform can delegate straight to the active provider, while the
+ * Node Platform implements it against the Gemini SDK.
+ */
+export interface PlatformAI {
+  /** Whether a usable AI provider is configured (e.g. an API key is present). */
+  isConfigured(): boolean;
+  /** Generate text from Gemini-style `contents` (a string prompt is accepted). */
+  generateText(req: { contents: unknown; config?: unknown }): Promise<{ text: string }>;
+  /** Optional image generation; absent on hosts/providers without the capability. */
+  generateImage?(prompt: string): Promise<Uint8Array>;
+}
+
+
 export interface PlatformStorage {
   settings: Repo<Record<string, unknown>>;
   history: Repo<unknown>;
@@ -64,6 +81,8 @@ export interface Platform {
   storage: PlatformStorage;
   secrets: { getAIConfig(): AIConfig };
   machine: { getBaseUrl(): string };
+  /** AI text/image generation primitive. */
+  ai: PlatformAI;
   /** Optional: hosts without a scheduler cause schedule routes to return 501. */
   scheduler?: Scheduler;
   clock: () => number;
