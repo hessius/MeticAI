@@ -3,6 +3,7 @@ import { jsonResponse, notFound } from "./http";
 import { handleAnnotationRoutes } from "./routes/annotations";
 import { handleDialInRoutes } from "./routes/dialin";
 import { handlePourOverRoutes } from "./routes/pourover";
+import { handleShotAnalysisRoutes } from "./routes/shots";
 
 /**
  * The single shared request handler for the unified TS core.
@@ -30,6 +31,9 @@ export async function handle(req: Request, platform: Platform): Promise<Response
 
   const pourOver = await handlePourOverRoutes(req, platform);
   if (pourOver) return pourOver;
+
+  const shotAnalysis = await handleShotAnalysisRoutes(req, platform);
+  if (shotAnalysis) return shotAnalysis;
 
   return notFound(`No route for ${req.method} ${pathname}`);
 }
