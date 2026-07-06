@@ -80,7 +80,16 @@ export interface PlatformStorage {
 export interface Platform {
   storage: PlatformStorage;
   secrets: { getAIConfig(): AIConfig };
-  machine: { getBaseUrl(): string };
+  machine: {
+    getBaseUrl(): string;
+    /**
+     * Fetch a path on the espresso machine's HTTP API. `path` is joined to the
+     * resolved base URL (e.g. "/api/v1/history"). Lets core routes read machine
+     * state (shot history, profiles) uniformly across hosts: the Node platform
+     * fetches server-side, the browser platform fetches over the LAN.
+     */
+    fetch(path: string, init?: RequestInit): Promise<Response>;
+  };
   /** AI text/image generation primitive. */
   ai: PlatformAI;
   /** Optional: hosts without a scheduler cause schedule routes to return 501. */

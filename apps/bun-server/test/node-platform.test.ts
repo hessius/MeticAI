@@ -110,6 +110,29 @@ describe("createNodePlatform machine url", () => {
     const p = createNodePlatform({ machineBaseUrl: "http://machine:8080/", dataDir: "/tmp/x" });
     expect(p.machine.getBaseUrl()).toBe("http://machine:8080");
   });
+
+  test("fetch joins a relative path onto the base URL", async () => {
+    const p = createNodePlatform({ machineBaseUrl: "http://machine:8080", dataDir: "/tmp/x" });
+    const prev = globalThis.fetch;
+    let seen = "";
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      seen = String(url);
+      return new Response("{}");
+    }) as typeof fetch;
+    try {
+      await p.machine.fetch("/api/v1/history");
+      expect(seen).toBe("http://machine:8080/api/v1/history");
+      await p.machine.fetch("api/v1/profile/list");
+      expect(seen).toBe("http://machine:8080/api/v1/profile/list");
+    } finally {
+      globalThis.fetch = prev;
+    }
+  });
+
+  test("fetch rejects when the machine URL is not configured", async () => {
+    const p = createNodePlatform({ machineBaseUrl: undefined, dataDir: "/tmp/x" });
+    await expect(p.machine.fetch("/api/v1/history")).rejects.toThrow();
+  });
 });
 
 describe("createNodePlatform secrets", () => {

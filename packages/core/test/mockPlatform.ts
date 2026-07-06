@@ -73,6 +73,43 @@ export function throwingAI(message = "boom"): PlatformAI {
   };
 }
 
+/** The machine seam of the mock Platform. */
+type MockMachine = Platform["machine"];
+
+/** Default mock machine: getBaseUrl is fixed, fetch rejects (no machine wired). */
+function unwiredMachine(): MockMachine {
+  return {
+    getBaseUrl: () => "http://machine.test:8080",
+    fetch: async () => {
+      throw new Error("Machine not available");
+    },
+  };
+}
+
+/**
+ * A mock machine whose fetch resolves canned JSON per path. `routes` maps a
+ * request path (matched by `pathname`, ignoring query + base URL) to the JSON
+ * body to return; unmatched paths resolve to a 404.
+ */
+export function scriptedMachine(routes: Record<string, unknown>): MockMachine {
+  return {
+    getBaseUrl: () => "http://machine.test:8080",
+    fetch: async (path: string) => {
+      const pathname = path.startsWith("http") ? new URL(path).pathname : path.split("?")[0];
+      if (pathname in routes) {
+        return new Response(JSON.stringify(routes[pathname]), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ detail: "not found" }), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  };
+}
+
 /**
  * A fully in-memory Platform for contract tests. Every route family's
  * behaviour is verified against this double so the frozen `/api/*` contract is
@@ -91,7 +128,7 @@ export function makeMockPlatform(overrides: Partial<Platform> = {}): Platform {
       images: memBlobStore(),
     },
     secrets: { getAIConfig: () => ({ provider: "gemini", apiKey: "test" }) },
-    machine: { getBaseUrl: () => "http://machine.test:8080" },
+    machine: unwiredMachine(),
     ai: unconfiguredAI(),
     clock: () => 0,
     logger: { info() {}, error() {}, debug() {} },

@@ -6,7 +6,7 @@ function fakePlatform(baseUrl: string): Platform {
   return {
     storage: {} as Platform["storage"],
     secrets: { getAIConfig: () => ({ provider: "gemini", apiKey: "" }) },
-    machine: { getBaseUrl: () => baseUrl },
+    machine: { getBaseUrl: () => baseUrl, fetch: async () => new Response(null) },
     ai: { isConfigured: () => false, generateText: async () => ({ text: "" }) },
     clock: () => 0,
     logger: { info() {}, error() {}, debug() {} },

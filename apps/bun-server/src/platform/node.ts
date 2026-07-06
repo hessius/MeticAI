@@ -306,6 +306,15 @@ export function createNodePlatform(options: NodePlatformOptions = {}): Platform 
     },
     machine: {
       getBaseUrl: () => machineBaseUrl,
+      fetch: (path: string, init?: RequestInit) => {
+        if (!machineBaseUrl) {
+          return Promise.reject(new Error("Machine base URL is not configured"));
+        }
+        const url = path.startsWith("http")
+          ? path
+          : `${machineBaseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+        return fetch(url, init);
+      },
     },
     ai: geminiAI(getAIConfig),
     scheduler: timerScheduler(logger),
