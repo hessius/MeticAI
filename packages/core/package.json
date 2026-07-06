@@ -28,7 +28,8 @@
     "./routes/analyzeLlmPrompt": "./src/routes/analyzeLlmPrompt.ts",
     "./routes/pourover": "./src/routes/pourover.ts",
     "./routes/shots": "./src/routes/shots.ts",
-    "./routes/profiles": "./src/routes/profiles.ts"
+    "./routes/profiles": "./src/routes/profiles.ts",
+    "./routes/profileApply": "./src/routes/profileApply.ts"
   },
   "scripts": {
     "test": "vitest run",

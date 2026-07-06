@@ -74,7 +74,7 @@ export function throwingAI(message = "boom"): PlatformAI {
 }
 
 /** The machine seam of the mock Platform. */
-type MockMachine = Platform["machine"];
+export type MockMachine = Platform["machine"];
 
 /** Default mock machine: getBaseUrl is fixed, fetch rejects (no machine wired). */
 function unwiredMachine(): MockMachine {

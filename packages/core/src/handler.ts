@@ -5,6 +5,7 @@ import { handleDialInRoutes } from "./routes/dialin";
 import { handlePourOverRoutes } from "./routes/pourover";
 import { handleShotAnalysisRoutes } from "./routes/shots";
 import { handleProfileRecommendationRoutes } from "./routes/profiles";
+import { handleApplyRecommendationsRoute } from "./routes/profileApply";
 
 /**
  * The single shared request handler for the unified TS core.
@@ -38,6 +39,9 @@ export async function handle(req: Request, platform: Platform): Promise<Response
 
   const profileRecommendation = await handleProfileRecommendationRoutes(req, platform);
   if (profileRecommendation) return profileRecommendation;
+
+  const applyRecommendations = await handleApplyRecommendationsRoute(req, platform);
+  if (applyRecommendations) return applyRecommendations;
 
   return notFound(`No route for ${req.method} ${pathname}`);
 }
