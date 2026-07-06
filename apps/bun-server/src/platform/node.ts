@@ -257,7 +257,7 @@ export function createNodePlatform(options: NodePlatformOptions = {}): Platform 
       history: fsSingletonRepo(join(dataDir, "profile_history.json")),
       annotations: fsKeyedMapRepo(join(dataDir, "shot_annotations.json")),
       dialInSessions: fsKeyedMapRepo(join(dataDir, "dialin_sessions.json")),
-      pourOverPrefs: fsSingletonRepo(join(dataDir, "pour_over_prefs.json")),
+      pourOverPrefs: fsSingletonRepo(join(dataDir, "pour_over_preferences.json")),
       schedules: fsRepo(join(dataDir, "schedules")),
       aiCache: memoryCache(clock),
       images: fsBlobStore(join(dataDir, "images")),

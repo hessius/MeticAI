@@ -21,7 +21,8 @@
     "./ai/analysisKnowledge": "./src/ai/analysisKnowledge.ts",
     "./ai/prompts": "./src/ai/prompts.ts",
     "./routes/annotations": "./src/routes/annotations.ts",
-    "./routes/dialin": "./src/routes/dialin.ts"
+    "./routes/dialin": "./src/routes/dialin.ts",
+    "./routes/pourover": "./src/routes/pourover.ts"
   },
   "scripts": {
     "test": "vitest run",
