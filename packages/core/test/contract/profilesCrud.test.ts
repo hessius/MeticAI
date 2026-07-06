@@ -546,3 +546,14 @@ describe("profiles-crud: image-proxy", () => {
     expect(fetchCount).toBe(1);
   });
 });
+
+describe("profiles-crud: auto-sync", () => {
+  test("auto-sync is a no-op success envelope (no notFound leak)", async () => {
+    const res = await handle(jsonReq("/api/profiles/auto-sync", "POST", { ai_description: false }), makeMockPlatform());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("success");
+    expect(body.imported_count).toBe(0);
+    expect(body.updated_count).toBe(0);
+  });
+});

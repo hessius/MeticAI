@@ -20,8 +20,10 @@
  *   GET  /api/version     -> app version + runtime mode
  *   GET  /api/available-models -> served text models (live discovery + fallback)
  *   GET  /api/changelog   -> recent GitHub releases (best-effort)
+ *   GET  /api/status | POST /api/check-updates -> update availability (GitHub)
  *   GET  /api/update-method / /api/tailscale-status -> admin stubs
- *   /api/check-updates | /restart | /beta-channel | /feedback -> 501
+ *   POST /api/trigger-update -> 503 (no Watchtower in the unified image)
+ *   /api/restart | /beta-channel | /feedback -> 501
  */
 
 import type { Platform } from "../platform";
@@ -30,6 +32,104 @@ import { STATIC_FALLBACK_MODELS } from "../ai/modelResolver";
 
 const SETTINGS_KEY = "settings";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+
+const GITHUB_RELEASES_URL =
+  "https://api.github.com/repos/hessius/MeticAI/releases?per_page=30";
+
+/** Parse a semver like "2.1.0" into a comparable numeric tuple (pre-release stripped). */
+function versionTuple(v: string): [number, number, number] {
+  const bare = v.replace(/^v/, "").split("-")[0]!;
+  const parts = bare.split(".").map((p) => Number.parseInt(p, 10));
+  return [parts[0] || 0, parts[1] || 0, parts[2] || 0];
+}
+
+function isPrerelease(v: string): boolean {
+  return /-(beta|alpha|rc)/i.test(v.replace(/^v/, ""));
+}
+
+function gtVersion(a: string, b: string): boolean {
+  const ta = versionTuple(a);
+  const tb = versionTuple(b);
+  for (let i = 0; i < 3; i++) {
+    if (ta[i]! > tb[i]!) return true;
+    if (ta[i]! < tb[i]!) return false;
+  }
+  return false;
+}
+
+interface UpdateStatus {
+  update_available: boolean;
+  latest_version: string;
+  current_version: string;
+  last_check: string;
+  release_url: string | null;
+  latest_stable_version: string | null;
+  latest_beta_version: string | null;
+  error?: string;
+}
+
+/**
+ * Query the GitHub Releases API for the latest stable/beta versions and
+ * compare against the running version. Mirrors the Python
+ * `_fetch_latest_release`. Best-effort: returns a safe fallback on any error.
+ */
+async function fetchUpdateStatus(currentVersion: string): Promise<UpdateStatus> {
+  const now = new Date().toISOString();
+  try {
+    const resp = await fetch(GITHUB_RELEASES_URL, {
+      signal: AbortSignal.timeout(10000),
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (resp.ok) {
+      const releases = (await resp.json()) as Array<{
+        tag_name?: string;
+        prerelease?: boolean;
+        html_url?: string;
+      }>;
+      let latestStable: string | null = null;
+      let latestBeta: string | null = null;
+      let releaseUrl: string | null = null;
+      for (const release of releases) {
+        const tag = (release.tag_name || "").replace(/^v/, "");
+        if (!tag) continue;
+        const pre = release.prerelease || isPrerelease(tag);
+        if (pre) {
+          if (latestBeta === null) latestBeta = tag;
+        } else if (latestStable === null) {
+          latestStable = tag;
+          releaseUrl = release.html_url || null;
+        }
+        if (latestStable && latestBeta) break;
+      }
+      const latestVersion = latestStable || "";
+      const updateAvailable =
+        latestVersion !== "" &&
+        currentVersion !== "unknown" &&
+        gtVersion(latestVersion, currentVersion);
+      return {
+        update_available: updateAvailable,
+        latest_version: latestVersion,
+        current_version: currentVersion,
+        last_check: now,
+        release_url: releaseUrl,
+        latest_stable_version: latestStable,
+        latest_beta_version: latestBeta,
+      };
+    }
+  } catch {
+    /* fall through to safe fallback */
+  }
+  return {
+    update_available: false,
+    latest_version: "",
+    current_version: currentVersion,
+    last_check: now,
+    release_url: null,
+    latest_stable_version: null,
+    latest_beta_version: null,
+    error: "Could not reach GitHub API",
+  };
+}
 
 /** Extract the bare host from a machine base URL (e.g. http://1.2.3.4:8080 -> 1.2.3.4). */
 function machineHost(baseUrl: string): string {
@@ -173,11 +273,36 @@ export async function handleSystemRoutes(
   if (pathname === "/api/tailscale-status" && req.method === "GET") {
     return jsonResponse({ enabled: false, installed: false });
   }
+  // GET /api/status -> update availability via the GitHub Releases API.
+  if (pathname === "/api/status" && req.method === "GET") {
+    return jsonResponse(await fetchUpdateStatus(platform.appVersion || "unknown"));
+  }
+
+  // POST /api/check-updates -> a fresh update check (same source, fresh_check flag).
+  if (pathname === "/api/check-updates" && req.method === "POST") {
+    const status = await fetchUpdateStatus(platform.appVersion || "unknown");
+    return jsonResponse({ ...status, fresh_check: true });
+  }
+
+  // POST /api/trigger-update -> the unified image has no Watchtower; updates are
+  // applied by pulling a new image. Mirror Python's no-Watchtower 503 response.
+  if (pathname === "/api/trigger-update" && req.method === "POST") {
+    return jsonResponse(
+      {
+        status: "error",
+        error: "Watchtower not available",
+        message:
+          "Automatic updates require Watchtower. Update manually with: docker compose pull && docker compose up -d",
+      },
+      503,
+    );
+  }
+
   if (
-    (pathname === "/api/check-updates" ||
-      pathname === "/api/restart" ||
+    (pathname === "/api/restart" ||
       pathname === "/api/beta-channel" ||
-      pathname === "/api/feedback") &&
+      pathname === "/api/feedback" ||
+      pathname === "/api/tailscale/configure") &&
     (req.method === "GET" || req.method === "POST")
   ) {
     return jsonResponse(

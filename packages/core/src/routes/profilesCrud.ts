@@ -28,6 +28,7 @@
  *   GET    /api/profile/{name}
  *   GET    /api/profiles/sync/status
  *   POST   /api/profiles/sync
+ *   POST   /api/profiles/auto-sync
  */
 
 import type { Platform } from "../platform";
@@ -67,7 +68,11 @@ const PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="512" hei
 </svg>`;
 
 function imageResponse(bytes: Uint8Array, contentType: string): Response {
-  return new Response(bytes as unknown as BodyInit, {
+  // Uint8Array is a valid Response body at runtime on every host, but the DOM
+  // and Bun type libs disagree on the exact BodyInit shape; cast through the
+  // Response constructor's own parameter type to stay lib-agnostic.
+  type ResponseBody = ConstructorParameters<typeof Response>[0];
+  return new Response(bytes as unknown as ResponseBody, {
     status: 200,
     headers: { "Content-Type": contentType },
   });
@@ -786,6 +791,22 @@ export async function handleProfilesCrudRoutes(
   // POST /api/profiles/sync
   if (pathname === "/api/profiles/sync" && method === "POST") {
     return jsonResponse({ status: "success", new: [], updated: [], orphaned: [] });
+  }
+
+  // POST /api/profiles/auto-sync
+  // Profiles live on the machine and the SPA reads them directly, so there is
+  // no separate library to import into: auto-sync is a no-op success. Prevents
+  // a core notFound leak when the (opt-in, default-off) auto-sync preference is
+  // enabled in proxy mode.
+  if (pathname === "/api/profiles/auto-sync" && method === "POST") {
+    return jsonResponse({
+      status: "success",
+      imported: [],
+      updated: [],
+      orphaned: [],
+      imported_count: 0,
+      updated_count: 0,
+    });
   }
 
   return null;

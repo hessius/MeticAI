@@ -162,3 +162,78 @@ describe("system: admin stubs", () => {
     expect(res.status).toBe(501);
   });
 });
+
+describe("system: update status", () => {
+  const RELEASES = [
+    { tag_name: "v9.9.9", prerelease: false, html_url: "https://gh/9.9.9" },
+    { tag_name: "v9.9.9-beta.1", prerelease: true, html_url: "https://gh/beta" },
+  ];
+
+  function withStubbedFetch<T>(releases: unknown, run: () => Promise<T>): Promise<T> {
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify(releases), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })) as typeof fetch;
+    return run().finally(() => {
+      globalThis.fetch = original;
+    });
+  }
+
+  test("GET /api/status reports an available update when GitHub is ahead", async () => {
+    const p = makeMockPlatform({ appVersion: "1.0.0" });
+    const body = await withStubbedFetch(RELEASES, async () =>
+      (await handle(get("/api/status"), p)).json(),
+    );
+    expect(body.update_available).toBe(true);
+    expect(body.current_version).toBe("1.0.0");
+    expect(body.latest_stable_version).toBe("9.9.9");
+    expect(body.latest_beta_version).toBe("9.9.9-beta.1");
+    expect(body.release_url).toBe("https://gh/9.9.9");
+  });
+
+  test("GET /api/status reports no update when current is newest", async () => {
+    const p = makeMockPlatform({ appVersion: "99.0.0" });
+    const body = await withStubbedFetch(RELEASES, async () =>
+      (await handle(get("/api/status"), p)).json(),
+    );
+    expect(body.update_available).toBe(false);
+  });
+
+  test("POST /api/check-updates sets fresh_check", async () => {
+    const p = makeMockPlatform({ appVersion: "1.0.0" });
+    const body = await withStubbedFetch(RELEASES, async () =>
+      (await handle(post("/api/check-updates", {}), p)).json(),
+    );
+    expect(body.fresh_check).toBe(true);
+    expect(body.update_available).toBe(true);
+  });
+
+  test("GET /api/status degrades safely when GitHub is unreachable", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      throw new Error("network down");
+    }) as typeof fetch;
+    try {
+      const body = await (await handle(get("/api/status"), makeMockPlatform({ appVersion: "1.0.0" }))).json();
+      expect(body.update_available).toBe(false);
+      expect(body.error).toBeDefined();
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("POST /api/trigger-update returns 503 (no Watchtower)", async () => {
+    const res = await handle(post("/api/trigger-update", {}), makeMockPlatform());
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.status).toBe("error");
+    expect(body.message).toContain("docker compose");
+  });
+
+  test("POST /api/tailscale/configure is 501 (bring-up not on this server)", async () => {
+    const res = await handle(post("/api/tailscale/configure", { enabled: true }), makeMockPlatform());
+    expect(res.status).toBe(501);
+  });
+});

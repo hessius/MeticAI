@@ -14,6 +14,7 @@ import { handleShotsReadRoutes } from "./routes/shotsRead";
 import { handleMachineCommandRoutes } from "./routes/machineCommands";
 import { handleProfilesCrudRoutes } from "./routes/profilesCrud";
 import { handleRecipesRoutes } from "./routes/recipes";
+import { handleSchedulingRoutes } from "./routes/scheduling";
 
 /**
  * The single shared request handler for the unified TS core.
@@ -74,6 +75,9 @@ export async function handle(req: Request, platform: Platform): Promise<Response
 
   const recipes = await handleRecipesRoutes(req, platform);
   if (recipes) return recipes;
+
+  const scheduling = await handleSchedulingRoutes(req, platform);
+  if (scheduling) return scheduling;
 
   return notFound(`No route for ${req.method} ${pathname}`);
 }
