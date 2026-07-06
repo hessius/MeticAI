@@ -3433,10 +3433,16 @@ export function installDirectModeInterceptor(): void {
                       }
                     } else if (dynamics && typeof dynamics === 'object') {
                       const d = dynamics as Record<string, unknown>
-                      if (Array.isArray(d.points) && d.points.length > 0 && typeof d.points[0] === 'object' && !Array.isArray(d.points[0])) {
-                        d.points = (d.points as Array<Record<string, unknown>>).map(pt => [
-                          Number(resolve(pt.time)) || 0, Number(resolve(pt.value)) || 0
-                        ])
+                      if (Array.isArray(d.points) && d.points.length > 0) {
+                        if (Array.isArray(d.points[0])) {
+                          d.points = (d.points as Array<Array<unknown>>).map(pt => [
+                            Number(resolve(pt[0])) || 0, Number(resolve(pt[1])) || 0
+                          ])
+                        } else if (typeof d.points[0] === 'object') {
+                          d.points = (d.points as Array<Record<string, unknown>>).map(pt => [
+                            Number(resolve(pt.time)) || 0, Number(resolve(pt.value)) || 0
+                          ])
+                        }
                       }
                       if (!d.over) d.over = 'time'
                       if (!d.interpolation) d.interpolation = 'linear'

@@ -20,9 +20,12 @@
     "./logic/profileDescription": "./src/logic/profileDescription.ts",
     "./logic/profileRecommendation": "./src/logic/profileRecommendation.ts",
     "./logic/recommendationsParse": "./src/logic/recommendationsParse.ts",
+    "./logic/profileValidator": "./src/logic/profileValidator.ts",
+    "./logic/oepf": "./src/logic/oepf.ts",
     "./ai/aiErrors": "./src/ai/aiErrors.ts",
     "./ai/analysisKnowledge": "./src/ai/analysisKnowledge.ts",
     "./ai/prompts": "./src/ai/prompts.ts",
+    "./ai/profilePromptFull": "./src/ai/profilePromptFull.ts",
     "./routes/annotations": "./src/routes/annotations.ts",
     "./routes/dialin": "./src/routes/dialin.ts",
     "./routes/dialinPrompt": "./src/routes/dialinPrompt.ts",
@@ -31,7 +34,8 @@
     "./routes/shots": "./src/routes/shots.ts",
     "./routes/profiles": "./src/routes/profiles.ts",
     "./routes/profileApply": "./src/routes/profileApply.ts",
-    "./routes/profileDescription": "./src/routes/profileDescription.ts"
+    "./routes/profileDescription": "./src/routes/profileDescription.ts",
+    "./routes/analyzeAndProfile": "./src/routes/analyzeAndProfile.ts"
   },
   "scripts": {
     "test": "vitest run",

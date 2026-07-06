@@ -7,6 +7,7 @@ import { handleShotAnalysisRoutes } from "./routes/shots";
 import { handleProfileRecommendationRoutes } from "./routes/profiles";
 import { handleApplyRecommendationsRoute } from "./routes/profileApply";
 import { handleRegenerateDescriptionRoute } from "./routes/profileDescription";
+import { handleAnalyzeAndProfileRoute } from "./routes/analyzeAndProfile";
 
 /**
  * The single shared request handler for the unified TS core.
@@ -46,6 +47,9 @@ export async function handle(req: Request, platform: Platform): Promise<Response
 
   const regenerateDescription = await handleRegenerateDescriptionRoute(req, platform);
   if (regenerateDescription) return regenerateDescription;
+
+  const analyzeAndProfile = await handleAnalyzeAndProfileRoute(req, platform);
+  if (analyzeAndProfile) return analyzeAndProfile;
 
   return notFound(`No route for ${req.method} ${pathname}`);
 }
