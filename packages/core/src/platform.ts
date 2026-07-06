@@ -100,4 +100,6 @@ export interface Platform {
   scheduler?: Scheduler;
   clock: () => number;
   logger: Logger;
+  /** Optional app/build version surfaced by GET /api/version (defaults to "unknown"). */
+  appVersion?: string;
 }

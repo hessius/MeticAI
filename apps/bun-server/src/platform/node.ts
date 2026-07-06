@@ -9,7 +9,7 @@
  */
 
 import { mkdir, readFile, writeFile, readdir, unlink, rename } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { GoogleGenAI } from "@google/genai";
 import type {
@@ -268,6 +268,24 @@ function resolveMachineBaseUrl(override?: string): string {
   return ip.includes(":") ? `http://${ip}` : `http://${ip}:${MACHINE_PORT}`;
 }
 
+/** App version for GET /api/version: $APP_VERSION, else the repo VERSION file, else "unknown". */
+function resolveAppVersion(): string {
+  const env = process.env.APP_VERSION?.trim();
+  if (env) return env;
+  for (const candidate of ["VERSION", "../VERSION", "../../VERSION", "../../../VERSION"]) {
+    try {
+      const p = join(process.cwd(), candidate);
+      if (existsSync(p)) {
+        const v = readFileSync(p, "utf8").trim();
+        if (v) return v;
+      }
+    } catch {
+      /* ignore and try the next candidate */
+    }
+  }
+  return "unknown";
+}
+
 export function createNodePlatform(options: NodePlatformOptions = {}): Platform {
   const dataDir =
     options.dataDir ?? process.env.DATA_DIR ?? join(process.cwd(), "data");
@@ -322,5 +340,6 @@ export function createNodePlatform(options: NodePlatformOptions = {}): Platform 
     scheduler: timerScheduler(logger),
     clock,
     logger,
+    appVersion: resolveAppVersion(),
   };
 }

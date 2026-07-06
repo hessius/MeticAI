@@ -8,6 +8,7 @@ import { handleProfileRecommendationRoutes } from "./routes/profiles";
 import { handleApplyRecommendationsRoute } from "./routes/profileApply";
 import { handleRegenerateDescriptionRoute } from "./routes/profileDescription";
 import { handleAnalyzeAndProfileRoute } from "./routes/analyzeAndProfile";
+import { handleSystemRoutes } from "./routes/system";
 
 /**
  * The single shared request handler for the unified TS core.
@@ -50,6 +51,9 @@ export async function handle(req: Request, platform: Platform): Promise<Response
 
   const analyzeAndProfile = await handleAnalyzeAndProfileRoute(req, platform);
   if (analyzeAndProfile) return analyzeAndProfile;
+
+  const system = await handleSystemRoutes(req, platform);
+  if (system) return system;
 
   return notFound(`No route for ${req.method} ${pathname}`);
 }

@@ -194,6 +194,8 @@ export interface BrowserPlatformDeps {
   /** Machine base URL resolver. Defaults to `getDefaultMachineUrl`. */
   machineBaseUrl?: () => string;
   clock?: () => number;
+  /** App/build version for GET /api/version. Defaults to the `__APP_VERSION__` build define. */
+  appVersion?: string;
   /** Active AI provider resolver. Defaults to the configured provider. */
   aiProvider?: () => AIProvider;
   /** Whether AI is configured. Defaults to `isAIConfigured`. */
@@ -251,5 +253,9 @@ export function createBrowserPlatform(deps: BrowserPlatformDeps = {}): Platform 
     ai: providerAI(getProvider, configured),
     clock,
     logger: consoleLogger(),
+    appVersion:
+      deps.appVersion ??
+      ((globalThis as Record<string, unknown>).__APP_VERSION__ as string | undefined) ??
+      "unknown",
   };
 }
