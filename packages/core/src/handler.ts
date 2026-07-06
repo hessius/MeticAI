@@ -13,6 +13,7 @@ import { handleHistoryRoutes } from "./routes/history";
 import { handleShotsReadRoutes } from "./routes/shotsRead";
 import { handleMachineCommandRoutes } from "./routes/machineCommands";
 import { handleProfilesCrudRoutes } from "./routes/profilesCrud";
+import { handleRecipesRoutes } from "./routes/recipes";
 
 /**
  * The single shared request handler for the unified TS core.
@@ -70,6 +71,9 @@ export async function handle(req: Request, platform: Platform): Promise<Response
 
   const profilesCrud = await handleProfilesCrudRoutes(req, platform);
   if (profilesCrud) return profilesCrud;
+
+  const recipes = await handleRecipesRoutes(req, platform);
+  if (recipes) return recipes;
 
   return notFound(`No route for ${req.method} ${pathname}`);
 }

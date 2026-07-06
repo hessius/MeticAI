@@ -43,6 +43,8 @@ htmlcov/
 data/
 !data/PourOverBase.json
 !data/recipes/
+!packages/core/src/data/
+!packages/core/src/data/**
 
 # Update tracking
 .versions.json

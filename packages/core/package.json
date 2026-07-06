@@ -36,7 +36,9 @@
     "./routes/profileApply": "./src/routes/profileApply.ts",
     "./routes/profileDescription": "./src/routes/profileDescription.ts",
     "./routes/analyzeAndProfile": "./src/routes/analyzeAndProfile.ts",
-    "./ai/modelResolver": "./src/ai/modelResolver.ts"
+    "./ai/modelResolver": "./src/ai/modelResolver.ts",
+    "./data/recipes": "./src/data/recipes.ts",
+    "./routes/recipes": "./src/routes/recipes.ts"
   },
   "scripts": {
     "test": "vitest run",
