@@ -426,3 +426,123 @@ describe("profiles-crud: sync + orphaned + profile json", () => {
     expect(body.profile).toEqual({ id: "p1", name: "Turbo" });
   });
 });
+
+describe("profiles-crud: image-proxy", () => {
+  const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+  /** A machine that serves the profile list plus a binary image at a path. */
+  function imageMachine(
+    list: unknown[],
+    fullById: Record<string, unknown> = {},
+    imageByPath: Record<string, { bytes: Uint8Array; contentType: string }> = {},
+  ): Platform["machine"] {
+    return {
+      getBaseUrl: () => "http://machine.test:8080",
+      fetch: async (path: string) => {
+        const pathname = path.startsWith("http") ? new URL(path).pathname : path.split("?")[0]!;
+        if (pathname === "/api/v1/profile/list") {
+          return new Response(JSON.stringify(list), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        const getMatch = pathname.match(/^\/api\/v1\/profile\/get\/(.+)$/);
+        if (getMatch && fullById[getMatch[1]!]) {
+          return new Response(JSON.stringify(fullById[getMatch[1]!]), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (imageByPath[pathname]) {
+          const { bytes, contentType } = imageByPath[pathname]!;
+          return new Response(bytes as unknown as BodyInit, {
+            status: 200,
+            headers: { "content-type": contentType },
+          });
+        }
+        return new Response(JSON.stringify({ detail: "not found" }), {
+          status: 404,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    };
+  }
+
+  test("fetches a machine-relative image and returns the bytes", async () => {
+    const p = makeMockPlatform({
+      machine: imageMachine(
+        [{ id: "p1", name: "Turbo", display: { image: "/images/turbo.png" } }],
+        {},
+        { "/images/turbo.png": { bytes: PNG_BYTES, contentType: "image/png" } },
+      ),
+    });
+    const res = await handle(get("/api/profile/Turbo/image-proxy"), p);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/png");
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(PNG_BYTES);
+  });
+
+  test("fetches the full profile when the list entry lacks an image", async () => {
+    const p = makeMockPlatform({
+      machine: imageMachine(
+        [{ id: "p1", name: "Turbo" }],
+        { p1: { id: "p1", name: "Turbo", display: { image: "/images/turbo.png" } } },
+        { "/images/turbo.png": { bytes: PNG_BYTES, contentType: "image/png" } },
+      ),
+    });
+    const res = await handle(get("/api/profile/Turbo/image-proxy"), p);
+    expect(res.status).toBe(200);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(PNG_BYTES);
+  });
+
+  test("decodes a data: URI image", async () => {
+    // "data:image/png;base64," + base64 of the PNG_BYTES signature
+    const b64 = "iVBORw0KGgo=";
+    const p = makeMockPlatform({
+      machine: imageMachine([
+        { id: "p1", name: "Turbo", display: { image: `data:image/png;base64,${b64}` } },
+      ]),
+    });
+    const res = await handle(get("/api/profile/Turbo/image-proxy"), p);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/png");
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(PNG_BYTES);
+  });
+
+  test("returns a placeholder SVG when the profile is missing", async () => {
+    const p = makeMockPlatform({ machine: imageMachine([]) });
+    const res = await handle(get("/api/profile/Ghost/image-proxy"), p);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await res.text()).toContain("<svg");
+  });
+
+  test("returns a placeholder SVG when the profile has no image", async () => {
+    const p = makeMockPlatform({
+      machine: imageMachine([{ id: "p1", name: "Turbo" }], { p1: { id: "p1", name: "Turbo" } }),
+    });
+    const res = await handle(get("/api/profile/Turbo/image-proxy"), p);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
+  });
+
+  test("serves a cached image on the second request without refetching", async () => {
+    let fetchCount = 0;
+    const base = imageMachine(
+      [{ id: "p1", name: "Turbo", display: { image: "/images/turbo.png" } }],
+      {},
+      { "/images/turbo.png": { bytes: PNG_BYTES, contentType: "image/png" } },
+    );
+    const counting: Platform["machine"] = {
+      getBaseUrl: base.getBaseUrl,
+      fetch: async (path, init) => {
+        if (path.includes("/images/")) fetchCount++;
+        return base.fetch(path, init);
+      },
+    };
+    const p = makeMockPlatform({ machine: counting });
+    await handle(get("/api/profile/Turbo/image-proxy"), p);
+    await handle(get("/api/profile/Turbo/image-proxy"), p);
+    expect(fetchCount).toBe(1);
+  });
+});

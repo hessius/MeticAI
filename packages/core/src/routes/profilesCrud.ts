@@ -23,6 +23,7 @@
  *   GET    /api/machine/profiles/orphaned
  *   GET    /api/machine/profile/{id}/json
  *   GET    /api/profile/{name}/target-curves
+ *   GET    /api/profile/{name}/image-proxy
  *   PUT    /api/profile/{name}/edit
  *   GET    /api/profile/{name}
  *   GET    /api/profiles/sync/status
@@ -55,6 +56,57 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Placeholder returned when a profile has no image (avoids console 404s). */
+const PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 256 256">
+<rect width="256" height="256" fill="#2d2d2d"/>
+<path fill="#6b5b47" d="M128 32c-53 0-96 43-96 96s43 96 96 96 96-43 96-96-43-96-96-96zm0 176c-44.2 0-80-35.8-80-80s35.8-80 80-80 80 35.8 80 80-35.8 80-80 80z"/>
+<path fill="#8b7355" d="M128 56c-39.8 0-72 32.2-72 72s32.2 72 72 72 72-32.2 72-72-32.2-72-72-72zm0 128c-30.9 0-56-25.1-56-56s25.1-56 56-56 56 25.1 56 56-25.1 56-56 56z"/>
+<ellipse cx="128" cy="128" rx="32" ry="40" fill="#6b5b47"/>
+</svg>`;
+
+function imageResponse(bytes: Uint8Array, contentType: string): Response {
+  return new Response(bytes as unknown as BodyInit, {
+    status: 200,
+    headers: { "Content-Type": contentType },
+  });
+}
+
+function placeholderImageResponse(): Response {
+  return new Response(PLACEHOLDER_SVG, {
+    status: 200,
+    headers: { "Content-Type": "image/svg+xml" },
+  });
+}
+
+function base64Decode(encoded: string): Uint8Array | null {
+  try {
+    if (typeof atob === "function") {
+      const binary = atob(encoded);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    }
+    const buf = (globalThis as { Buffer?: { from(s: string, e: string): Uint8Array } }).Buffer;
+    if (buf) return new Uint8Array(buf.from(encoded, "base64"));
+  } catch {
+    /* fall through */
+  }
+  return null;
+}
+
+/** Decode a base64 `data:image/*;base64,...` URI. Returns null when malformed. */
+function parseDataImageUri(uri: string): { mimeType: string; bytes: Uint8Array } | null {
+  const commaIdx = uri.indexOf(",");
+  if (commaIdx === -1) return null;
+  const header = uri.slice(0, commaIdx);
+  const encoded = uri.slice(commaIdx + 1);
+  if (!header.endsWith(";base64") || !header.startsWith("data:image/")) return null;
+  const mimeType = header.slice(5, header.length - 7).trim().toLowerCase();
+  if (!mimeType.startsWith("image/")) return null;
+  const bytes = base64Decode(encoded);
+  return bytes ? { mimeType, bytes } : null;
 }
 
 async function machineOk(platform: Platform, path: string, init?: RequestInit): Promise<boolean> {
@@ -501,6 +553,74 @@ export async function handleProfilesCrudRoutes(
       method: "DELETE",
     });
     return jsonResponse({ success: ok }, ok ? 200 : 502);
+  }
+
+  // GET /api/profile/{name}/image-proxy → fetch the profile image from the
+  // machine and return the bytes, so the SPA never needs the machine IP.
+  // Mirrors apps/server/api/routes/profiles.py + the native interceptor: the
+  // image path may be a data: URI or a machine-relative path; missing images
+  // degrade to a placeholder SVG (avoids browser console errors).
+  const imageProxyMatch = pathname.match(/^\/api\/profile\/([^/]+)\/image-proxy$/);
+  if (imageProxyMatch && method === "GET") {
+    const name = decodeURIComponent(imageProxyMatch[1]!);
+    const forceRefresh = url.searchParams.get("force_refresh") === "true";
+    const cacheKey = `image-proxy:${name}`;
+    try {
+      if (!forceRefresh) {
+        const cached = await platform.storage.images.read(cacheKey);
+        if (cached) return imageResponse(cached, "image/png");
+      }
+
+      let profile = await findProfileByName(platform, name);
+      if (!profile) return placeholderImageResponse();
+
+      // The list omits stages/display for some entries; fetch the full profile
+      // so display.image is present.
+      let imagePath = profileImagePath(profile);
+      if (!imagePath) {
+        try {
+          const fullResp = await platform.machine.fetch(`/api/v1/profile/get/${profile.id}`);
+          if (fullResp.ok) {
+            const full = (await fullResp.json()) as MachineProfile;
+            if (full && typeof full.id === "string") profile = full;
+            imagePath = profileImagePath(profile);
+          }
+        } catch {
+          /* fall through to placeholder */
+        }
+      }
+      if (!imagePath) return placeholderImageResponse();
+
+      if (imagePath.startsWith("data:image/")) {
+        const parsed = parseDataImageUri(imagePath);
+        if (!parsed) return placeholderImageResponse();
+        await platform.storage.images.write(cacheKey, parsed.bytes);
+        return imageResponse(parsed.bytes, parsed.mimeType);
+      }
+
+      // Absolute machine URLs are reduced to their path so machine.fetch can
+      // join them onto the resolved base URL uniformly across hosts.
+      let fetchPath = imagePath;
+      if (/^https?:\/\//i.test(imagePath)) {
+        try {
+          const parsedUrl = new URL(imagePath);
+          fetchPath = `${parsedUrl.pathname}${parsedUrl.search}`;
+        } catch {
+          return placeholderImageResponse();
+        }
+      }
+
+      const imgResp = await platform.machine.fetch(fetchPath);
+      if (!imgResp.ok) return placeholderImageResponse();
+      const bytes = new Uint8Array(await imgResp.arrayBuffer());
+      const rawType = imgResp.headers.get("content-type") ?? "";
+      const mediaType = rawType.split(";", 1)[0]!.trim();
+      const contentType = mediaType.startsWith("image/") ? mediaType : "image/png";
+      await platform.storage.images.write(cacheKey, bytes);
+      return imageResponse(bytes, contentType);
+    } catch {
+      return placeholderImageResponse();
+    }
   }
 
   // GET /api/profile/{name}/target-curves
