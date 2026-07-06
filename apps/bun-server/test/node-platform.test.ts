@@ -58,6 +58,30 @@ describe("createNodePlatform storage", () => {
     expect(await platform.storage.settings.list()).toEqual([{ meticulousIp: "1.2.3.4" }]);
   });
 
+  test("keyed-map annotations repo handles slash-containing ids in one file", async () => {
+    const dataDir = await tempDir();
+    const platform = createNodePlatform({ dataDir });
+    const annotations = platform.storage.annotations;
+
+    // Keys mirror the shot layout `${date}/${filename}` (contain a slash).
+    await annotations.write("2024-01-15/a.json", { key: "2024-01-15/a.json", rating: 4 });
+    await annotations.write("2024-01-15/b.json", { key: "2024-01-15/b.json", rating: 2 });
+
+    expect(await annotations.read("2024-01-15/a.json")).toEqual({
+      key: "2024-01-15/a.json",
+      rating: 4,
+    });
+    expect((await annotations.list()).length).toBe(2);
+
+    // All entries live in a single JSON object file (Python-compatible layout).
+    const raw = JSON.parse(await readFile(join(dataDir, "shot_annotations.json"), "utf8"));
+    expect(Object.keys(raw).sort()).toEqual(["2024-01-15/a.json", "2024-01-15/b.json"]);
+
+    await annotations.delete("2024-01-15/a.json");
+    expect(await annotations.read("2024-01-15/a.json")).toBeNull();
+    expect((await annotations.list()).length).toBe(1);
+  });
+
   test("aiCache honors TTL expiry", async () => {
     const platform = createNodePlatform({ dataDir: await tempDir() });
     await platform.storage.aiCache.set("k", { v: 1 }, 10_000);

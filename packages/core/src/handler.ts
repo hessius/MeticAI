@@ -1,5 +1,6 @@
 import type { Platform } from "./platform";
 import { jsonResponse, notFound } from "./http";
+import { handleAnnotationRoutes } from "./routes/annotations";
 
 /**
  * The single shared request handler for the unified TS core.
@@ -8,15 +9,19 @@ import { jsonResponse, notFound } from "./http";
  *  - the browser installs it over `window.fetch` for direct (native) mode,
  *  - the Bun server consumes it via `Bun.serve({ fetch })` for proxy mode.
  *
- * Route families are registered incrementally in Phase 2; for now the handler
- * exposes only the health probe so the contract harness can lock the contract.
+ * Route families are registered incrementally; each `handle*Routes` dispatcher
+ * returns `null` when the request is not one of its routes so the next family
+ * can try it.
  */
-export async function handle(req: Request, _platform: Platform): Promise<Response> {
+export async function handle(req: Request, platform: Platform): Promise<Response> {
   const { pathname } = new URL(req.url);
 
   if (req.method === "GET" && pathname === "/api/health") {
     return jsonResponse({ status: "ok" });
   }
+
+  const annotation = await handleAnnotationRoutes(req, platform);
+  if (annotation) return annotation;
 
   return notFound(`No route for ${req.method} ${pathname}`);
 }

@@ -19,7 +19,8 @@
     "./logic/profileRecommendation": "./src/logic/profileRecommendation.ts",
     "./ai/aiErrors": "./src/ai/aiErrors.ts",
     "./ai/analysisKnowledge": "./src/ai/analysisKnowledge.ts",
-    "./ai/prompts": "./src/ai/prompts.ts"
+    "./ai/prompts": "./src/ai/prompts.ts",
+    "./routes/annotations": "./src/routes/annotations.ts"
   },
   "scripts": {
     "test": "vitest run",

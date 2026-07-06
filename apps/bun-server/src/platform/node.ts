@@ -96,6 +96,47 @@ function fsSingletonRepo<T>(file: string): Repo<T> {
   };
 }
 
+/**
+ * A single-file repository backed by one JSON object that maps id -> document
+ * (e.g. shot_annotations.json). Unlike the directory repo, ids may contain any
+ * character (including `/`), so this suits keys like `${date}/${filename}`.
+ */
+function fsKeyedMapRepo<T>(file: string): Repo<T> {
+  const loadMap = async (): Promise<Record<string, T>> => {
+    if (!existsSync(file)) return {};
+    try {
+      const parsed = JSON.parse(await readFile(file, "utf8"));
+      return parsed && typeof parsed === "object" ? (parsed as Record<string, T>) : {};
+    } catch {
+      return {};
+    }
+  };
+  const saveMap = async (map: Record<string, T>): Promise<void> => {
+    await atomicWrite(file, JSON.stringify(map, null, 2));
+  };
+  return {
+    async read(id) {
+      const map = await loadMap();
+      return Object.prototype.hasOwnProperty.call(map, id) ? map[id]! : null;
+    },
+    async list() {
+      return Object.values(await loadMap());
+    },
+    async write(id, value) {
+      const map = await loadMap();
+      map[id] = value;
+      await saveMap(map);
+    },
+    async delete(id) {
+      const map = await loadMap();
+      if (Object.prototype.hasOwnProperty.call(map, id)) {
+        delete map[id];
+        await saveMap(map);
+      }
+    },
+  };
+}
+
 interface CacheEntry {
   value: unknown;
   expiresAt: number | null;
@@ -214,7 +255,7 @@ export function createNodePlatform(options: NodePlatformOptions = {}): Platform 
     storage: {
       settings,
       history: fsSingletonRepo(join(dataDir, "profile_history.json")),
-      annotations: fsRepo(join(dataDir, "annotations")),
+      annotations: fsKeyedMapRepo(join(dataDir, "shot_annotations.json")),
       dialInSessions: fsRepo(join(dataDir, "dial_in_sessions")),
       pourOverPrefs: fsSingletonRepo(join(dataDir, "pour_over_prefs.json")),
       schedules: fsRepo(join(dataDir, "schedules")),
