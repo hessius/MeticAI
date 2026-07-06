@@ -88,3 +88,6 @@ testflight.md
 
 # Brainstorming visual companion
 .superpowers/
+
+# TypeScript incremental build info
+*.tsbuildinfo
