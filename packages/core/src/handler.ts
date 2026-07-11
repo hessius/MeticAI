@@ -26,8 +26,12 @@ import { handleSchedulingRoutes } from "./routes/scheduling";
  * Route families are registered incrementally; each `handle*Routes` dispatcher
  * returns `null` when the request is not one of its routes so the next family
  * can try it.
+ *
+ * `tryHandle` returns `null` when no route matched, which lets a host layer fall
+ * through to a legacy handler during an incremental cutover. `handle` wraps it
+ * with a terminal 404 for hosts that own the whole request surface.
  */
-export async function handle(req: Request, platform: Platform): Promise<Response> {
+export async function tryHandle(req: Request, platform: Platform): Promise<Response | null> {
   const { pathname } = new URL(req.url);
 
   if (req.method === "GET" && pathname === "/api/health") {
@@ -79,5 +83,12 @@ export async function handle(req: Request, platform: Platform): Promise<Response
   const scheduling = await handleSchedulingRoutes(req, platform);
   if (scheduling) return scheduling;
 
+  return null;
+}
+
+export async function handle(req: Request, platform: Platform): Promise<Response> {
+  const matched = await tryHandle(req, platform);
+  if (matched) return matched;
+  const { pathname } = new URL(req.url);
   return notFound(`No route for ${req.method} ${pathname}`);
 }

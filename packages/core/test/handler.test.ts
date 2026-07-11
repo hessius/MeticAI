@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { handle } from "../src/handler";
+import { handle, tryHandle } from "../src/handler";
 import { makeMockPlatform } from "./mockPlatform";
 
 describe("core handler contract", () => {
@@ -22,5 +22,26 @@ describe("core handler contract", () => {
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };
     expect(body.error).toContain("/api/does-not-exist");
+  });
+});
+
+describe("tryHandle fallthrough contract", () => {
+  const platform = makeMockPlatform();
+
+  it("returns a Response for a matched route", async () => {
+    const res = await tryHandle(
+      new Request("http://local/api/health"),
+      platform,
+    );
+    expect(res).not.toBeNull();
+    expect(res?.status).toBe(200);
+  });
+
+  it("returns null (not a 404) for an unmatched route so a host can fall through", async () => {
+    const res = await tryHandle(
+      new Request("http://local/api/does-not-exist"),
+      platform,
+    );
+    expect(res).toBeNull();
   });
 });
