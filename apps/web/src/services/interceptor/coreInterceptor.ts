@@ -1,20 +1,15 @@
-import { tryHandle } from "@metic/core";
+import { tryHandle, type Platform } from "@metic/core";
 import { createBrowserPlatform } from "@/services/platform/browserPlatform";
-import { getDirectRequestContext, isMeticAIProxyApiPath } from "./directModeHttp";
+import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from "./directModeHttp";
+import { handleBrowserNativeRoutes } from "./browserNativeRoutes";
 
 export interface CoreInterceptorDeps {
   /**
-   * The original, unpatched `window.fetch`, captured before any interceptor was
-   * installed. Used by the browser Platform to reach the machine without
-   * re-entering this or the legacy interceptor.
+   * The original, unpatched `window.fetch`, captured before the interceptor was
+   * installed. Used by the browser Platform (and the machine-native passthrough)
+   * to reach the machine without re-entering this interceptor.
    */
   originalFetch: typeof fetch;
-  /**
-   * The handler to delegate to when core does not recognise a route. In
-   * practice this is the already-installed `DirectModeInterceptor` fetch, so
-   * every route core has not yet taken over keeps working unchanged.
-   */
-  fallbackFetch: typeof fetch;
 }
 
 function currentOrigin(): string {
@@ -23,9 +18,9 @@ function currentOrigin(): string {
 
 /**
  * Normalise any fetch input into a single `Request` with an absolute URL and a
- * buffered body, so it can be cloned for the core handler while remaining
- * usable for the fallback path (constructing a `Request` from another `Request`
- * would otherwise disturb the original's body).
+ * buffered body, so it can be cloned for the browser-native shim and the core
+ * handler (constructing a `Request` from another `Request` would otherwise
+ * disturb the original's body).
  */
 function toCanonicalRequest(input: RequestInfo | URL, init?: RequestInit): Request {
   if (input instanceof Request && !init) return input;
@@ -41,18 +36,17 @@ function toCanonicalRequest(input: RequestInfo | URL, init?: RequestInit): Reque
 }
 
 /**
- * Layer the shared `@metic/core` handler on top of the existing direct-mode
- * fetch. For MeticAI proxy API paths it asks core first; core answers the
- * routes it owns and returns `null` for the rest, which delegates to
- * `fallbackFetch` (the legacy `DirectModeInterceptor`). Non-proxy URLs and
- * machine-native `/api/v1/...` calls bypass core entirely.
+ * Install the shared `@metic/core` handler as the direct-mode request path.
  *
- * Install AFTER `installDirectModeInterceptor()` so `fallbackFetch` is the
- * legacy interceptor.
+ * MeticAI proxy API routes (`/api/*`, excluding machine-native `/api/v1/*`) are
+ * served by, in order: the browser-native shim (canvas/sessionStorage-bound
+ * routes core cannot own) and then core's `tryHandle`. A route owned by neither
+ * returns a terminal 404, matching core's server-side `handle`. Machine-native
+ * and external URLs bypass core entirely and go to the original fetch.
  */
 export function installCoreInterceptor(deps: CoreInterceptorDeps): void {
-  const { originalFetch, fallbackFetch } = deps;
-  const platform = createBrowserPlatform({ fetchImpl: originalFetch });
+  const { originalFetch } = deps;
+  const platform: Platform = createBrowserPlatform({ fetchImpl: originalFetch });
 
   window.fetch = function coreModeFetch(
     input: RequestInfo | URL,
@@ -60,23 +54,27 @@ export function installCoreInterceptor(deps: CoreInterceptorDeps): void {
   ): Promise<Response> {
     const { url } = getDirectRequestContext(input, init);
 
-    // Only proxy-API routes are candidates for core; machine-native and
-    // external URLs go straight to the legacy path.
+    // Machine-native (`/api/v1/*`) and external URLs are not core's concern.
     if (!isMeticAIProxyApiPath(url)) {
-      return fallbackFetch(input, init);
+      return originalFetch(input, init);
     }
 
     return (async () => {
       const canonical = toCanonicalRequest(input, init);
-      let handled: Response | null;
       try {
-        handled = await tryHandle(canonical.clone(), platform);
+        const native = await handleBrowserNativeRoutes(canonical.clone(), platform);
+        if (native) return native;
+        const handled = await tryHandle(canonical.clone(), platform);
+        if (handled) return handled;
       } catch (err) {
-        console.error("[coreInterceptor] core handler threw; falling back", err);
-        handled = null;
+        console.error("[coreInterceptor] handler threw", err);
+        return jsonResponse(
+          { detail: err instanceof Error ? err.message : "Internal error" },
+          500,
+        );
       }
-      if (handled) return handled;
-      return fallbackFetch(canonical);
+      const { pathname } = new URL(canonical.url);
+      return jsonResponse({ detail: `No route for ${canonical.method} ${pathname}` }, 404);
     })();
   };
 }
