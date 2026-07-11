@@ -75,6 +75,9 @@ import { useStorageMigration } from '@/services/storage'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { useBrewNotifications } from '@/hooks/useBrewNotifications'
 import { useSoundEffects, useGlobalSoundDelegation } from '@/hooks/useSoundEffects'
+import { useAndroidBackButton } from '@/hooks/useAndroidBackButton'
+import { closeTopmostOverlay } from '@/lib/backNavigation'
+import { hasUnsavedChanges } from '@/lib/unsavedChanges'
 
 function App() {
   const { t } = useTranslation()
@@ -863,24 +866,23 @@ function App() {
     setViewState('start')
   }, [refreshProfileCount])
 
-  // Swipe navigation for mobile - back navigation via swipe right
-  const handleSwipeRight = useCallback(() => {
-    if (!isMobile) return
-    
-    // Handle back navigation based on current view
+  // Shared back-navigation mapping used by both the mobile swipe gesture and
+  // the Android hardware back button. Returns true if it navigated, false if
+  // there was nowhere to go back to (e.g. the main screen).
+  const navigateBack = useCallback((): boolean => {
     switch (viewState) {
       case 'form':
         handleBackToStart()
-        break
+        return true
       case 'results':
         handleReset()
-        break
+        return true
       case 'history-detail':
         setViewState('profile-catalogue')
-        break
+        return true
       case 'profile-catalogue':
         handleBackToStart()
-        break
+        return true
       case 'settings':
       case 'pour-over':
       case 'live-shot':
@@ -888,7 +890,7 @@ function App() {
       case 'dial-in':
       case 'machine-status':
         handleBackToStart()
-        break
+        return true
       case 'shot-history': {
         const prev = previousViewStateRef.current
         if (prev === 'shot-analysis' || prev === 'history-detail') {
@@ -896,19 +898,40 @@ function App() {
         } else {
           handleBackToStart()
         }
-        break
+        return true
       }
-      // Don't navigate on start, loading, or error views - but still block browser gesture
+      // start, loading, onboarding, error: nowhere to go back to.
       default:
-        break
+        return false
     }
-  }, [isMobile, viewState, handleBackToStart, handleReset, setViewState])
+  }, [viewState, handleBackToStart, handleReset, setViewState])
+
+  // Swipe navigation for mobile - back navigation via swipe right
+  const handleSwipeRight = useCallback(() => {
+    if (!isMobile) return
+    navigateBack()
+  }, [isMobile, navigateBack])
 
   useSwipeNavigation({
     onSwipeRight: handleSwipeRight,
     // Keep enabled on mobile to always block browser's native back gesture
     enabled: isMobile,
   })
+
+  // Android hardware back button. Priority: close an open modal/dialog/menu,
+  // otherwise confirm before discarding unsaved edits and navigate to the
+  // previous view. On the main screen there is nowhere to go back to, so the
+  // press is intentionally a no-op (the app is not exited).
+  const handleAndroidBack = useCallback(() => {
+    if (closeTopmostOverlay()) return
+    if (qrDialogOpen) { setQrDialogOpen(false); return }
+    if (showAddProfileDialog) { setShowAddProfileDialog(false); return }
+    if (pendingImportUrl) { setPendingImportUrl(null); return }
+    if (hasUnsavedChanges() && !window.confirm(t('profileEdit.unsavedChanges'))) return
+    navigateBack()
+  }, [qrDialogOpen, showAddProfileDialog, pendingImportUrl, navigateBack, t])
+
+  useAndroidBackButton(handleAndroidBack)
 
   const handleViewHistoryEntry = (entry: HistoryEntry, cachedImageUrl?: string) => {
     document.getElementById('root')?.scrollTo(0, 0)
