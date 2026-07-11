@@ -300,9 +300,16 @@ describe('contentsToPrompt', () => {
 describe('LocalLLMProvider', () => {
   it('is text-only with no image generation', () => {
     const p: AIProvider = new LocalLLMProvider()
-    expect(p.capabilities).toEqual({ text: true, vision: false, imageGen: false, jsonMode: false })
+    expect(p.capabilities).toEqual({
+      text: true, vision: false, imageGen: false, jsonMode: false, contextWindowTokens: 4096,
+    })
     expect(p.generateImage).toBeUndefined()
     expect(p.detectFromKey('whatever')).toBe(false)
+  })
+
+  it('advertises a small context window so call sites request compact prompts', () => {
+    const p: AIProvider = new LocalLLMProvider()
+    expect(p.capabilities.contextWindowTokens).toBeLessThanOrEqual(4096)
   })
   it('generates text through the on-device bridge', async () => {
     const p = new LocalLLMProvider()
