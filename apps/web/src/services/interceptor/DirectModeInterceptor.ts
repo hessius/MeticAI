@@ -1,6 +1,6 @@
 import { STORAGE_KEYS } from '@/lib/constants'
 import { createBrowserAIService } from '@/services/ai/BrowserAIService'
-import { getActiveProviderId, getActiveHostedProviderId, getProvider, getProviderForMethod, getProviderModel, isAIConfigured, PROVIDERS } from '@/services/ai/providers'
+import { getActiveProviderId, getActiveHostedProviderId, getProvider, getProviderForMethod, getProviderModel, isAIConfigured, needsCompactPrompt, PROVIDERS } from '@/services/ai/providers'
 import { retryWithBackoff, formatGeminiError } from '@/services/ai/retryUtils'
 import { AIServiceError } from '@/services/ai/aiErrors'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
@@ -3231,6 +3231,12 @@ export function installDirectModeInterceptor(): void {
             : ''
 
           const facts = buildShotFacts(richAnalysis as Parameters<typeof buildShotFacts>[0])
+
+          // 5. Call the AI provider for shot analysis (with retry on transient errors)
+          if (!isAIConfigured()) {
+            return jsonResponse({ status: 'error', message: aiNotConfiguredMessage() })
+          }
+          const analyzeProvider = getProviderForMethod('analyzeShot')
           const prompt = buildAnalyzeLlmPrompt({
             profileName: pName,
             temperature: shotProfile?.temperature ?? null,
@@ -3240,13 +3246,9 @@ export function installDirectModeInterceptor(): void {
             cleanStages,
             facts,
             tasteContext,
+            compact: needsCompactPrompt(analyzeProvider),
           })
 
-          // 5. Call the AI provider for shot analysis (with retry on transient errors)
-          if (!isAIConfigured()) {
-            return jsonResponse({ status: 'error', message: aiNotConfiguredMessage() })
-          }
-          const analyzeProvider = getProviderForMethod('analyzeShot')
           const gen = async () => {
             const r = await retryWithBackoff(() => analyzeProvider.generateText({
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
