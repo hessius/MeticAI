@@ -49,6 +49,7 @@ import { getServerUrl } from '@/lib/config'
 import { invalidateCatalogueCache } from '@/lib/catalogueCache'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { hasFeature } from '@/lib/featureFlags'
+import { useUnsavedChangesGuard } from '@/lib/unsavedChanges'
 import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { profileService } from '@/services/profileService'
 
@@ -714,6 +715,9 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [hasEditChanges])
+
+  // Guard in-app navigation (e.g. Android hardware back) against losing edits.
+  useUnsavedChangesGuard(hasEditChanges)
 
   const handleStartEdit = (section: 'title' | 'details') => {
     const pj = entry.profile_json as ProfileData | null
