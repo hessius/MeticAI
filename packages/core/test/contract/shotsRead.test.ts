@@ -153,3 +153,11 @@ describe("shots-read: GET /api/shots/data/{date}/{filename}", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("shots read: llm-analysis-cache stub", () => {
+  test("GET /api/shots/llm-analysis-cache reports no cache", async () => {
+    const res = await handle(new Request("http://x/api/shots/llm-analysis-cache"), makeMockPlatform());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ cached: false });
+  });
+});

@@ -14,4 +14,5 @@ export type {
   Scheduler,
   Logger,
   AIConfig,
+  GenerationProgressEvent,
 } from "./platform";

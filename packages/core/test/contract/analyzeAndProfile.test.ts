@@ -164,3 +164,11 @@ describe("POST /api/analyze_and_profile", () => {
     expect((await res.json()).status).toBe("success");
   });
 });
+
+describe("generate progress stub", () => {
+  test("GET /api/generate/progress reports no active generation (404)", async () => {
+    const res = await handle(new Request("http://x/api/generate/progress"), makeMockPlatform());
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "No active generation" });
+  });
+});

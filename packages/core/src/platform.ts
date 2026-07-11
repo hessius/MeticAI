@@ -109,4 +109,19 @@ export interface Platform {
   logger: Logger;
   /** Optional app/build version surfaced by GET /api/version (defaults to "unknown"). */
   appVersion?: string;
+  /**
+   * Optional progress reporter for long-running generation flows. The browser
+   * platform drives the segmented profile-generation progress bar from these
+   * events; hosts without a UI (Node/Bun server, mock) omit it. `message` is an
+   * i18n key. Reporting must never throw into the caller.
+   */
+  reportProgress?: (event: GenerationProgressEvent) => void;
+}
+
+/** A profile-generation progress event (message is an i18n key). */
+export interface GenerationProgressEvent {
+  phase: "analyzing" | "generating" | "validating" | "retrying" | "complete" | "failed";
+  message: string;
+  attempt?: number;
+  maxAttempts?: number;
 }

@@ -79,6 +79,13 @@ export async function handleAnalyzeAndProfileRoute(
 ): Promise<Response | null> {
   const { pathname } = new URL(req.url);
   const normalized = pathname.startsWith("/api/") ? pathname.slice(4) : pathname;
+
+  // GET /api/generate/progress -> generation is synchronous (no SSE) in the
+  // unified runtime, so there is never an active streaming generation.
+  if (normalized === "/generate/progress" && req.method === "GET") {
+    return jsonResponse({ error: "No active generation" }, 404);
+  }
+
   if (normalized !== "/analyze_and_profile" || req.method !== "POST") return null;
 
   try {
@@ -90,6 +97,9 @@ export async function handleAnalyzeAndProfileRoute(
         analysis: "",
       });
     }
+
+    const report = platform.reportProgress?.bind(platform);
+    report?.({ phase: "analyzing", message: "generation.progress.preparingPrompt" });
 
     const form = await req.formData();
     const fileValue = form.get("file");
@@ -107,6 +117,7 @@ export async function handleAnalyzeAndProfileRoute(
 
     const parts: Array<Record<string, unknown>> = [];
     if (image) {
+      report?.({ phase: "analyzing", message: "generation.progress.processingImage" });
       const buffer = new Uint8Array(await image.arrayBuffer());
       parts.push({
         inlineData: { mimeType: image.type || "image/jpeg", data: toBase64(buffer) },
@@ -114,17 +125,20 @@ export async function handleAnalyzeAndProfileRoute(
     }
     parts.push({ text: systemPrompt });
 
+    report?.({ phase: "generating", message: "generation.progress.generatingProfile" });
     const response = await platform.ai.generateText({
       contents: [{ role: "user", parts }],
     });
 
     const generateFix = async (fixPrompt: string): Promise<string> => {
+      report?.({ phase: "retrying", message: "generation.progress.validatingProfile" });
       const fixResponse = await platform.ai.generateText({
         contents: [{ role: "user", parts: [{ text: fixPrompt }] }],
       });
       return fixResponse.text;
     };
 
+    report?.({ phase: "validating", message: "generation.progress.validatingProfile" });
     const { reply: validatedReply } = await validateAndRetryProfile(
       response.text,
       generateFix,
@@ -155,6 +169,7 @@ export async function handleAnalyzeAndProfileRoute(
       }
     }
 
+    report?.({ phase: "complete", message: "generation.progress.profileGenerated" });
     return jsonResponse({
       status: "success",
       analysis: image ? cleanAnalysis : "",
