@@ -21,6 +21,7 @@
 import type { Platform } from "../platform";
 import { jsonResponse } from "../http";
 import { buildFullProfilePrompt, validateAndRetryProfile } from "../ai/profilePromptFull";
+import { needsCompactPrompt } from "../ai/contextWindow";
 import { convertGeminiToOEPF } from "../logic/oepf";
 
 const BASE64_ALPHABET =
@@ -113,7 +114,7 @@ export async function handleAnalyzeAndProfileRoute(
       .join("\n\n");
 
     const authorName = await resolveAuthorName(platform);
-    const systemPrompt = buildFullProfilePrompt(authorName, preferences, [], !!image);
+    const systemPrompt = buildFullProfilePrompt(authorName, preferences, [], !!image, needsCompactPrompt(platform.ai));
 
     const parts: Array<Record<string, unknown>> = [];
     if (image) {

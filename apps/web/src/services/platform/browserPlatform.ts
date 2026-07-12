@@ -197,6 +197,9 @@ function providerAI(getProvider: () => AIProvider, configured: () => boolean): P
     currentModel() {
       return getProviderModel(getActiveHostedProviderId());
     },
+    contextWindowTokens() {
+      return getProvider().capabilities.contextWindowTokens;
+    },
   };
 }
 

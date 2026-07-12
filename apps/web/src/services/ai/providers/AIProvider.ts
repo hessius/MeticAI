@@ -3,6 +3,14 @@ export interface ProviderCapabilities {
   vision: boolean
   imageGen: boolean
   jsonMode: boolean
+  /**
+   * Approximate total context window (input + output) in tokens, when the
+   * provider has a hard limit small enough that full prompts overflow it.
+   * On-device models (Apple Intelligence, Gemma) sit around 4096 tokens, so
+   * the large analysis/profile prompts must be compacted for them. Hosted
+   * providers leave this undefined (effectively unbounded for our prompts).
+   */
+  contextWindowTokens?: number
 }
 
 export interface AIProvider {

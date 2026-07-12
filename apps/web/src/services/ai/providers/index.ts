@@ -36,6 +36,23 @@ export function getProviderForMethod(
   return getProvider(resolveProviderIdForMethod(method, opts))
 }
 
+/**
+ * Providers whose context window is at or below this many tokens cannot fit the
+ * full analysis/profile prompts and must be given a compacted variant.
+ */
+export const COMPACT_PROMPT_CONTEXT_THRESHOLD = 8192
+
+/**
+ * Whether the given provider needs the compact (small-context) prompt variant.
+ * On-device models (Apple Intelligence, Gemma) advertise a ~4096-token window;
+ * the full prompts overflow it and the model errors out ("exceeded model
+ * context window size") instead of returning a result.
+ */
+export function needsCompactPrompt(provider: AIProvider): boolean {
+  const window = provider.capabilities.contextWindowTokens
+  return window != null && window <= COMPACT_PROMPT_CONTEXT_THRESHOLD
+}
+
 export { geminiProvider, GeminiProvider } from './GeminiProvider'
 export { localLLMProvider, LocalLLMProvider } from './LocalLLMProvider'
 export { OpenAICompatProvider } from './OpenAICompatProvider'

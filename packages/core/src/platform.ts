@@ -70,6 +70,14 @@ export interface PlatformAI {
   listModels?(): Promise<Array<{ id: string; display_name: string; description: string }>>;
   /** The currently-configured model id, surfaced by GET /api/available-models. */
   currentModel?(): string;
+  /**
+   * Approximate total context window (input + output) in tokens for the active
+   * provider, when it has a hard limit small enough that full prompts overflow
+   * it. On-device models (Apple Intelligence, Gemma) sit around 4096 tokens, so
+   * the large analysis/profile prompts must be compacted for them. Hosted
+   * providers omit this (effectively unbounded for our prompts).
+   */
+  contextWindowTokens?(): number | undefined;
 }
 
 
