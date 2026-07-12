@@ -1,3 +1,0 @@
-[submodule "apps/mcp-server"]
-	path = apps/mcp-server
-	url = https://github.com/hessius/meticulous-mcp.git

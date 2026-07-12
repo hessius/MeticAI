@@ -3,32 +3,6 @@
 
 version: 2
 updates:
-  # Python — FastAPI server
-  - package-ecosystem: "pip"
-    directory: "/apps/server"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "python"
-    commit-message:
-      prefix: "chore(deps)"
-
-  # Python — MCP server
-  - package-ecosystem: "pip"
-    directory: "/apps/mcp-server"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 3
-    labels:
-      - "dependencies"
-      - "python"
-    commit-message:
-      prefix: "chore(deps)"
-
   # npm — Web frontend (Bun uses package.json)
   - package-ecosystem: "npm"
     directory: "/apps/web"
@@ -48,6 +22,30 @@ updates:
       production-dependencies:
         dependency-type: "production"
         update-types: ["patch"]
+
+  # npm — Bun server host (@metic/server)
+  - package-ecosystem: "npm"
+    directory: "/apps/bun-server"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "javascript"
+    commit-message:
+      prefix: "chore(deps)"
+
+  # npm — shared @metic/core handler
+  - package-ecosystem: "npm"
+    directory: "/packages/core"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "javascript"
+    commit-message:
+      prefix: "chore(deps)"
 
   # Docker — unified Dockerfile
   - package-ecosystem: "docker"

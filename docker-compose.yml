@@ -1,7 +1,7 @@
 # ==============================================================================
 # Metic Docker Compose Configuration
 # ==============================================================================
-# Single unified container for all Metic services (v2.0).
+# Single unified container running the Bun server (web UI + API + telemetry).
 #
 # Usage:
 #   docker compose up -d
@@ -9,7 +9,6 @@
 # Optional add-ons:
 #   docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
 #   docker compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d
-#   docker compose -f docker-compose.yml -f docker-compose.homeassistant.yml up -d
 # ==============================================================================
 
 services:
@@ -18,17 +17,19 @@ services:
     container_name: meticai
     restart: unless-stopped
     ports:
-      - "3550:3550"   # Web UI (nginx proxy)
+      - "3550:3550"   # Web UI + API
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-}
       - METICULOUS_IP=${METICULOUS_IP:-}
       - DATA_DIR=/data
+      # Storage backend for /data: "json" (flat files, default) or "sqlite".
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-json}
     volumes:
       - meticai-data:/data
-      - mosquitto-data:/var/lib/mosquitto
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:3550/health"]
+      # The distroless image has no shell/curl; the binary self-probes /health.
+      test: ["CMD", "/app/metic", "healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -49,5 +50,3 @@ services:
 volumes:
   meticai-data:
     name: meticai-data
-  mosquitto-data:
-    name: mosquitto-data

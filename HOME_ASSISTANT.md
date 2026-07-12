@@ -1,5 +1,11 @@
 # 🏠 Home Assistant Integration
 
+> **⚠️ Removed in 3.0.0.** The MQTT bridge (Mosquitto broker + meticulous-addon)
+> was removed when the Python backend was replaced by the unified Bun server.
+> Home Assistant auto-discovery is no longer available. Live telemetry and
+> machine control remain fully functional inside Metic via the built-in
+> `/api/ws/live` WebSocket. This document is retained for users still on 2.x.
+
 Connect Metic to Home Assistant to get real-time espresso machine telemetry, create automations, and control your Meticulous from HA dashboards.
 
 ## How It Works
