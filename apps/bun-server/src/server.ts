@@ -18,6 +18,7 @@ import { createNodePlatform } from "./platform/node.ts";
 import { isMachinePath, proxyToMachine } from "./machineProxy.ts";
 import { createStaticServer } from "./static.ts";
 import { TelemetryHub, type TelemetryClient } from "./telemetryHub.ts";
+import { handleTailscaleRoutes } from "./tailscale.ts";
 
 const LIVE_WS_PATH = "/api/ws/live";
 
@@ -69,6 +70,10 @@ export function createServer(options: CreateServerOptions = {}): Server<WsData> 
       }
 
       if (pathname.startsWith("/api/")) {
+        // Host-specific Tailscale routes (unix-socket LocalAPI + settings) are
+        // served here, not in the host-agnostic core.
+        const tailscale = await handleTailscaleRoutes(request, platform);
+        if (tailscale) return tailscale;
         return handle(request, platform);
       }
 
