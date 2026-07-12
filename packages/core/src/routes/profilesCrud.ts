@@ -788,6 +788,24 @@ export async function handleProfilesCrudRoutes(
     return jsonResponse({ new_count: 0, updated_count: 0, orphaned_count: 0 });
   }
 
+  // POST /api/profiles/sync/accept/{profile_id}
+  // Sync tracking (stored profile_json + content_hash in the profile-generation
+  // history) is a legacy server-only concept; in the unified runtime profiles
+  // live on the machine and the SPA reads them directly, so sync/status always
+  // reports zero pending items and there is nothing to accept. Return a benign
+  // success matching the frozen response shape so the SyncReport UI never leaks
+  // a notFound if it posts here.
+  const acceptMatch = pathname.match(/^\/api\/profiles\/sync\/accept\/([^/]+)$/);
+  if (acceptMatch && method === "POST") {
+    const profileId = decodeURIComponent(acceptMatch[1]);
+    return jsonResponse({
+      status: "success",
+      profile_name: profileId,
+      content_hash: "",
+      ai_description_generated: false,
+    });
+  }
+
   // POST /api/profiles/sync
   if (pathname === "/api/profiles/sync" && method === "POST") {
     return jsonResponse({ status: "success", new: [], updated: [], orphaned: [] });
