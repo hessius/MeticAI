@@ -48,7 +48,7 @@ const PROXY_FLAGS: FeatureFlags = {
   scheduledShots: true,
   systemManagement: true,
   tailscaleConfig: true,
-  mcpServer: true,
+  mcpServer: false,          // MCP server removed in 3.0.0
   cloudSync: true,
   aiFeatures: true,
   liveTelemetry: true,
@@ -58,7 +58,7 @@ const PROXY_FLAGS: FeatureFlags = {
   dialIn: true,
   recommendations: true,
   pwaInstall: false,
-  bridgeStatus: true,
+  bridgeStatus: false,       // MQTT bridge removed in 3.0.0
   watchtowerUpdate: true,
 }
 
