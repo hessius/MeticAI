@@ -212,6 +212,20 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Enforce image size gate
+        run: |
+          # The 3.0.0 distroless single-binary image is a single Bun process
+          # (no Python/nginx/mosquitto/s6). Guard against accidental bloat.
+          # Threshold is the uncompressed size reported by `docker images`.
+          MAX_MB=260
+          SIZE_BYTES=$(docker image inspect meticai:test --format '{{.Size}}')
+          SIZE_MB=$(( SIZE_BYTES / 1024 / 1024 ))
+          echo "Unified image size: ${SIZE_MB} MB (limit ${MAX_MB} MB)"
+          if [ "${SIZE_MB}" -gt "${MAX_MB}" ]; then
+            echo "::error::Image size ${SIZE_MB} MB exceeds the ${MAX_MB} MB gate"
+            exit 1
+          fi
+
       - name: Test container starts
         run: |
           docker run -d --name test-container \
@@ -226,8 +240,9 @@ jobs:
           # Check container is running
           docker ps | grep test-container
 
-          # Check health endpoint
-          docker exec test-container curl -f http://localhost:3550/health || exit 1
+          # Check health endpoint. The distroless image has no shell/curl, so
+          # probe via the binary's own healthcheck subcommand.
+          docker exec test-container /app/metic healthcheck || exit 1
 
       - name: Setup Bun (attempt 1)
         id: setup_bun_1

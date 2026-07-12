@@ -1,22 +1,23 @@
 # ==============================================================================
-# MeticAI Unified Docker Image
+# MeticAI 3.0.0 Unified Image — distroless single binary
 # ==============================================================================
-# This image contains all MeticAI components:
-# - Server (FastAPI backend)
-# - Web Frontend (React, served via nginx)
-# - MCP Server (Meticulous machine communication)
-# - Gemini SDK-based AI integration
-# - Mosquitto MQTT Broker (real-time telemetry bus)
-# - Meticulous Bridge (Socket.IO → MQTT relay via @nickwilsonr/meticulous-addon)
+# One process, one binary. The Bun server (apps/bun-server, @metic/server)
+# consumes the shared @metic/core handler, serves the built React frontend,
+# transparently proxies the machine API, and streams live telemetry over a
+# native WebSocket. There is no Python, nginx, mosquitto, MCP server, bridge or
+# s6-overlay: all of that logic now lives in @metic/core.
 #
-# Process management: s6-overlay
-# Port 3550: nginx (web UI + API proxy)
+# Stage 1  build the frontend (Vite/Bun -> dist)
+# Stage 2  compile the server to a self-contained binary (bun build --compile)
+# Stage 3  distroless/cc runtime: binary + frontend/dist + VERSION only
+#
+# Port 3550: the Bun server (web UI + API + /api/ws/live telemetry).
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
 # Stage 1: Build Web Frontend
 # ------------------------------------------------------------------------------
-FROM oven/bun:1.3.14-alpine AS web-builder
+FROM --platform=$BUILDPLATFORM oven/bun:1.3.14-alpine AS web-builder
 
 WORKDIR /build
 
@@ -40,155 +41,76 @@ RUN bun run build
 
 
 # ------------------------------------------------------------------------------
-# Stage 2: Build Python Dependencies
+# Stage 2: Compile the Bun server to a single self-contained binary
 # ------------------------------------------------------------------------------
-FROM python:3.13-slim AS python-builder
+# Runs on the BUILD platform and cross-compiles to the TARGET arch via
+# `bun build --compile --target`, so multi-arch builds never touch qemu here.
+# Uses the Debian (glibc) Bun image so the produced binary matches the glibc
+# distroless/cc runtime below (the -alpine image would emit a musl binary).
+FROM --platform=$BUILDPLATFORM oven/bun:1.3.14 AS server-builder
+
+ARG TARGETARCH
 
 WORKDIR /build
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+# Preserve the monorepo layout so @metic/server's file:../../packages/core
+# dependency resolves during install.
+COPY packages/core /build/packages/core
+COPY apps/bun-server/ /build/apps/bun-server/
 
-# Create virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+WORKDIR /build/apps/bun-server
+RUN bun install --frozen-lockfile 2>/dev/null || bun install
 
-# Install server dependencies
-COPY apps/server/requirements.txt ./server-requirements.txt
-RUN pip install --no-cache-dir -r server-requirements.txt
-
-# Install MCP server dependencies
-COPY apps/mcp-server/meticulous-mcp/requirements.txt ./mcp-requirements.txt
-RUN pip install --no-cache-dir -r mcp-requirements.txt
-
-# Install bridge dependencies (MQTT bridge for real-time machine data)
-COPY apps/bridge/requirements.txt ./bridge-requirements.txt
-RUN pip install --no-cache-dir -r bridge-requirements.txt
-
-
-# ------------------------------------------------------------------------------
-# Stage 3: Final Runtime Image
-# ------------------------------------------------------------------------------
-FROM python:3.13-slim
-
-# Install runtime dependencies (xz-utils needed for s6-overlay extraction)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    nginx \
-    curl \
-    xz-utils \
-    git \
-    mosquitto \
-    mosquitto-clients \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install s6-overlay for process management
-ARG S6_OVERLAY_VERSION=3.2.2.0
-ARG TARGETARCH
+# Map Docker's TARGETARCH onto Bun's glibc compile targets (distroless/cc is
+# glibc-based). The compiled binary embeds the Bun runtime plus all JS deps
+# (@metic/core, @google/genai, socket.io-client) and bun:sqlite.
 RUN case "${TARGETARCH}" in \
-        amd64) S6_ARCH="x86_64" ;; \
-        arm64) S6_ARCH="aarch64" ;; \
-        arm)   S6_ARCH="armhf" ;; \
-        *)     S6_ARCH="x86_64" ;; \
+        amd64) BUN_TARGET="bun-linux-x64" ;; \
+        arm64) BUN_TARGET="bun-linux-arm64" ;; \
+        *)     BUN_TARGET="bun-linux-x64" ;; \
     esac \
-    && curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz" -o /tmp/s6-overlay-noarch.tar.xz \
-    && curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz" -o /tmp/s6-overlay-arch.tar.xz \
-    && tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
-    && tar -C / -Jxpf /tmp/s6-overlay-arch.tar.xz \
-    && rm /tmp/s6-overlay-*.tar.xz
+    && echo "Compiling metic for ${BUN_TARGET}" \
+    && bun build --compile --minify --sourcemap \
+        --target="${BUN_TARGET}" \
+        src/main.ts --outfile /build/metic
 
-# Copy Python virtual environment from builder
-COPY --from=python-builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-ENV PYTHONUNBUFFERED=1
 
-# Create app directories
-RUN mkdir -p /app/server /app/mcp-server /var/www/html /data
+# ------------------------------------------------------------------------------
+# Stage 3: Distroless runtime
+# ------------------------------------------------------------------------------
+# distroless/cc provides glibc + libstdc++/libgcc (needed by the Bun runtime)
+# and nothing else: no shell, no package manager, minimal attack surface.
+FROM gcr.io/distroless/cc-debian12
 
-# Copy built web frontend
-COPY --from=web-builder /build/apps/web/dist /var/www/html
+WORKDIR /app
 
-# Ensure config.json exists (gitignored in source, needed at runtime)
-RUN echo '{"serverUrl":""}' > /var/www/html/config.json
+# The compiled server binary.
+COPY --from=server-builder /build/metic /app/metic
 
-# Copy server
-COPY apps/server/ /app/server/
+# The built frontend (served from ${STATIC_DIR:-./frontend/dist}).
+COPY --from=web-builder /build/apps/web/dist /app/frontend/dist
 
-# Copy VERSION file so the /api/version endpoint can read it
-COPY VERSION /app/server/VERSION
+# VERSION drives GET /api/version (resolveAppVersion reads ./VERSION from cwd).
+COPY VERSION /app/VERSION
 
-# Copy MCP server
-COPY apps/mcp-server/ /app/mcp-server/
-
-# Clone espresso profile schema (required by MCP server for profile validation)
-RUN git clone --depth 1 https://github.com/MeticulousHome/espresso-profile-schema.git /app/espresso-profile-schema
-
-# Clone meticulous-addon (MQTT bridge for real-time machine telemetry)
-# Credit: @nickwilsonr — https://github.com/nickwilsonr/meticulous-addon
-RUN git clone --depth 1 https://github.com/nickwilsonr/meticulous-addon.git /app/meticulous-addon
-
-# Patch: fix double-slash in base_url that breaks /api/v1/machine on some firmware
-# The upstream addon sets base_url with trailing slash → "http://x:8080//api/v1/machine" → 404
-RUN sed -i 's|base_url = f"http://{self.machine_ip}:8080/"|base_url = f"http://{self.machine_ip}:8080"|' \
-    /app/meticulous-addon/rootfs/usr/bin/run.py && \
-    echo "Patched meticulous-addon: removed trailing slash from base_url"
-
-# Patch: add 'power' sensor to the bridge's MQTT mapping
-# The upstream addon doesn't map machine power % to MQTT — inject it after 'brightness'
-RUN python3 -c "\
-import re, pathlib; \
-p = pathlib.Path('/app/meticulous-addon/rootfs/usr/bin/run.py'); \
-s = p.read_text(); \
-s = s.replace(\
-  '\"brightness\": {\\n                \"component\": \"sensor\",\\n                \"state_topic\": f\"{base}/brightness/state\",\\n            },', \
-  '\"brightness\": {\\n                \"component\": \"sensor\",\\n                \"state_topic\": f\"{base}/brightness/state\",\\n            },\\n            \"power\": {\\n                \"component\": \"sensor\",\\n                \"state_topic\": f\"{base}/power/state\",\\n            },'); \
-s = s.replace('\"brightness\": \"Brightness\",', '\"brightness\": \"Brightness\",\\n                \"power\": \"Power\",'); \
-s = s.replace('\"brightness\": \"Display brightness level\",', '\"brightness\": \"Display brightness level\",\\n                \"power\": \"Motor power percentage during extraction\",'); \
-p.write_text(s); \
-print('Patched meticulous-addon with power sensor mapping')"
-
-# Copy bridge wrapper (zero-fork adapter for the addon)
-COPY apps/bridge/ /app/bridge/
-
-# Copy mosquitto configuration (localhost-only, no auth)
-COPY docker/mosquitto.conf /etc/mosquitto/mosquitto.conf
-
-# Copy nginx configuration
-COPY docker/nginx.conf /etc/nginx/nginx.conf
-
-# Copy s6 service definitions
-COPY docker/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
-
-# Copy data migration script (v1.x → v2.0 one-shot)
-COPY docker/scripts/data-migrate.sh /etc/s6-overlay/scripts/data-migrate
-RUN chmod +x /etc/s6-overlay/scripts/data-migrate
-
-# Create data directory for persistent storage
+# Persistent storage (settings, history, annotations, dial-in, images, and the
+# optional SQLite database when STORAGE_BACKEND=sqlite).
 VOLUME ["/data"]
 
-# Copy default data files (templates, etc.)
-# These are placed in /app/defaults and copied to /data at startup if missing
-COPY data/PourOverBase.json /app/defaults/PourOverBase.json
-COPY data/recipes/ /app/defaults/recipes/
+# Environment (only the vars the unified binary actually reads).
+ENV DATA_DIR=/data \
+    METICULOUS_IP=meticulous.local \
+    GEMINI_API_KEY="" \
+    STORAGE_BACKEND=json \
+    PORT=3550 \
+    STATIC_DIR=/app/frontend/dist
 
-# Environment variables
-ENV DATA_DIR=/data
-ENV METICULOUS_IP=meticulous.local
-ENV GEMINI_API_KEY=""
-ENV MCP_SERVER_PORT=8080
-ENV SERVER_PORT=8000
-ENV MQTT_ENABLED=true
-ENV MQTT_HOST=127.0.0.1
-ENV MQTT_PORT=1883
-
-# Expose ports
-# 3550: nginx (web UI + API proxy) - main entry point
+# 3550: Bun server (web UI + API + telemetry WebSocket) — main entry point.
 EXPOSE 3550
 
-# Health check
+# The binary self-probes /health; no curl needed in the image.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:3550/health || exit 1
+    CMD ["/app/metic", "healthcheck"]
 
-# s6-overlay entrypoint
-ENTRYPOINT ["/init"]
+ENTRYPOINT ["/app/metic"]
+CMD ["serve"]
