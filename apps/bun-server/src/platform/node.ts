@@ -19,6 +19,7 @@ import {
 } from "@metic/core/ai/modelResolver";
 import type {
   Platform,
+  PlatformStorage,
   PlatformAI,
   Repo,
   Cache,
@@ -27,6 +28,8 @@ import type {
   Logger,
   AIConfig,
 } from "@metic/core/platform";
+import { openSqliteStorage } from "./sqliteStorage.ts";
+import { migrateJsonToSqlite } from "./sqliteMigration.ts";
 
 async function atomicWrite(path: string, data: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
@@ -274,6 +277,12 @@ export interface NodePlatformOptions {
   dataDir?: string;
   /** Machine base URL override. Defaults to http://$METICULOUS_IP:8080. */
   machineBaseUrl?: string;
+  /**
+   * Persistence backend. Defaults to $STORAGE_BACKEND (`json` | `sqlite`), else
+   * `json` for zero-migration continuity with 2.x volumes. `sqlite` runs a
+   * one-time, idempotent, reversible boot migration of any existing JSON.
+   */
+  storageBackend?: "json" | "sqlite";
 }
 
 const MACHINE_PORT = 8080;
@@ -305,6 +314,39 @@ function resolveAppVersion(): string {
   return "unknown";
 }
 
+/** Storage repos excluding the in-memory aiCache (which is backend-agnostic). */
+type DocumentStorage = Omit<PlatformStorage, "aiCache">;
+
+function buildJsonStorage(dataDir: string): DocumentStorage {
+  return {
+    settings: fsSingletonRepo<Record<string, unknown>>(join(dataDir, "settings.json")),
+    history: fsSingletonRepo(join(dataDir, "profile_history.json")),
+    annotations: fsKeyedMapRepo(join(dataDir, "shot_annotations.json")),
+    dialInSessions: fsKeyedMapRepo(join(dataDir, "dialin_sessions.json")),
+    pourOverPrefs: fsSingletonRepo(join(dataDir, "pour_over_preferences.json")),
+    schedules: fsRepo(join(dataDir, "schedules")),
+    descriptions: fsKeyedMapRepo(join(dataDir, "profile_descriptions.json")),
+    aiTags: fsKeyedMapRepo(join(dataDir, "profile_ai_tags.json")),
+    images: fsBlobStore(join(dataDir, "images")),
+  };
+}
+
+function buildSqliteStorage(dataDir: string, logger: Logger): DocumentStorage {
+  const handles = openSqliteStorage(dataDir);
+  migrateJsonToSqlite(dataDir, handles, (m) => logger.info(m));
+  return {
+    settings: handles.singletonRepo<Record<string, unknown>>("settings"),
+    history: handles.singletonRepo("history"),
+    annotations: handles.documentRepo("annotations"),
+    dialInSessions: handles.documentRepo("dialInSessions"),
+    pourOverPrefs: handles.singletonRepo("pourOverPrefs"),
+    schedules: handles.documentRepo("schedules"),
+    descriptions: handles.documentRepo("descriptions"),
+    aiTags: handles.documentRepo("aiTags"),
+    images: handles.blobStore(),
+  };
+}
+
 export function createNodePlatform(options: NodePlatformOptions = {}): Platform {
   const dataDir =
     options.dataDir ?? process.env.DATA_DIR ?? join(process.cwd(), "data");
@@ -312,9 +354,11 @@ export function createNodePlatform(options: NodePlatformOptions = {}): Platform 
   const logger = consoleLogger();
   const machineBaseUrl = resolveMachineBaseUrl(options.machineBaseUrl);
 
-  const settings = fsSingletonRepo<Record<string, unknown>>(
-    join(dataDir, "settings.json"),
-  );
+  const backend =
+    options.storageBackend ??
+    (process.env.STORAGE_BACKEND?.trim().toLowerCase() === "sqlite" ? "sqlite" : "json");
+  const documentStorage =
+    backend === "sqlite" ? buildSqliteStorage(dataDir, logger) : buildJsonStorage(dataDir);
 
   const getAIConfig = (): AIConfig => {
     // Env var takes precedence (container/12-factor); settings.json is the
@@ -329,16 +373,8 @@ export function createNodePlatform(options: NodePlatformOptions = {}): Platform 
 
   return {
     storage: {
-      settings,
-      history: fsSingletonRepo(join(dataDir, "profile_history.json")),
-      annotations: fsKeyedMapRepo(join(dataDir, "shot_annotations.json")),
-      dialInSessions: fsKeyedMapRepo(join(dataDir, "dialin_sessions.json")),
-      pourOverPrefs: fsSingletonRepo(join(dataDir, "pour_over_preferences.json")),
-      schedules: fsRepo(join(dataDir, "schedules")),
-      descriptions: fsKeyedMapRepo(join(dataDir, "profile_descriptions.json")),
-      aiTags: fsKeyedMapRepo(join(dataDir, "profile_ai_tags.json")),
+      ...documentStorage,
       aiCache: memoryCache(clock),
-      images: fsBlobStore(join(dataDir, "images")),
     },
     secrets: {
       getAIConfig,
