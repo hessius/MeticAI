@@ -489,6 +489,17 @@ def _determine_exit_trigger_hit(
     max_flow = _safe_float(stage_data.get("max_flow", 0))
     end_flow = _safe_float(stage_data.get("end_flow", 0))
 
+    # Boundary (transition) values: the first sample of the next stage is the
+    # sample at which this stage's exit trigger actually fired (see
+    # _extract_shot_stage_data). Include it so a stage that exits exactly when a
+    # rising target is reached is credited for the crossing value instead of the
+    # last in-stage sample (which the machine already advanced past).
+    start_time = _safe_float(stage_data.get("start_time", 0))
+    boundary_pressure = stage_data.get("boundary_pressure")
+    boundary_flow = stage_data.get("boundary_flow")
+    boundary_weight = stage_data.get("boundary_weight")
+    boundary_time = stage_data.get("boundary_time")
+
     triggered = None
     not_triggered = []
 
@@ -506,22 +517,38 @@ def _determine_exit_trigger_hit(
         actual_value = 0.0
         if trigger_type == "time":
             actual_value = duration
+            if boundary_time is not None:
+                actual_value = max(duration, _safe_float(boundary_time) - start_time)
         elif trigger_type == "weight":
             actual_value = end_weight
+            if boundary_weight is not None:
+                actual_value = max(end_weight, _safe_float(boundary_weight))
         elif trigger_type == "pressure":
             # For >= or >: we want to know if max reached the target
             # For <= or <: we want to know if pressure dropped below target (use end)
             if comparison in (">=", ">"):
                 actual_value = max_pressure
+                if boundary_pressure is not None:
+                    actual_value = max(max_pressure, _safe_float(boundary_pressure))
             else:  # <= or < or ==
-                actual_value = end_pressure
+                actual_value = (
+                    _safe_float(boundary_pressure)
+                    if boundary_pressure is not None
+                    else end_pressure
+                )
         elif trigger_type == "flow":
             # For >= or >: we want to know if max reached the target
             # For <= or <: we want to know if flow dropped below target (use end)
             if comparison in (">=", ">"):
                 actual_value = max_flow
+                if boundary_flow is not None:
+                    actual_value = max(max_flow, _safe_float(boundary_flow))
             else:  # <= or < or ==
-                actual_value = end_flow
+                actual_value = (
+                    _safe_float(boundary_flow)
+                    if boundary_flow is not None
+                    else end_flow
+                )
 
         # Evaluate comparison with small tolerance
         tolerance = 0.5 if trigger_type in ["time", "weight"] else 0.2
@@ -795,6 +822,23 @@ def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
     # Save final stage
     if current_stage and stage_entries:
         stage_data[current_stage] = _compute_stage_stats(stage_entries)
+
+    # Attach boundary (transition) values. The machine flips ``status`` to the
+    # next stage on the control tick where the current stage's exit condition
+    # becomes true, so the sample that actually satisfied the trigger is labeled
+    # as the FIRST sample of the next stage. Expose that sample (the next
+    # stage's start_* values) so exit-trigger evaluation can credit the stage
+    # for the value that caused it to end. Without this, a stage that exits on a
+    # rising ``pressure >= X`` / ``flow >= X`` trigger under-reports its exit
+    # metric and is falsely assessed as "failed".
+    stage_names = list(stage_data.keys())
+    for i, name in enumerate(stage_names):
+        if i + 1 < len(stage_names):
+            nxt = stage_data[stage_names[i + 1]]
+            stage_data[name]["boundary_pressure"] = nxt.get("start_pressure")
+            stage_data[name]["boundary_flow"] = nxt.get("start_flow")
+            stage_data[name]["boundary_weight"] = nxt.get("start_weight")
+            stage_data[name]["boundary_time"] = nxt.get("start_time")
 
     return stage_data
 

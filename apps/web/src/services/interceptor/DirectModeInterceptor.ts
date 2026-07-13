@@ -720,6 +720,7 @@ export function computeRichLocalAnalysis(entry: HistEntry, profileName: string) 
             startWeight: number; endWeight: number
             startPressure: number; endPressure: number; avgPressure: number; maxPressure: number; minPressure: number
             startFlow: number; endFlow: number; avgFlow: number; maxFlow: number
+            boundaryPressure?: number; boundaryFlow?: number; boundaryWeight?: number; boundaryTime?: number
           }
           const shotStages = new Map<string, StageStats>()
           {
@@ -752,6 +753,26 @@ export function computeRichLocalAnalysis(entry: HistEntry, profileName: string) 
               stagePts.push(pt)
             }
             flush()
+          }
+
+          // Attach boundary (transition) values. The machine flips a sample's
+          // status to the next stage on the control tick where the current
+          // stage's exit condition becomes true, so the sample that satisfies a
+          // rising pressure/flow trigger is labeled as the FIRST sample of the
+          // next stage. Expose it (the next stage's start_* values) so exit
+          // evaluation credits the stage for the value that ended it; otherwise
+          // a stage that exits exactly when its target is reached is falsely
+          // assessed as "failed".
+          {
+            const ordered = [...shotStages.entries()]
+            for (let i = 0; i < ordered.length - 1; i++) {
+              const cur = ordered[i][1]
+              const nxt = ordered[i + 1][1]
+              cur.boundaryPressure = nxt.startPressure
+              cur.boundaryFlow = nxt.startFlow
+              cur.boundaryWeight = nxt.startWeight
+              cur.boundaryTime = nxt.startTime
+            }
           }
 
           // ── Overall metrics ──
@@ -914,10 +935,27 @@ export function computeRichLocalAnalysis(entry: HistEntry, profileName: string) 
                 const tVal = _resolveVar(tr.value, vars)
                 const comp = tr.comparison ?? '>='
                 let actual = 0
-                if (tType === 'time') actual = sd.duration
-                else if (tType === 'weight') actual = sd.endWeight
-                else if (tType === 'pressure') actual = comp === '>=' || comp === '>' ? sd.maxPressure : sd.endPressure
-                else if (tType === 'flow') actual = comp === '>=' || comp === '>' ? sd.maxFlow : sd.endFlow
+                if (tType === 'time') {
+                  actual = sd.duration
+                  if (sd.boundaryTime !== undefined) actual = Math.max(sd.duration, sd.boundaryTime - sd.startTime)
+                } else if (tType === 'weight') {
+                  actual = sd.endWeight
+                  if (sd.boundaryWeight !== undefined) actual = Math.max(sd.endWeight, sd.boundaryWeight)
+                } else if (tType === 'pressure') {
+                  if (comp === '>=' || comp === '>') {
+                    actual = sd.maxPressure
+                    if (sd.boundaryPressure !== undefined) actual = Math.max(sd.maxPressure, sd.boundaryPressure)
+                  } else {
+                    actual = sd.boundaryPressure !== undefined ? sd.boundaryPressure : sd.endPressure
+                  }
+                } else if (tType === 'flow') {
+                  if (comp === '>=' || comp === '>') {
+                    actual = sd.maxFlow
+                    if (sd.boundaryFlow !== undefined) actual = Math.max(sd.maxFlow, sd.boundaryFlow)
+                  } else {
+                    actual = sd.boundaryFlow !== undefined ? sd.boundaryFlow : sd.endFlow
+                  }
+                }
                 const tol = (tType === 'time' || tType === 'weight') ? 0.5 : 0.2
                 let hit = false
                 if (comp === '>=') hit = actual >= tVal - tol
