@@ -935,33 +935,38 @@ export function computeRichLocalAnalysis(entry: HistEntry, profileName: string) 
                 const tVal = _resolveVar(tr.value, vars)
                 const comp = tr.comparison ?? '>='
                 let actual = 0
+                let boundaryActual: number | undefined
                 if (tType === 'time') {
                   actual = sd.duration
-                  if (sd.boundaryTime !== undefined) actual = Math.max(sd.duration, sd.boundaryTime - sd.startTime)
+                  if (sd.boundaryTime !== undefined) boundaryActual = sd.boundaryTime - sd.startTime
                 } else if (tType === 'weight') {
                   actual = sd.endWeight
-                  if (sd.boundaryWeight !== undefined) actual = Math.max(sd.endWeight, sd.boundaryWeight)
+                  boundaryActual = sd.boundaryWeight
                 } else if (tType === 'pressure') {
-                  if (comp === '>=' || comp === '>') {
-                    actual = sd.maxPressure
-                    if (sd.boundaryPressure !== undefined) actual = Math.max(sd.maxPressure, sd.boundaryPressure)
-                  } else {
-                    actual = sd.boundaryPressure !== undefined ? sd.boundaryPressure : sd.endPressure
-                  }
+                  actual = comp === '>=' || comp === '>' ? sd.maxPressure : sd.endPressure
+                  boundaryActual = sd.boundaryPressure
                 } else if (tType === 'flow') {
-                  if (comp === '>=' || comp === '>') {
-                    actual = sd.maxFlow
-                    if (sd.boundaryFlow !== undefined) actual = Math.max(sd.maxFlow, sd.boundaryFlow)
-                  } else {
-                    actual = sd.boundaryFlow !== undefined ? sd.boundaryFlow : sd.endFlow
-                  }
+                  actual = comp === '>=' || comp === '>' ? sd.maxFlow : sd.endFlow
+                  boundaryActual = sd.boundaryFlow
                 }
                 const tol = (tType === 'time' || tType === 'weight') ? 0.5 : 0.2
-                let hit = false
-                if (comp === '>=') hit = actual >= tVal - tol
-                else if (comp === '>') hit = actual > tVal
-                else if (comp === '<=') hit = actual <= tVal + tol
-                else if (comp === '<') hit = actual < tVal
+                const evalHit = (a: number) => {
+                  if (comp === '>=') return a >= tVal - tol
+                  if (comp === '>') return a > tVal
+                  if (comp === '<=') return a <= tVal + tol
+                  if (comp === '<') return a < tVal
+                  return false
+                }
+                let hit = evalHit(actual)
+                // The machine advances stages on the tick where the exit
+                // condition fires, so the satisfying sample is labeled as the
+                // next stage. If the in-stage value falls short, rescue the
+                // trigger with that transition (boundary) value rather than
+                // falsely reporting the stage as failed.
+                if (!hit && boundaryActual !== undefined && evalHit(boundaryActual)) {
+                  actual = boundaryActual
+                  hit = true
+                }
                 const u = unitMap[tType] ?? ''
                 const info = { type: tType, target: tVal, actual: _round1(actual), description: `${tType} >= ${tVal}${u}` }
                 if (hit && !triggered) triggered = info

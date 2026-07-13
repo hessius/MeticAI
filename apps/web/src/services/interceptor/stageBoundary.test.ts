@@ -68,4 +68,24 @@ describe('computeRichLocalAnalysis boundary-aware exit triggers', () => {
     )
     expect(stageOf(analysis, 'Fill').assessment.status).toBe('failed')
   })
+
+  it('keeps the in-stage value for a trigger already satisfied in-stage', () => {
+    // Rescue is only for triggers the in-stage value falls short of. A weight
+    // trigger satisfied in-stage must report the in-stage value, not the larger
+    // boundary weight (which keeps accumulating into the next stage).
+    const samples: Sample[] = [
+      ...([0.5, 1.0, 1.5, 2.0].map(w => ['Fill', 1.0, 7.5, w] as Sample)),
+      ...([5.0, 6.0, 7.0].map(w => ['Bloom', 2.0, 1.0, w] as Sample)),
+    ]
+    const analysis = computeRichLocalAnalysis(
+      buildEntry(samples, [
+        { name: 'Fill', type: 'flow', exit_triggers: [{ type: 'weight', value: 2, comparison: '>=' }], limits: [], dynamics: { points: [[0, 8.1]] } },
+        { name: 'Bloom', type: 'pressure', exit_triggers: [], limits: [], dynamics: { points: [[0, 3]] } },
+      ]),
+      'Test',
+    )
+    const triggered = stageOf(analysis, 'Fill').exit_trigger_result?.triggered
+    expect(triggered).toBeTruthy()
+    expect(triggered!.actual).toBe(2.0)
+  })
 })

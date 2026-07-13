@@ -105,3 +105,26 @@ def test_last_stage_has_no_boundary():
     stages = _extract_shot_stage_data(shot)
     assert "boundary_pressure" in stages["Fill"]
     assert "boundary_pressure" not in stages["Bloom"]
+
+
+def test_in_stage_satisfied_trigger_keeps_in_stage_actual():
+    """Rescue is only for triggers the in-stage value falls short of. A weight
+    trigger already satisfied in-stage must report the in-stage value, not the
+    (larger, monotonically accumulating) boundary weight."""
+    shot = _build_shot(
+        [("Fill", 1.0, 7.5, w) for w in (0.5, 1.0, 1.5, 2.0)]
+        + [("Bloom", 2.0, 1.0, w) for w in (5.0, 6.0, 7.0)]
+    )
+    stages = _extract_shot_stage_data(shot)
+    profile_stage = {
+        "name": "Fill",
+        "type": "flow",
+        "exit_triggers": [{"type": "weight", "value": 2, "comparison": ">="}],
+        "limits": [],
+        "dynamics": {"points": [[0, 8.1]]},
+    }
+    result = _analyze_stage_execution(profile_stage, stages["Fill"], 5.0, [])
+    triggered = result["exit_trigger_result"]["triggered"]
+    assert triggered is not None
+    assert triggered["actual"] == 2.0
+

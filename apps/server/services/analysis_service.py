@@ -513,57 +513,56 @@ def _determine_exit_trigger_hit(
         value = _safe_float(resolved_value)
 
         # Check if this trigger was satisfied
-        # Select the appropriate actual value based on comparison operator
+        # Select the in-stage actual value based on comparison operator, plus the
+        # boundary (transition-sample) value used to rescue a trigger that the
+        # in-stage value falls short of.
         actual_value = 0.0
+        boundary_actual = None
         if trigger_type == "time":
             actual_value = duration
             if boundary_time is not None:
-                actual_value = max(duration, _safe_float(boundary_time) - start_time)
+                boundary_actual = _safe_float(boundary_time) - start_time
         elif trigger_type == "weight":
             actual_value = end_weight
             if boundary_weight is not None:
-                actual_value = max(end_weight, _safe_float(boundary_weight))
+                boundary_actual = _safe_float(boundary_weight)
         elif trigger_type == "pressure":
             # For >= or >: we want to know if max reached the target
             # For <= or <: we want to know if pressure dropped below target (use end)
-            if comparison in (">=", ">"):
-                actual_value = max_pressure
-                if boundary_pressure is not None:
-                    actual_value = max(max_pressure, _safe_float(boundary_pressure))
-            else:  # <= or < or ==
-                actual_value = (
-                    _safe_float(boundary_pressure)
-                    if boundary_pressure is not None
-                    else end_pressure
-                )
+            actual_value = max_pressure if comparison in (">=", ">") else end_pressure
+            if boundary_pressure is not None:
+                boundary_actual = _safe_float(boundary_pressure)
         elif trigger_type == "flow":
             # For >= or >: we want to know if max reached the target
             # For <= or <: we want to know if flow dropped below target (use end)
-            if comparison in (">=", ">"):
-                actual_value = max_flow
-                if boundary_flow is not None:
-                    actual_value = max(max_flow, _safe_float(boundary_flow))
-            else:  # <= or < or ==
-                actual_value = (
-                    _safe_float(boundary_flow)
-                    if boundary_flow is not None
-                    else end_flow
-                )
+            actual_value = max_flow if comparison in (">=", ">") else end_flow
+            if boundary_flow is not None:
+                boundary_actual = _safe_float(boundary_flow)
 
         # Evaluate comparison with small tolerance
         tolerance = 0.5 if trigger_type in ["time", "weight"] else 0.2
-        was_hit = False
 
-        if comparison == ">=":
-            was_hit = actual_value >= (value - tolerance)
-        elif comparison == ">":
-            was_hit = actual_value > value
-        elif comparison == "<=":
-            was_hit = actual_value <= (value + tolerance)
-        elif comparison == "<":
-            was_hit = actual_value < value
-        elif comparison == "==":
-            was_hit = abs(actual_value - value) < tolerance
+        def _eval_hit(actual: float) -> bool:
+            if comparison == ">=":
+                return actual >= (value - tolerance)
+            if comparison == ">":
+                return actual > value
+            if comparison == "<=":
+                return actual <= (value + tolerance)
+            if comparison == "<":
+                return actual < value
+            if comparison == "==":
+                return abs(actual - value) < tolerance
+            return False
+
+        was_hit = _eval_hit(actual_value)
+        # The machine advances stages on the tick where the exit condition fires,
+        # so the satisfying sample is labeled as the next stage. If the in-stage
+        # value falls short, rescue the trigger with that transition (boundary)
+        # value rather than falsely reporting the stage as failed.
+        if not was_hit and boundary_actual is not None and _eval_hit(boundary_actual):
+            actual_value = boundary_actual
+            was_hit = True
 
         # Build a proper description with the resolved value
         unit = {"time": "s", "weight": "g", "pressure": "bar", "flow": "ml/s",
