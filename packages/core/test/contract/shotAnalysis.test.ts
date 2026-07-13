@@ -155,4 +155,58 @@ describe('computeRichLocalAnalysis', () => {
       { time: 10, stage_name: 'Pour', target_flow: 1 },
     ])
   })
+
+  it('credits a stage whose rising pressure target is reached exactly at the transition', () => {
+    // The machine flips status to the next stage on the tick where the exit
+    // fires, so the crossing sample (3.1 bar) is labeled as the next stage.
+    const entry: HistEntry = {
+      id: 'shot-boundary',
+      time: 1710000000,
+      name: 'Fill Bloom',
+      profile: {
+        name: 'Fill Bloom',
+        final_weight: 36,
+        variables: [],
+        stages: [
+          { name: 'Fill', type: 'flow', dynamics: { points: [[0, 8.1]] }, exit_triggers: [{ type: 'pressure', value: 3, comparison: '>=' }], limits: [] },
+          { name: 'Bloom', type: 'pressure', dynamics: { points: [[0, 3]] }, exit_triggers: [], limits: [] },
+        ],
+      },
+      data: [
+        ...[0.2, 0.5, 0.9, 1.3, 1.7, 2.0, 2.2].map((p, i) => ({ time: i * 130, profile_time: i * 130, status: 'Fill', shot: { pressure: p, flow: 7.5, weight: 0 } })),
+        ...[3.1, 3.4, 2.0, 1.5, 1.2].map((p, i) => ({ time: (7 + i) * 130, profile_time: (7 + i) * 130, status: 'Bloom', shot: { pressure: p, flow: 1.0, weight: 0.5 } })),
+      ],
+    }
+
+    const analysis = computeRichLocalAnalysis(entry, 'Fill Bloom')
+    const fill = analysis.stage_analyses.find((s: { stage_name: string }) => s.stage_name === 'Fill')
+    expect(fill.assessment.status).toBe('reached_goal')
+    expect(fill.exit_trigger_result.triggered.type).toBe('pressure')
+    expect(fill.exit_trigger_result.triggered.actual).toBeGreaterThanOrEqual(3.0)
+  })
+
+  it('still fails a stage when neither it nor the transition reaches the target', () => {
+    const entry: HistEntry = {
+      id: 'shot-boundary-fail',
+      time: 1710000000,
+      name: 'Fill Bloom',
+      profile: {
+        name: 'Fill Bloom',
+        final_weight: 36,
+        variables: [],
+        stages: [
+          { name: 'Fill', type: 'flow', dynamics: { points: [[0, 8.1]] }, exit_triggers: [{ type: 'pressure', value: 3, comparison: '>=' }], limits: [] },
+          { name: 'Bloom', type: 'pressure', dynamics: { points: [[0, 3]] }, exit_triggers: [], limits: [] },
+        ],
+      },
+      data: [
+        ...[0.2, 0.5, 0.9, 1.3, 1.7].map((p, i) => ({ time: i * 130, profile_time: i * 130, status: 'Fill', shot: { pressure: p, flow: 7.5, weight: 0 } })),
+        ...[1.9, 1.8, 1.5].map((p, i) => ({ time: (5 + i) * 130, profile_time: (5 + i) * 130, status: 'Bloom', shot: { pressure: p, flow: 1.0, weight: 0.5 } })),
+      ],
+    }
+
+    const analysis = computeRichLocalAnalysis(entry, 'Fill Bloom')
+    const fill = analysis.stage_analyses.find((s: { stage_name: string }) => s.stage_name === 'Fill')
+    expect(fill.assessment.status).toBe('failed')
+  })
 })
