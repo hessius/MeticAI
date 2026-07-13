@@ -181,7 +181,9 @@ export function HistoryView({ onBack, onViewProfile, onGenerateNew, onManageMach
       setProfileImages(images)
     }
     
-    loadImages()
+    loadImages().catch((err) => {
+      console.error('Failed to load profile images', err)
+    })
   }, [entries, fetchImagesForProfiles])
 
   // Get all available tags from entries for filtering
