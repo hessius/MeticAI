@@ -121,6 +121,13 @@
       "generateBusy": "Un profil est déjà en cours de génération. Votre formulaire a été conservé; veuillez réessayer dans quelques minutes."
     }
   },
+  "pwaInstall": {
+    "title": "Installer MeticAI",
+    "description": "Ajoutez MeticAI à cet appareil pour un mode direct plus rapide, comme une application.",
+    "install": "Installer",
+    "installing": "Installation...",
+    "dismiss": "Pas maintenant"
+  },
   "navigation": {
     "generateNewProfile": "Nouveau profil",
     "addProfile": "Ajouter un profil",
@@ -216,10 +223,12 @@
     "uploaded": "Téléversé !",
     "uploading": "Téléversement...",
     "useImagePrompt": "Souhaitez-vous utiliser cette image pour votre profil ?",
-    "generateAiDescription": "Générer une explication IA",
-    "generatingAiDescription": "Génération de l'explication IA...",
-    "aiDescriptionGenerated": "Explication IA générée avec succès",
-    "aiDescriptionFailed": "Échec de la génération de l'explication IA",
+    "generateAiDescription": "Générer une description IA",
+    "generatingAiDescription": "Génération de la description IA...",
+    "regenerateAiDescription": "Régénérer la description IA",
+    "regeneratingAiDescription": "Régénération de la description IA...",
+    "aiDescriptionGenerated": "Description IA générée avec succès",
+    "aiDescriptionFailed": "Échec de la génération de la description IA",
     "notes": "Notes",
     "notesPlaceholder": "Ajouter des notes sur ce profil…",
     "notesSaveFailed": "Échec de la sauvegarde des notes",
@@ -305,7 +314,9 @@
     "saveAsNew": "Enregistrer comme nouveau profil",
     "saveAsNewDescription": "Enregistrer les variables ajustées comme nouveau profil",
     "newProfileNamePlaceholder": "Nom du nouveau profil...",
-    "titleRun": "Lancer"
+    "titleRun": "Lancer",
+    "temperatureBoost": "Boost de température",
+    "temperatureBoostDescription": "Les premiers cafés après un démarrage à froid peuvent être ~3 °C plus froids. Le boost augmente temporairement la température d’infusion de 3 °C (max. 99 °C) pour atteindre la cible dès la première tasse."
   },
   "shotHistory": {
     "duration": "Durée",
@@ -325,12 +336,15 @@
     "checkingNewShots": "Recherche de nouveaux shots...",
     "refreshing": "Actualisation...",
     "checkForNewShots": "Rechercher de nouveaux shots",
+    "loadMore": "Charger plus",
+    "loadingMore": "Chargement...",
     "noShots": "Aucun shot trouvé",
     "noShotsDescription": "Aucun shot n'a encore été réalisé avec ce profil",
     "noData": "Aucune donnée disponible",
     "shotsCount": "{{count}} shots",
     "temp": "Temp",
     "replay": "Relire",
+    "scrubber": "Position de lecture",
     "compare": "Comparer",
     "analyze": "Analyser",
     "shotAnalysis": "Analyse de shot",
@@ -418,8 +432,49 @@
     "configuration": "Configuration",
     "loadingSettings": "Chargement des paramètres...",
     "geminiApiKey": "Clé API Gemini",
+    "providerApiKey": "Clé API {{provider}}",
+    "aiProvider": "Fournisseur d'IA",
+    "aiProviderLocal": "Sur l'appareil (Apple Intelligence)",
+    "localModelStatus": "Modèle sur l'appareil",
+    "localModelRecheck": "Revérifier",
+    "localModelChecking": "Vérification de la disponibilité…",
+    "localModelReady": "Apple Intelligence prêt",
+    "localModelUnavailable": "Apple Intelligence indisponible sur cet appareil",
+    "localModelDescription": "Exécute l'IA en privé sur votre appareil — sans clé API ni internet. Nécessite un iPhone 15 Pro ou ultérieur avec Apple Intelligence activé.",
+    "aiMode": "Mode IA",
+    "aiModeLocal": "Sur l'appareil",
+    "aiModeHosted": "Cloud",
+    "aiModeBoth": "Les deux",
+    "aiModeHint": "Choisissez où l'IA s'exécute : en privé sur cet appareil, dans le cloud, ou les deux avec un routage par fonction.",
+    "localBackend": "Modèle sur l'appareil",
+    "localBackendApple": "Apple Intelligence",
+    "localBackendGemma": "Gemma 4",
+    "localModelGemmaTitle": "Modèle Gemma 4",
+    "localModelGemmaReady": "Gemma 4 prêt",
+    "localModelDownloading": "Téléchargement… {{percent}} %",
+    "localModelDownloadingIndeterminate": "Téléchargement… cela peut prendre quelques minutes",
+    "localModelGemmaError": "Échec du téléchargement",
+    "localModelGemmaNotDownloaded": "Non téléchargé ({{size}})",
+    "localModelGemmaDescription": "Gemma 4 s'exécute entièrement sur votre appareil après un téléchargement unique. Environ 4 Go de RAM sont recommandés ; le Wi-Fi est conseillé pour le téléchargement.",
+    "localModelLowStorage": "Espace de stockage libre insuffisant pour télécharger le modèle (au moins 3 Go requis).",
+    "localModelLowMemory": "Cet appareil n'a peut-être pas assez de mémoire pour exécuter le modèle correctement.",
+    "localModelCancel": "Annuler",
+    "localModelDelete": "Supprimer le modèle",
+    "localModelDownload": "Télécharger ({{size}})",
+    "aiRouting": "Routage des fonctions",
+    "aiRoutingHint": "Choisissez quel backend gère chaque fonction.",
+    "aiRouteImageGeneration": "Génération d'images",
+    "aiRouteCloudRequired": "Cloud (requis)",
+    "aiRouteAnalyzeShot": "Analyse du shot",
+    "aiRouteGenerateProfile": "Création de profil",
+    "aiRouteRecommendations": "Recommandations",
+    "aiRouteDialIn": "Réglage",
+    "aiRouteLocal": "Sur l'appareil",
+    "aiRouteCloud": "Cloud",
+    "aiProviderImageHint": "Fonctions de texte uniquement. La génération d'images nécessite Gemini, OpenAI ou OpenRouter.",
     "configured": "Configurée",
     "apiKeyPlaceholder": "Entrez votre clé API Gemini",
+    "providerApiKeyPlaceholder": "Entrez votre clé API {{provider}}",
     "apiKeyPlaceholderNew": "Entrez une nouvelle clé pour modifier",
     "apiKeyConfigured": "Clé API configurée. Cliquez sur le champ pour entrer une nouvelle clé.",
     "apiKeyConfiguredExtended": "Clé API configurée. Cliquez sur le champ pour entrer une nouvelle clé. Vous pouvez garder la clé enregistrée et désactiver les fonctionnalités IA ci-dessous.",
@@ -455,6 +510,8 @@
     "geminiModel": "Modèle Gemini",
     "geminiModelDescription": "Sélectionnez le modèle Gemini à utiliser pour les fonctions IA.",
     "geminiModelDescriptionDynamic": "Modèles chargés depuis Google AI. Sélectionnez le modèle à utiliser.",
+    "modelsLoading": "Chargement des modèles…",
+    "modelDefault": "Modèle par défaut",
     "mqttEnabled": "Pont MQTT",
     "mqttEnabledDescription": "Télémétrie machine en temps réel via MQTT. Alimente le tableau de bord en direct.",
     "settingsSaved": "Paramètres enregistrés avec succès !",
@@ -580,7 +637,8 @@
     "aiSettings": "Paramètres IA",
     "versionAndChangelog": "Version et journal des modifications",
     "mqttBridge": "Pont MQTT",
-    "disclaimer": "Metic est un projet open source indépendant et n'est pas affilié, soutenu ou lié à Meticulous Home, le fabricant de la machine à espresso Meticulous."
+    "disclaimer": "Metic est un projet open source indépendant et n'est pas affilié, soutenu ou lié à Meticulous Home, le fabricant de la machine à espresso Meticulous.",
+    "localModelDownloadKeepOpen": "Garde l'application ouverte et reste sur cet écran jusqu'à la fin du téléchargement."
   },
   "profileBreakdown": {
     "title": "Détails du profil",
@@ -743,6 +801,23 @@
     "updateNow": "Mettre à jour maintenant"
   },
   "controlCenter": {
+    "heating": {
+      "statusHeating": "Chauffe",
+      "statusReady": "Prêt",
+      "statusReadyToBrew": "Prêt à infuser",
+      "statusStable": "Température stable",
+      "timeToReady": "avant stabilité thermique",
+      "stillDialingIn": "Réglage en cours · {{time}} avant stabilité maximale",
+      "almostStable": "Presque prêt — stabilité maximale en cours",
+      "estimatePrefix": "~",
+      "estimating": "Estimation…",
+      "brewChamber": "Chambre d'infusion",
+      "brewHead": "Tête d'infusion",
+      "temperatureChart": "Température",
+      "deltaToTarget": "Vers la cible",
+      "target": "Cible",
+      "stabilityReached": "Température stable"
+    },
     "offline": "La machine est hors ligne",
     "stale": "Périmé",
     "noProfile": "Aucun profil chargé",
@@ -793,7 +868,7 @@
       "continue": "Reprendre",
       "preheat": "Préchauffer",
       "tare": "Tarer",
-      "home": "Position initiale",
+      "raise": "Relever",
       "purge": "Purger",
       "live": "En direct",
       "abortPreheat": "Annuler"
@@ -807,7 +882,7 @@
       "preheatCancelled": "Préchauffage annulé",
       "warmupCancelled": "Chauffage annulé",
       "tared": "Balance tarée",
-      "homed": "Piston en retour…",
+      "homed": "Relevage du piston...",
       "purging": "Purge en cours…",
       "soundsOn": "Sons activés",
       "soundsOff": "Sons désactivés",
@@ -918,6 +993,7 @@
     "replaying": "Replaying {{speed}}x",
     "tooltipTime": "Time",
     "tooltipStage": "Stage",
+    "currentValues": "Valeurs actuelles",
     "targets": "Cibles",
     "shotLabel": "Extraction",
     "targetsLabel": "Cibles",
@@ -1157,6 +1233,9 @@
     "inHistory": "Dans le catalogue",
     "rename": "Renommer",
     "editMode": "Modifier",
+    "reorderHint": "Faites glisser la poignée pour réorganiser les profils sur votre machine.",
+    "reorderDisabledFilter": "Effacez les filtres pour réorganiser les profils.",
+    "reorderError": "Impossible d'enregistrer le nouvel ordre des profils.",
     "delete": "Supprimer",
     "export": "Exporter JSON",
     "confirmDelete": "Supprimer",
@@ -1219,7 +1298,9 @@
     "deselectAll": "Tout désélectionner",
     "globalSettings": "Paramètres globaux",
     "applyFailed": "Échec de l'application des recommandations",
-    "classifyFailed": "Échec de la classification"
+    "classifyFailed": "Échec de la classification",
+    "noneApplied": "Aucune recommandation n'a pu être appliquée : {{reason}}",
+    "partiallyApplied": "{{applied}} appliquées, {{skipped}} ignorées"
   },
   "taste": {
     "compass": {
@@ -1555,6 +1636,12 @@
     "somethingWentWrong": "Quelque chose s'est mal passé",
     "aiModelUnavailable": "Le modèle d'IA est temporairement indisponible — il s'agit d'une panne côté Google. Essayez de changer de modèle dans les Paramètres, ce qui peut également augmenter l'utilisation des tokens.",
     "aiQuotaExceeded": "Quota d'API dépassé. Veuillez patienter un instant et réessayer.",
+    "localVisionUnsupported": "L'IA sur l'appareil ne peut pas analyser les images. Passez à un fournisseur cloud pour les fonctions basées sur l'image.",
+    "localUnavailable": "L'IA sur l'appareil n'est pas disponible sur cet appareil.",
+    "localTimeout": "L'IA sur l'appareil a mis trop de temps à répondre. Veuillez réessayer.",
+    "localModelNotDownloaded": "Le modèle sur l'appareil n'a pas encore été téléchargé. Téléchargez-le dans les Réglages.",
+    "localOutOfMemory": "Votre appareil n'a pas assez de mémoire libre. Fermez d'autres applis et réessayez, ou passez à l'IA cloud.",
+    "localGenerationFailed": "L'IA sur l'appareil s'est arrêtée de façon inattendue pendant la génération. Réessayez, ou passez à l'IA cloud.",
     "aiNoCompatibleModel": "Aucun modèle d'IA compatible n'est disponible pour votre clé API. Vérifiez votre accès à Gemini ou mettez à jour Metic vers la dernière version.",
     "analysisFailed": "Analyse échouée"
   },
@@ -1642,6 +1729,12 @@
       "feature1": "Générer des profils espresso personnalisés à partir de descriptions",
       "feature2": "Analyser vos shots avec un retour de niveau expert",
       "feature3": "Obtenir des recommandations de dial-in basées sur le goût",
+      "localOption": "Sur l'appareil",
+      "localOptionHint": "Privé, gratuit, sans clé",
+      "cloudOption": "Cloud",
+      "cloudOptionHint": "Utilisez votre propre clé API",
+      "localTitle": "IA sur l'appareil (Apple Intelligence)",
+      "localDescription": "L'IA s'exécute entièrement sur votre iPhone — privée et gratuite, sans clé API. Nécessite un iPhone 15 Pro ou ultérieur avec Apple Intelligence activé. La génération d'images nécessite toujours une clé cloud.",
       "getKey": "Obtenir une clé API gratuite de Google AI Studio"
     },
     "language": {
@@ -1761,5 +1854,28 @@
     "selectImage": "Sélectionner une image",
     "regenerateSlot": "Régénérer",
     "generating": "Génération..."
+  },
+  "analysis": {
+    "facts": {
+      "title": "Signaux de phase",
+      "subtitle": "Comment chaque étape s'est terminée (quelle condition s'est déclenchée). C'est une description de l'intention, pas un verdict réussi/échoué. Voir Analyse des étapes pour les résultats.",
+      "stalled": "Bloqué",
+      "channeling": "Chenalisation possible",
+      "curveDelta": "Courbe Δ {{delta}}",
+      "adjustmentsTitle": "Ajustements suggérés",
+      "infoLabel": "À propos des signaux de phase",
+      "curveDeltaInfo": "Curve Δ indique l'écart entre la moyenne mesurée d'une étape et sa consigne cible (bar ou ml/s). Positif signifie au-dessus de la cible, négatif en dessous.",
+      "signal": {
+        "targeted": "Comme prévu",
+        "failsafe": "Sécurité",
+        "unknown": "Inconnu"
+      }
+    },
+    "taste": {
+      "gateTitle": "Affiner avec le goût (facultatif)",
+      "gateBody": "Indiquez le goût de cette extraction pour des recommandations plus fines.",
+      "skip": "Ignorer",
+      "analyzeWithTaste": "Analyser avec le goût"
+    }
   }
 }

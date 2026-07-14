@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from fastapi import HTTPException
 from unittest.mock import Mock, patch, MagicMock, mock_open, AsyncMock
 from io import BytesIO
+import base64
 from PIL import Image
 from pathlib import Path
 import os
@@ -3062,6 +3063,57 @@ class TestShotAnalysisHelpers:
         assert isinstance(desc, str)
         assert isinstance(desc, str) and len(desc) > 0
 
+    def test_dynamics_targets_handle_nested_format(self):
+        """Nested dynamics (dynamics.points) must resolve like flat dynamics_points.
+
+        Regression: 'Slayer at Home' uses nested dynamics, so a flat-only reader
+        returned None and mis-detected the effective control mode (#423).
+        """
+        from services.analysis_service import (
+            _max_dynamics_target,
+            _mean_dynamics_target,
+            _format_dynamics_description,
+        )
+
+        variables = [{"key": "flow_MaxFlowRate", "type": "flow", "value": 10.8}]
+        stage = {
+            "type": "flow",
+            "dynamics": {
+                "points": [[0, "$flow_MaxFlowRate"], [30, "$flow_MaxFlowRate"]],
+                "over": "time",
+            },
+        }
+        assert _max_dynamics_target(stage, variables) == 10.8
+        assert _mean_dynamics_target(stage, variables) == 10.8
+        assert "10.8" in _format_dynamics_description(stage, variables)
+
+    def test_effective_mode_pressure_for_nested_aggressive_flow(self):
+        """A nested aggressive-flow stage with a pressure limit is pressure-governed."""
+        from services.shot_facts import effective_control_mode
+        from services.analysis_service import (
+            _max_dynamics_target,
+            _mean_dynamics_target,
+            _format_limits,
+        )
+
+        variables = [
+            {"key": "flow_MaxFlowRate", "type": "flow", "value": 10.8},
+            {"key": "pressure_Max Pressure", "type": "pressure", "value": 6},
+        ]
+        profile_stage = {
+            "type": "flow",
+            "dynamics": {"points": [[0, "$flow_MaxFlowRate"], [30, "$flow_MaxFlowRate"]]},
+            "limits": [{"type": "pressure", "value": "$pressure_Max Pressure"}],
+        }
+        stage = {
+            "type": "flow",
+            "stage_type": "flow",
+            "profile_max_target": _max_dynamics_target(profile_stage, variables),
+            "profile_target_value": _mean_dynamics_target(profile_stage, variables),
+            "limits": _format_limits(profile_stage["limits"], variables),
+        }
+        assert effective_control_mode(stage) == "pressure"
+
     def test_compute_stage_stats_basic(self):
         """Test computing statistics for stage telemetry."""
         from services.analysis_service import _compute_stage_stats
@@ -4594,6 +4646,78 @@ class TestMachineProfilesEndpoint:
         assert data["status"] == "success"
         assert data["total"] == 0
         assert len(data["profiles"]) == 0
+
+    @patch("api.routes.profiles.invalidate_profile_list_cache")
+    @patch("api.routes.profiles.async_session_post", new_callable=AsyncMock)
+    def test_reorder_profiles_success(
+        self, mock_session_post, mock_invalidate, client
+    ):
+        """Reordering forwards the new ID list to the machine settings endpoint."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_session_post.return_value = mock_response
+
+        order = ["profile-b", "profile-a", "profile-c"]
+        response = client.post("/api/machine/profiles/order", json={"order": order})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["order"] == order
+        mock_session_post.assert_awaited_once_with(
+            "/api/v1/settings", {"profile_order": order}
+        )
+        mock_invalidate.assert_called_once()
+
+    @patch("api.routes.profiles.async_session_post", new_callable=AsyncMock)
+    def test_reorder_profiles_rejects_empty_list(self, mock_session_post, client):
+        """An empty order list is a client error and never reaches the machine."""
+        response = client.post("/api/machine/profiles/order", json={"order": []})
+
+        assert response.status_code == 400
+        mock_session_post.assert_not_called()
+
+    @patch("api.routes.profiles.async_session_post", new_callable=AsyncMock)
+    def test_reorder_profiles_rejects_non_string_ids(self, mock_session_post, client):
+        """Order entries must be non-empty strings."""
+        response = client.post(
+            "/api/machine/profiles/order", json={"order": ["ok", 42, ""]}
+        )
+
+        assert response.status_code == 400
+        mock_session_post.assert_not_called()
+
+    @patch("api.routes.profiles.invalidate_profile_list_cache")
+    @patch("api.routes.profiles.async_session_post", new_callable=AsyncMock)
+    def test_reorder_profiles_machine_unreachable(
+        self, mock_session_post, mock_invalidate, client
+    ):
+        """A MachineUnreachableError surfaces as a 503."""
+        from services.meticulous_service import MachineUnreachableError
+
+        mock_session_post.side_effect = MachineUnreachableError(ConnectionError("offline"))
+
+        response = client.post(
+            "/api/machine/profiles/order", json={"order": ["a", "b"]}
+        )
+
+        assert response.status_code == 503
+
+    @patch("api.routes.profiles.invalidate_profile_list_cache")
+    @patch("api.routes.profiles.async_session_post", new_callable=AsyncMock)
+    def test_reorder_profiles_machine_rejects(
+        self, mock_session_post, mock_invalidate, client
+    ):
+        """A non-2xx machine response surfaces as a 502."""
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_session_post.return_value = mock_response
+
+        response = client.post(
+            "/api/machine/profiles/order", json={"order": ["a", "b"]}
+        )
+
+        assert response.status_code == 502
 
     @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
     @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
@@ -6663,6 +6787,133 @@ class TestGenerateProfileImageEndpoint:
         assert response.status_code == 500
 
 
+class TestProviderImageGeneration:
+    """Unit tests for OpenAI-compatible image generation in ai_providers (#505)."""
+
+    @staticmethod
+    def _mock_httpx(responses):
+        """Build a patch target for httpx.Client whose .post returns queued responses.
+
+        ``responses`` is a list of (status_code, json_body) tuples returned in
+        order across successive .post() calls.
+        """
+        calls = {"posts": []}
+        iterator = iter(responses)
+
+        def _post(url, headers=None, **kwargs):
+            body_in = kwargs.get("json")
+            calls["posts"].append({"url": url, "headers": headers, "json": body_in})
+            status, body = next(iterator)
+            resp = MagicMock()
+            resp.status_code = status
+            resp.json.return_value = body
+            resp.text = json.dumps(body)
+            return resp
+
+        client_cm = MagicMock()
+        inner = MagicMock()
+        inner.post.side_effect = _post
+        client_cm.return_value.__enter__.return_value = inner
+        return client_cm, calls
+
+    def test_provider_supports_image(self):
+        from services import ai_providers
+
+        assert ai_providers.provider_supports_image("gemini") is True
+        assert ai_providers.provider_supports_image("openai") is True
+        assert ai_providers.provider_supports_image("openrouter") is True
+        assert ai_providers.provider_supports_image("deepseek") is False
+        assert ai_providers.provider_supports_image("kimi") is False
+
+    def test_openai_image_success(self):
+        from services import ai_providers
+
+        b64 = base64.b64encode(b"hello").decode("ascii")
+        client_cm, calls = self._mock_httpx([(200, {"data": [{"b64_json": b64}]})])
+        with patch.dict(os.environ, {"AI_PROVIDER": "openai", "AI_API_KEY": "sk-x"}):
+            with patch("services.ai_providers.httpx.Client", client_cm):
+                data = asyncio.run(ai_providers.generate_image_bytes("a latte", "openai"))
+        assert data == b"hello"
+        post = calls["posts"][0]
+        assert post["url"] == "https://api.openai.com/v1/images/generations"
+        assert post["json"]["model"] == "gpt-image-1"
+        # gpt-image-1 must not send response_format.
+        assert "response_format" not in post["json"]
+
+    def test_openai_falls_back_to_dalle_on_403(self):
+        from services import ai_providers
+
+        b64 = base64.b64encode(b"hello").decode("ascii")
+        client_cm, calls = self._mock_httpx(
+            [(403, {"error": "must be verified"}), (200, {"data": [{"b64_json": b64}]})]
+        )
+        with patch.dict(os.environ, {"AI_PROVIDER": "openai", "AI_API_KEY": "sk-x"}):
+            with patch("services.ai_providers.httpx.Client", client_cm):
+                data = asyncio.run(ai_providers.generate_image_bytes("a latte", "openai"))
+        assert data == b"hello"
+        assert len(calls["posts"]) == 2
+        assert calls["posts"][1]["json"]["model"] == "dall-e-3"
+        # dall-e-* needs response_format to return base64.
+        assert calls["posts"][1]["json"]["response_format"] == "b64_json"
+
+    def test_openrouter_image_success(self):
+        from services import ai_providers
+
+        b64 = base64.b64encode(b"hello").decode("ascii")
+        client_cm, calls = self._mock_httpx([(200, {"data": [{"b64_json": b64}]})])
+        with patch.dict(os.environ, {"AI_PROVIDER": "openrouter", "AI_API_KEY": "sk-or-x"}):
+            with patch("services.ai_providers.httpx.Client", client_cm):
+                data = asyncio.run(
+                    ai_providers.generate_image_bytes("a latte", "openrouter")
+                )
+        assert data == b"hello"
+        post = calls["posts"][0]
+        assert post["url"] == "https://openrouter.ai/api/v1/images"
+        assert post["json"]["model"] == "google/gemini-2.5-flash-image"
+
+    def test_openai_no_data_raises(self):
+        from services import ai_providers
+
+        client_cm, _ = self._mock_httpx([(200, {"data": []})])
+        with patch.dict(os.environ, {"AI_PROVIDER": "openai", "AI_API_KEY": "sk-x"}):
+            with patch("services.ai_providers.httpx.Client", client_cm):
+                with pytest.raises(ai_providers.ProviderError):
+                    asyncio.run(ai_providers.generate_image_bytes("x", "openai"))
+
+    def test_text_only_provider_rejected(self):
+        from services import ai_providers
+
+        with pytest.raises(ai_providers.ProviderError):
+            asyncio.run(ai_providers.generate_image_bytes("x", "deepseek"))
+
+
+class TestGenerateProfileImageMultiProvider:
+    """Route-level tests that the image endpoint branches by active provider (#505)."""
+
+    @patch("api.routes.profiles._set_cached_image")
+    @patch("api.routes.profiles.process_image_for_profile")
+    def test_openai_provider_branch_preview(self, mock_process, mock_cache, client):
+        mock_process.return_value = ("data:image/png;base64,abc", b"png_bytes")
+        with patch.dict(os.environ, {"AI_PROVIDER": "openai", "AI_API_KEY": "sk-x"}):
+            with patch(
+                "services.ai_providers.generate_image_bytes",
+                new_callable=AsyncMock,
+                return_value=b"raw_png",
+            ) as mock_gen:
+                response = client.post(
+                    "/api/profile/Test/generate-image?preview=true&style=abstract"
+                )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "preview"
+        mock_gen.assert_awaited_once()
+
+    def test_text_only_provider_returns_503(self, client):
+        with patch.dict(os.environ, {"AI_PROVIDER": "deepseek", "AI_API_KEY": "sk-x"}):
+            response = client.post("/api/profile/Test/generate-image?preview=true")
+        assert response.status_code == 503
+
+
 class TestLLMShotAnalysisEndpoint:
     """Tests for the POST /api/shots/analyze-llm endpoint."""
 
@@ -7726,8 +7977,8 @@ class TestSettingsManagement:
         assert settings["authorName"] == "Test Author"
 
 
-class TestHelperFunctions:
-    """Tests for various helper functions."""
+class TestSanitizationHelpers:
+    """Tests for profile-name sanitization helpers."""
 
     def test_sanitize_profile_name(self):
         """Test profile name sanitization for filenames."""
@@ -7739,9 +7990,6 @@ class TestHelperFunctions:
         assert sanitize_profile_name_for_filename("Test:Profile") == "test_profile"
         assert sanitize_profile_name_for_filename("Normal_Name") == "normal_name"
         assert sanitize_profile_name_for_filename("Test Profile") == "test_profile"
-
-    def test_extract_profile_name_from_reply(self):
-        """Test extracting profile name from LLM reply."""
 
 
 class TestHealthEndpoint:
@@ -9108,6 +9356,42 @@ class TestSettingsEndpoints:
         assert data["geminiApiKeyMasked"] is True
         assert data["geminiApiKey"]
         assert "stored-key" not in data["geminiApiKey"]
+
+    def test_get_settings_never_leaks_raw_ai_provider_key(self, client, monkeypatch):
+        """The raw BYO provider key (aiApiKey) must never be returned (#491)."""
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+        import api.routes.system as system_module
+        import services.ai_providers as ai_providers_module
+
+        def mock_load_settings():
+            return {
+                "aiProvider": "openai",
+                "aiApiKey": "sk-secret-openai-key-1234567890",
+                "meticulousIp": "",
+                "serverIp": "",
+                "authorName": "",
+            }
+
+        monkeypatch.setattr(system_module, "load_settings", mock_load_settings)
+        monkeypatch.setattr(
+            ai_providers_module, "get_active_provider_id", lambda: "openai"
+        )
+        monkeypatch.setattr(
+            ai_providers_module,
+            "get_provider_api_key",
+            lambda _provider=None: "sk-secret-openai-key-1234567890",
+        )
+
+        response = client.get("/api/settings")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert "aiApiKey" not in data
+        assert "sk-secret-openai-key" not in json.dumps(data)
+        # Masked representation is still present and configured.
+        assert data["geminiApiKeyConfigured"] is True
+        assert data["geminiApiKeyMasked"] is True
 
     def test_get_settings_error_handling(self, client, monkeypatch):
         """Test get_settings handles errors."""
@@ -15150,6 +15434,88 @@ END_RECOMMENDATIONS_JSON
         recs = _parse_recommendations_json(text)
         assert recs == []
 
+    def test_parse_bare_array_without_delimiters(self):
+        """Bare recommendations array (no delimiters) is recovered.
+
+        Reproduces the weak on-device model bug where the JSON array leaks
+        into prose without RECOMMENDATIONS_JSON markers.
+        """
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """## 5. Profile Design Observations
+**Potential Improvements:**
+- Increase pre-infusion duration.
+
+[
+  {
+    "variable": "pressure_PreBrew",
+    "current_value": 1.8,
+    "recommended_value": 2.5,
+    "stage": "PreBrew",
+    "confidence": "high",
+    "reason": "Increase pressure during pre-infusion."
+  }
+]
+"""
+        recs = _parse_recommendations_json(text)
+        assert len(recs) == 1
+        assert recs[0]["variable"] == "pressure_PreBrew"
+        assert recs[0]["recommended_value"] == 2.5
+
+    def test_parse_tolerates_trailing_comma(self):
+        """Trailing commas emitted by weak models are tolerated."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """RECOMMENDATIONS_JSON:
+[{"variable":"flow","current_value":2.5,"recommended_value":3.0,"stage":"main","confidence":"high","reason":"r"},]
+END_RECOMMENDATIONS_JSON
+"""
+        recs = _parse_recommendations_json(text)
+        assert len(recs) == 1
+        assert recs[0]["variable"] == "flow"
+
+    def test_parse_ignores_prose_mentioning_variables(self):
+        """Prose mentioning 'variable' without an array is not misparsed."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = "## 1. Shot Performance\n**Notes:**\n- The flow variable was stable."
+        assert _parse_recommendations_json(text) == []
+
+    def test_parse_drops_nonfinite_values(self):
+        """Hallucinated recs with NaN values (weak on-device models) are dropped."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """RECOMMENDATIONS_JSON:
+[{"variable":"flow_0","current_value":"NaN","recommended_value":"NaN","stage":"main","confidence":"low","reason":"r"},
+{"variable":"flow","current_value":2.5,"recommended_value":3.0,"stage":"main","confidence":"high","reason":"r"}]
+END_RECOMMENDATIONS_JSON
+"""
+        recs = _parse_recommendations_json(text)
+        assert len(recs) == 1
+        assert recs[0]["variable"] == "flow"
+
+    def test_parse_drops_blank_variable(self):
+        """Recs with an empty variable name are not actionable and are dropped."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """RECOMMENDATIONS_JSON:
+[{"variable":"","current_value":1,"recommended_value":2,"stage":"main","confidence":"low","reason":"r"}]
+END_RECOMMENDATIONS_JSON
+"""
+        assert _parse_recommendations_json(text) == []
+
+    def test_parse_keeps_advisory_zero_values(self):
+        """Advisory recs with finite 0 values are kept (not confused with NaN)."""
+        from api.routes.shots import _parse_recommendations_json
+
+        text = """RECOMMENDATIONS_JSON:
+[{"variable":"info_note","current_value":0,"recommended_value":0,"stage":"global","confidence":"low","reason":"General advice","is_patchable":false}]
+END_RECOMMENDATIONS_JSON
+"""
+        recs = _parse_recommendations_json(text)
+        assert len(recs) == 1
+        assert recs[0]["variable"] == "info_note"
+
     def test_classify_adjustable_variable(self):
         """Adjustable variable (no info_ prefix) is patchable."""
         from api.routes.shots import _classify_recommendation_patchable
@@ -15304,6 +15670,90 @@ class TestApplyRecommendationsEndpoint:
         assert len(data["skipped"]) == 1
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("api.routes.profiles.async_save_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
+    def test_apply_resolves_invented_positional_variable(
+        self, mock_list, mock_get, mock_save, client
+    ):
+        """An invented id like 'pressure_2' resolves to the real key by type + value."""
+        profile = self._make_mock_profile()
+        profile.variables = [
+            SimpleNamespace(
+                key="pressure_Max Pressure",
+                name="Max Pressure",
+                value=6.0,
+                type="pressure",
+            ),
+            SimpleNamespace(
+                key="pressure_PreBrew pressure",
+                name="PreBrew pressure",
+                value=1.8,
+                type="pressure",
+            ),
+        ]
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        recs = json.dumps(
+            [
+                {
+                    "variable": "pressure_2",
+                    "current_value": 6,
+                    "recommended_value": 5,
+                    "stage": "Pressure Ramp Up",
+                },
+            ]
+        )
+        response = client.post(
+            "/api/profile/TestProfile/apply-recommendations",
+            data={"recommendations": recs},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert len(data["applied"]) == 1
+        assert data["applied"][0]["variable"] == "pressure_Max Pressure"
+        assert data["applied"][0]["value"] == 5
+        assert data["applied"][0]["matched_from"] == "pressure_2"
+        # The unrelated pressure variable must remain unchanged.
+        assert profile.variables[0].value == 5
+        assert profile.variables[1].value == 1.8
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "test_api_key"})
+    @patch("api.routes.profiles.async_save_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
+    @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
+    def test_apply_unresolvable_invented_variable_reports_no_changes(
+        self, mock_list, mock_get, mock_save, client
+    ):
+        """An invented id with no matching variable type is skipped, not silently applied."""
+        profile = self._make_mock_profile()  # only a 'flow' variable
+        mock_list.return_value = [profile]
+        mock_get.return_value = profile
+        mock_save.return_value = None
+
+        recs = json.dumps(
+            [
+                {
+                    "variable": "pressure_2",
+                    "current_value": 6,
+                    "recommended_value": 5,
+                    "stage": "Ghost Stage",
+                },
+            ]
+        )
+        response = client.post(
+            "/api/profile/TestProfile/apply-recommendations",
+            data={"recommendations": recs},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "no_changes"
+        assert data["skipped"][0]["variable"] == "pressure_2"
+
+
     @patch("api.routes.profiles.async_save_profile", new_callable=AsyncMock)
     @patch("api.routes.profiles.async_get_profile", new_callable=AsyncMock)
     @patch("api.routes.profiles.async_list_profiles", new_callable=AsyncMock)
@@ -17055,3 +17505,835 @@ class TestLiveModelListing:
         assert best, "rank_models should select a model from the live list"
         # The selected model must actually validate against the API.
         assert asyncio.run(gs.validate_model(best)) is True
+
+
+class TestAITags:
+    """AI-generated sensory tags during description generation (#400)."""
+
+    def test_parse_ai_tags_extracts_valid_labels(self):
+        from services.analysis_service import parse_ai_tags
+
+        text = "Some description.\n\nTags: Chocolate, Creamy, Sweet"
+        assert parse_ai_tags(text) == ["Chocolate", "Creamy", "Sweet"]
+
+    def test_parse_ai_tags_validates_against_vocabulary(self):
+        from services.analysis_service import parse_ai_tags
+
+        text = "Body text\nTags: Chocolate, Spaceship, Nutty"
+        assert parse_ai_tags(text) == ["Chocolate", "Nutty"]
+
+    def test_parse_ai_tags_is_case_insensitive_and_dedupes(self):
+        from services.analysis_service import parse_ai_tags
+
+        text = "Tags: chocolate, CHOCOLATE, creamy."
+        assert parse_ai_tags(text) == ["Chocolate", "Creamy"]
+
+    def test_parse_ai_tags_empty_when_absent(self):
+        from services.analysis_service import parse_ai_tags
+
+        assert parse_ai_tags("No tags line here") == []
+        assert parse_ai_tags(None) == []
+        assert parse_ai_tags("Tags:") == []
+
+    def test_parse_ai_tags_tolerates_literal_brackets(self):
+        from services.analysis_service import parse_ai_tags
+
+        assert parse_ai_tags("Tags: [Chocolate, Sweet]") == ["Chocolate", "Sweet"]
+        assert parse_ai_tags("Tags: [Chocolate]") == ["Chocolate"]
+
+    def test_parse_ai_tags_tolerates_markdown_decoration(self):
+        from services.analysis_service import parse_ai_tags
+
+        assert parse_ai_tags("**Tags:** Chocolate, Sweet") == ["Chocolate", "Sweet"]
+        assert parse_ai_tags("**Tags: Chocolate, Sweet**") == ["Chocolate", "Sweet"]
+        assert parse_ai_tags("- Tags: Chocolate, Sweet") == ["Chocolate", "Sweet"]
+        assert parse_ai_tags("* **Tags**: Chocolate, Sweet") == ["Chocolate", "Sweet"]
+        assert parse_ai_tags("# Tags: Chocolate") == ["Chocolate"]
+
+    def test_strip_tags_line_removes_markdown_decorated_line(self):
+        from services.analysis_service import strip_tags_line
+
+        assert strip_tags_line("Great coffee.\n**Tags:** Sweet, Berry").endswith(
+            "Great coffee."
+        )
+        assert "Tags" not in strip_tags_line("Great coffee.\n- Tags: Sweet")
+
+    def test_resolve_description_placeholders_resolves_variables(self):
+        from services.analysis_service import resolve_description_placeholders
+
+        variables = [
+            {"key": "pressure_Max Pressure", "name": "Max Pressure", "value": 6},
+            {"key": "time_PreBrew Duration", "name": "PreBrew Duration", "value": 30},
+        ]
+        assert (
+            resolve_description_placeholders("Peaks at $pressure_Max Pressure.", variables)
+            == "Peaks at 6 bar."
+        )
+        assert (
+            resolve_description_placeholders("Runs $time\\_PreBrew Duration$.", variables)
+            == "Runs 30 s."
+        )
+
+    def test_resolve_description_placeholders_strips_invented_tokens(self):
+        from services.analysis_service import resolve_description_placeholders
+
+        assert (
+            resolve_description_placeholders("Adjust $pressure_1$ upward.", [])
+            == "Adjust upward."
+        )
+        assert (
+            resolve_description_placeholders("See $pressure\\_1$ here.", [])
+            == "See here."
+        )
+
+    def test_resolve_description_placeholders_leaves_prose_untouched(self):
+        from services.analysis_service import resolve_description_placeholders
+
+        text = "A balanced, chocolatey shot with 9 bar peak pressure."
+        assert resolve_description_placeholders(text, []) == text
+        assert resolve_description_placeholders("", []) == ""
+        assert resolve_description_placeholders(None, []) == ""
+
+    def test_resolve_description_placeholders_tidies_whitespace_linearly(self):
+        import time
+
+        from services.analysis_service import resolve_description_placeholders
+
+        assert resolve_description_placeholders("word   .", []) == "word."
+        assert resolve_description_placeholders("a\t\tb ,c", []) == "a b,c"
+        # A long whitespace run with no trailing punctuation must resolve quickly
+        # (guards against the previously polynomial regex on many tabs/spaces).
+        text = "x" + (" " * 20000) + "y"
+        start = time.perf_counter()
+        assert resolve_description_placeholders(text, []) == "x y"
+        assert time.perf_counter() - start < 0.5
+
+    def test_strip_tags_line_removes_trailing_line(self):
+        from services.analysis_service import strip_tags_line
+
+        text = "Profile Created: X\n\nDescription:\nGreat coffee.\n\nTags: Sweet, Berry"
+        stripped = strip_tags_line(text)
+        assert "Tags:" not in stripped
+        assert stripped.endswith("Great coffee.")
+
+    def test_description_result_carries_tags(self):
+        from services.analysis_service import DescriptionResult
+
+        result = DescriptionResult("hello", ["Sweet"])
+        assert result == "hello"
+        assert isinstance(result, str)
+        assert result.ai_tags == ["Sweet"]
+        assert DescriptionResult("x").ai_tags == []
+
+    def test_regenerate_persists_ai_tags(self):
+        from services.analysis_service import DescriptionResult
+
+        history = [
+            {
+                "id": "entry-1",
+                "profile_name": "Test Profile",
+                "profile_json": {"name": "Test Profile"},
+                "reply": "old static description",
+            }
+        ]
+
+        with patch(
+            "api.routes.profiles._generate_profile_description",
+            new_callable=AsyncMock,
+        ) as mock_gen, patch(
+            "api.routes.profiles.load_history", return_value=history
+        ), patch(
+            "api.routes.profiles.save_history"
+        ):
+            mock_gen.return_value = DescriptionResult(
+                "A fresh AI description.", ["Chocolate", "Creamy"]
+            )
+            client = TestClient(app)
+            resp = client.post("/api/profile/entry-1/regenerate-description")
+
+        assert resp.status_code == 200
+        assert history[0]["ai_tags"] == ["Chocolate", "Creamy"]
+        assert history[0]["reply"] == "A fresh AI description."
+
+    def test_regenerate_invalidates_profile_list_cache(self):
+        """Regenerating a description must bust the profile-list cache so the
+        catalogue reloads the freshly-generated ai_tags (beta feedback: tags
+        never appeared after generating an AI explanation)."""
+        from services.analysis_service import DescriptionResult
+
+        history = [
+            {
+                "id": "entry-1",
+                "profile_name": "Test Profile",
+                "profile_json": {"name": "Test Profile"},
+                "reply": "old static description",
+            }
+        ]
+
+        with patch(
+            "api.routes.profiles._generate_profile_description",
+            new_callable=AsyncMock,
+        ) as mock_gen, patch(
+            "api.routes.profiles.load_history", return_value=history
+        ), patch(
+            "api.routes.profiles.save_history"
+        ), patch(
+            "api.routes.profiles.invalidate_profile_list_cache"
+        ) as mock_invalidate:
+            mock_gen.return_value = DescriptionResult(
+                "A fresh AI description.", ["Chocolate", "Creamy"]
+            )
+            client = TestClient(app)
+            resp = client.post("/api/profile/entry-1/regenerate-description")
+
+        assert resp.status_code == 200
+        mock_invalidate.assert_called_once()
+
+
+class TestShotFactsClassify:
+    """#423 Targeted vs Failsafe trigger classification."""
+
+    def test_weight_is_always_targeted(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("pressure", "weight", total_triggers=2)
+        assert r["kind"] == "targeted"
+        assert "yield" in r["label"].lower()
+
+    def test_time_only_trigger_is_planned_duration(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("flow", "time", total_triggers=1)
+        assert r["kind"] == "targeted"
+        assert "planned" in r["label"].lower()
+
+    def test_time_with_other_triggers_is_targeted_timed_transition(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("flow", "time", total_triggers=2)
+        assert r["kind"] == "targeted"
+        assert "timed transition" in r["label"].lower()
+
+    def test_flow_control_pressure_trigger_is_puck_resistance(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("flow", "pressure", total_triggers=2)
+        assert r["kind"] == "targeted"
+        assert "resistance" in r["label"].lower()
+
+    def test_flow_control_flow_trigger_is_flow_target_reached(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("flow", "flow", total_triggers=2)
+        assert r["kind"] == "targeted"
+        assert "flow target" in r["label"].lower()
+
+    def test_pressure_control_flow_only_trigger_is_planned_transition(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("pressure", "flow", total_triggers=1)
+        assert r["kind"] == "targeted"
+
+    def test_pressure_control_flow_with_others_is_failsafe_channeling(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("pressure", "flow", total_triggers=2)
+        assert r["kind"] == "failsafe"
+        assert "channel" in r["label"].lower() or "chok" in r["label"].lower()
+
+    def test_pressure_control_pressure_trigger_is_threshold(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("pressure", "pressure", total_triggers=1)
+        assert r["kind"] == "targeted"
+
+    def test_unknown_combo_returns_unknown(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("power", "weird", total_triggers=1)
+        assert r["kind"] == "unknown"
+
+    def test_power_pressure_trigger_is_puck_resistance(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("power", "pressure", total_triggers=1)
+        assert r["kind"] == "targeted"
+        assert "resistance" in r["label"].lower()
+
+    def test_terminal_stage_no_trigger_hits_weight_is_targeted_yield(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger(
+            "pressure", "", total_triggers=0,
+            is_terminal_stage=True, weight_on_target=True,
+        )
+        assert r["kind"] == "targeted"
+        assert r["label"] == "Targeted (yield reached)"
+
+    def test_terminal_stage_no_trigger_misses_weight_is_unknown(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger(
+            "pressure", "", total_triggers=0,
+            is_terminal_stage=True, weight_on_target=False,
+        )
+        assert r["kind"] == "unknown"
+
+    def test_intermediate_stage_no_trigger_is_planned_transition(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger("flow", "", total_triggers=0, is_terminal_stage=False)
+        assert r["kind"] == "targeted"
+        assert r["label"] == "Targeted (planned transition)"
+
+    def test_triggers_defined_but_none_fired_is_unknown(self):
+        from services.shot_facts import classify_trigger
+        r = classify_trigger(
+            "pressure", "", total_triggers=2,
+            is_terminal_stage=True, weight_on_target=True,
+        )
+        assert r["kind"] == "unknown"
+
+    def test_build_shot_facts_terminal_stage_no_trigger_is_targeted_yield(self):
+        from services.shot_facts import build_shot_facts
+        ed = {
+            "duration": 10, "weight_gain": 30, "end_weight": 36,
+            "start_pressure": 6, "end_pressure": 6, "avg_pressure": 6,
+            "max_pressure": 6, "min_pressure": 6,
+            "start_flow": 2, "end_flow": 2, "avg_flow": 2, "max_flow": 2,
+        }
+        analysis = {
+            "weight_analysis": {"actual": 36, "target": 36},
+            "stage_analyses": [
+                {
+                    "stage_name": "PreBrew", "stage_type": "flow",
+                    "exit_triggers": [{"type": "time"}],
+                    "exit_trigger_result": {"triggered": {"type": "time"}},
+                    "execution_data": ed,
+                },
+                {
+                    "stage_name": "Extraction", "stage_type": "flow",
+                    "exit_triggers": [],
+                    "exit_trigger_result": None,
+                    "execution_data": ed,
+                },
+            ],
+        }
+        facts = build_shot_facts(analysis)
+        assert facts["stages"][0]["trigger_class"]["kind"] == "targeted"
+        ext = facts["stages"][1]["trigger_class"]
+        assert ext["kind"] == "targeted"
+        assert ext["label"] == "Targeted (yield reached)"
+
+
+class TestEffectiveControlMode:
+    """#423 effective-mode detection (declared type vs true control intent)."""
+
+    def test_aggressive_flow_with_pressure_limit_is_pressure(self):
+        # Slayer "Extraction": flow target 10.8 ml/s capped by a 6 bar pressure limit.
+        from services.shot_facts import effective_control_mode
+        stage = {
+            "stage_type": "flow",
+            "profile_max_target": 10.8,
+            "limits": [{"type": "pressure", "value": 6.0}],
+        }
+        assert effective_control_mode(stage) == "pressure"
+
+    def test_gentle_flow_with_pressure_limit_stays_flow(self):
+        # Slayer "PreBrew": flow target 1.2 ml/s + 1.8 bar limit — genuinely flow-led.
+        from services.shot_facts import effective_control_mode
+        stage = {
+            "stage_type": "flow",
+            "profile_max_target": 1.2,
+            "limits": [{"type": "pressure", "value": 1.8}],
+        }
+        assert effective_control_mode(stage) == "flow"
+
+    def test_pressure_with_restricted_flow_limit_is_flow(self):
+        from services.shot_facts import effective_control_mode
+        stage = {
+            "stage_type": "pressure",
+            "profile_max_target": 9.0,
+            "limits": [{"type": "flow", "value": 2.5}],
+        }
+        assert effective_control_mode(stage) == "flow"
+
+    def test_pressure_with_loose_flow_limit_stays_pressure(self):
+        # Damian "Fill": pressure 2 bar + 8 ml/s limit — the limit isn't restrictive.
+        from services.shot_facts import effective_control_mode
+        stage = {
+            "stage_type": "pressure",
+            "profile_max_target": 2.0,
+            "limits": [{"type": "flow", "value": 8.0}],
+        }
+        assert effective_control_mode(stage) == "pressure"
+
+    def test_power_stage_is_power(self):
+        from services.shot_facts import effective_control_mode
+        assert effective_control_mode({"stage_type": "power"}) == "power"
+
+    def test_build_shot_facts_exposes_effective_and_declared_mode(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [
+                {
+                    "stage_name": "Extraction",
+                    "stage_type": "flow",
+                    "profile_max_target": 10.8,
+                    "limits": [{"type": "pressure", "value": 6.0}],
+                    "exit_triggers": [{"type": "pressure"}],
+                    "exit_trigger_result": {"triggered": {"type": "pressure"}},
+                    "execution_data": {"weight_gain": 20.0, "avg_pressure": 6.0},
+                }
+            ]
+        }
+        facts = build_shot_facts(local)
+        stage = facts["stages"][0]
+        assert stage["control_mode"] == "pressure"
+        assert stage["declared_mode"] == "flow"
+        assert stage["mode_overridden"] is True
+        # Effective pressure + pressure trigger ⇒ targeted threshold, not "puck resistance".
+        assert stage["trigger_class"]["kind"] == "targeted"
+
+
+class TestPuckFailure:
+    """#423 puck-failure refinement: weight-terminated yield hit off-curve."""
+
+    def _pressure_governed_stage(self, max_pressure, weight_target=36.0):
+        # Slayer-style: declared flow, high flow target capped by a 6 bar pressure
+        # limit ⇒ effective pressure. Ends on a near-final weight trigger.
+        return {
+            "stage_name": "Extraction",
+            "stage_type": "flow",
+            "profile_max_target": 10.8,
+            "limits": [{"type": "pressure", "value": 6.0}],
+            "exit_triggers": [{"type": "weight"}],
+            "exit_trigger_result": {
+                "triggered": {"type": "weight", "target": weight_target}
+            },
+            "execution_data": {"weight_gain": 30.0, "max_pressure": max_pressure},
+        }
+
+    def test_yield_hit_off_target_is_puck_failure(self):
+        from services.shot_facts import build_shot_facts
+        # Pressure never reached the 6 bar band (max 3.0 < 0.8×6 = 4.8) → puck failure.
+        facts = build_shot_facts(
+            {
+                "weight_analysis": {"target": 36.0},
+                "stage_analyses": [self._pressure_governed_stage(max_pressure=3.0)],
+            }
+        )
+        tc = facts["stages"][0]["trigger_class"]
+        assert tc["kind"] == "failsafe"
+        assert "puck failure" in tc["label"].lower()
+
+    def test_yield_hit_on_target_is_normal_completion(self):
+        from services.shot_facts import build_shot_facts
+        # Pressure reached the band (6.2 ≥ 4.8) → normal targeted yield.
+        facts = build_shot_facts(
+            {
+                "weight_analysis": {"target": 36.0},
+                "stage_analyses": [self._pressure_governed_stage(max_pressure=6.2)],
+            }
+        )
+        tc = facts["stages"][0]["trigger_class"]
+        assert tc["kind"] == "targeted"
+        assert "puck failure" not in tc["label"].lower()
+
+    def test_flow_governed_weight_completion_is_never_puck_failure(self):
+        from services.shot_facts import build_shot_facts
+        # Plain flow stage, no pressure limit ⇒ effective flow. Low pressure is
+        # expected for a volumetric pour and must NOT be flagged as puck failure.
+        facts = build_shot_facts(
+            {
+                "weight_analysis": {"target": 36.0},
+                "stage_analyses": [
+                    {
+                        "stage_name": "Pour",
+                        "stage_type": "flow",
+                        "profile_max_target": 2.0,
+                        "limits": [],
+                        "exit_triggers": [{"type": "weight"}],
+                        "exit_trigger_result": {
+                            "triggered": {"type": "weight", "target": 36.0}
+                        },
+                        "execution_data": {"weight_gain": 30.0, "max_pressure": 2.0},
+                    }
+                ],
+            }
+        )
+        tc = facts["stages"][0]["trigger_class"]
+        assert tc["kind"] == "targeted"
+        assert "puck failure" not in tc["label"].lower()
+
+    def test_intermediate_weight_milestone_is_first_drip_check(self):
+        from services.shot_facts import build_shot_facts
+        facts = build_shot_facts(
+            {
+                "weight_analysis": {"target": 36.0},
+                "stage_analyses": [self._pressure_governed_stage(max_pressure=3.0, weight_target=4.0)],
+            }
+        )
+        tc = facts["stages"][0]["trigger_class"]
+        assert tc["kind"] == "targeted"
+        assert "first-drip" in tc["label"].lower() or "milestone" in tc["reason"].lower()
+
+    def test_classify_trigger_weight_backward_compatible(self):
+        from services.shot_facts import classify_trigger
+        # No context supplied ⇒ legacy behaviour: always targeted yield.
+        r = classify_trigger("pressure", "weight", 1)
+        assert r["kind"] == "targeted"
+        assert "yield" in r["label"].lower()
+
+
+class TestShotFacts:
+    def _stage(self, **kw):
+        base = {
+            "stage_name": "Infusion",
+            "stage_type": "flow",
+            "exit_triggers": [],
+            "execution_data": {
+                "duration": 10.0, "weight_gain": 2.0, "end_weight": 8.0,
+                "start_pressure": 1.0, "end_pressure": 6.0, "avg_pressure": 4.0,
+                "max_pressure": 6.5, "min_pressure": 1.0,
+                "start_flow": 4.0, "end_flow": 0.5, "avg_flow": 2.0, "max_flow": 4.5,
+            },
+            "exit_trigger_result": {"triggered": {"type": "time"}},
+        }
+        base.update(kw)
+        return base
+
+    def test_stall_detected_on_time_failsafe_with_low_gain(self):
+        from services.shot_facts import detect_stall
+        stage = self._stage(
+            stage_type="pressure",
+            exit_triggers=[{"type": "flow"}, {"type": "time"}],
+            exit_trigger_result={"triggered": {"type": "time"}},
+            execution_data={**self._stage()["execution_data"], "weight_gain": 0.3},
+        )
+        assert detect_stall(stage)["stalled"] is True
+
+    def test_no_stall_when_weight_trigger(self):
+        from services.shot_facts import detect_stall
+        stage = self._stage(exit_trigger_result={"triggered": {"type": "weight"}})
+        assert detect_stall(stage)["stalled"] is False
+
+    def test_channeling_flag_on_pressure_drop_with_flow_rise(self):
+        from services.shot_facts import detect_channeling
+        ed = {**self._stage()["execution_data"],
+              "start_pressure": 8.0, "end_pressure": 3.0,
+              "start_flow": 1.0, "end_flow": 5.0}
+        assert detect_channeling(ed)["channeling"] is True
+
+    def test_no_channeling_on_stable_stage(self):
+        from services.shot_facts import detect_channeling
+        ed = {**self._stage()["execution_data"],
+              "start_pressure": 6.0, "end_pressure": 6.2,
+              "start_flow": 2.0, "end_flow": 2.1}
+        assert detect_channeling(ed)["channeling"] is False
+
+    def test_build_shot_facts_classifies_each_stage(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [
+                self._stage(
+                    stage_type="pressure",
+                    exit_triggers=[{"type": "weight"}],
+                    exit_trigger_result={"triggered": {"type": "weight"}},
+                ),
+            ],
+            "weight_analysis": {"actual": 36.0, "target": 36.0, "deviation_percent": 0.0},
+            "overall_metrics": {"total_time": 30.0},
+        }
+        facts = build_shot_facts(local)
+        assert len(facts["stages"]) == 1
+        assert facts["stages"][0]["trigger_class"]["kind"] == "targeted"
+        assert "phases" in facts
+
+    def test_total_time_falls_back_to_shot_summary(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [],
+            "weight_analysis": {},
+            "shot_summary": {"total_time": 28.5},
+        }
+        assert build_shot_facts(local)["total_time_s"] == 28.5
+
+    def test_curve_adherence_uses_profile_target_value(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [
+                self._stage(
+                    stage_type="pressure",
+                    profile_target_value=9.0,
+                    execution_data={**self._stage()["execution_data"], "avg_pressure": 8.5},
+                ),
+            ],
+            "weight_analysis": {},
+            "shot_summary": {"total_time": 30.0},
+        }
+        ca = build_shot_facts(local)["stages"][0]["curve_adherence"]
+        assert ca is not None
+        assert ca["target"] == 9.0
+        assert ca["measured"] == 8.5
+        assert ca["delta"] == -0.5
+
+    def test_curve_adherence_none_without_target(self):
+        from services.shot_facts import build_shot_facts
+        local = {
+            "stage_analyses": [self._stage(stage_type="pressure")],
+            "weight_analysis": {},
+            "shot_summary": {"total_time": 30.0},
+        }
+        assert build_shot_facts(local)["stages"][0]["curve_adherence"] is None
+
+
+class TestMeanDynamicsTarget:
+    def test_mean_of_pressure_setpoints(self):
+        from services.analysis_service import _mean_dynamics_target
+        stage = {"type": "pressure", "dynamics_points": [[0, 2.0], [10, 8.0]]}
+        assert _mean_dynamics_target(stage) == 5.0
+
+    def test_resolves_variable_references(self):
+        from services.analysis_service import _mean_dynamics_target
+        stage = {"type": "flow", "dynamics_points": [[0, "$f"], [5, 4.0]]}
+        variables = [{"key": "f", "name": "Flow", "value": 2.0}]
+        assert _mean_dynamics_target(stage, variables) == 3.0
+
+    def test_none_for_non_pressure_flow_stage(self):
+        from services.analysis_service import _mean_dynamics_target
+        assert _mean_dynamics_target({"type": "power", "dynamics_points": [[0, 5]]}) is None
+
+    def test_none_when_no_numeric_points(self):
+        from services.analysis_service import _mean_dynamics_target
+        assert _mean_dynamics_target({"type": "pressure", "dynamics_points": []}) is None
+
+
+class TestLocalAnalysisIncludesFacts:
+    def test_local_analysis_attaches_shot_facts(self):
+        from services.analysis_service import _perform_local_shot_analysis
+
+        shot_data = {
+            "data": [
+                {"time": 0, "shot": {"weight": 0, "pressure": 2.0, "flow": 0.5}, "status": "Bloom"},
+                {"time": 5000, "shot": {"weight": 2.0, "pressure": 2.0, "flow": 0.5}, "status": "Bloom"},
+                {"time": 6000, "shot": {"weight": 5.0, "pressure": 9.0, "flow": 2.5}, "status": "Main"},
+                {"time": 25000, "shot": {"weight": 36.0, "pressure": 9.0, "flow": 2.5}, "status": "Main"},
+            ]
+        }
+
+        profile_data = {
+            "name": "Test Profile",
+            "final_weight": 36.0,
+            "stages": [
+                {
+                    "name": "Bloom",
+                    "key": "bloom",
+                    "type": "pressure",
+                    "dynamics_points": [[0, 2.0]],
+                    "dynamics_over": "time",
+                    "exit_triggers": [{"type": "time", "value": 5, "comparison": ">="}],
+                },
+                {
+                    "name": "Main",
+                    "key": "main",
+                    "type": "pressure",
+                    "dynamics_points": [[0, 9.0]],
+                    "dynamics_over": "time",
+                    "exit_triggers": [{"type": "weight", "value": 36, "comparison": ">="}],
+                },
+            ],
+            "variables": [],
+        }
+
+        result = _perform_local_shot_analysis(shot_data, profile_data)
+
+        assert "shot_facts" in result
+        assert "stages" in result["shot_facts"]
+
+
+class TestCompassRules:
+    def test_sour_and_weak_suggests_finer_and_hotter(self):
+        from services.compass_rules import compass_adjustments
+        adj = compass_adjustments(taste_x=-0.8, taste_y=-0.6)
+        kinds = {a["kind"] for a in adj}
+        assert "grind_finer" in kinds
+        assert any(a["kind"] in ("temp_up", "ratio_up", "dose_up") for a in adj)
+
+    def test_bitter_and_strong_suggests_coarser_and_cooler(self):
+        from services.compass_rules import compass_adjustments
+        adj = compass_adjustments(taste_x=0.8, taste_y=0.7)
+        kinds = {a["kind"] for a in adj}
+        assert "grind_coarser" in kinds
+
+    def test_centered_taste_returns_no_changes(self):
+        from services.compass_rules import compass_adjustments
+        assert compass_adjustments(taste_x=0.0, taste_y=0.0) == []
+
+
+class TestAnalysisKnowledge:
+    def test_knowledge_constant_covers_trigger_classes(self):
+        from analysis_knowledge import ANALYSIS_KNOWLEDGE
+        assert "Targeted" in ANALYSIS_KNOWLEDGE
+        assert "Failsafe" in ANALYSIS_KNOWLEDGE
+        assert "channeling" in ANALYSIS_KNOWLEDGE.lower()
+
+    def test_fact_sheet_renders_stage_classification(self):
+        from analysis_knowledge import build_fact_sheet
+        facts = {
+            "stages": [{
+                "stage_name": "Infusion", "reached": True, "control_mode": "pressure",
+                "trigger_type": "weight",
+                "trigger_class": {"kind": "targeted", "label": "Targeted (yield reached)", "reason": "x"},
+                "stall": {"stalled": False, "weight_gain": 30.0},
+                "channeling": {"channeling": False, "pressure_drop": 0.1, "flow_rise": 0.1},
+                "curve_adherence": {"target": 9.0, "measured": 8.5, "delta": -0.5},
+            }],
+            "phases": [],
+            "weight": {"actual": 36.0, "target": 36.0, "deviation_pct": 0.0},
+            "total_time_s": 30.0,
+        }
+        sheet = build_fact_sheet(facts)
+        assert "Infusion" in sheet
+        assert "Targeted (yield reached)" in sheet
+        assert "36" in sheet
+
+    def test_fact_sheet_flags_stall_and_channeling(self):
+        from analysis_knowledge import build_fact_sheet
+        facts = {
+            "stages": [{
+                "stage_name": "Decline", "reached": True, "control_mode": "pressure",
+                "trigger_type": "time",
+                "trigger_class": {"kind": "failsafe", "label": "Failsafe (timeout limit)", "reason": "x"},
+                "stall": {"stalled": True, "weight_gain": 0.2},
+                "channeling": {"channeling": True, "pressure_drop": 3.0, "flow_rise": 2.0},
+                "curve_adherence": None,
+            }],
+            "phases": [], "weight": {}, "total_time_s": 25.0,
+        }
+        sheet = build_fact_sheet(facts).lower()
+        assert "stall" in sheet
+        assert "channel" in sheet
+
+
+class TestAnalysisPromptContent:
+    """The analyze-llm prompt must carry ANALYSIS_KNOWLEDGE, the fact sheet, and the few-shot."""
+
+    @patch("api.routes.shots.fetch_shot_data", new_callable=AsyncMock)
+    @patch("api.routes.shots.async_get_profile", new_callable=AsyncMock)
+    @patch("api.routes.shots.async_list_profiles", new_callable=AsyncMock)
+    @patch("api.routes.shots.get_vision_model")
+    @patch("api.routes.shots._perform_local_shot_analysis")
+    def test_prompt_includes_knowledge_factsheet_fewshot(
+        self,
+        mock_local_analysis,
+        mock_get_model,
+        mock_list_profiles,
+        mock_get_profile,
+        mock_fetch_shot,
+        client,
+    ):
+        mock_fetch_shot.return_value = {
+            "profile_name": "Test",
+            "time": 1705320000,
+            "data": [{"time": 25000, "shot": {"weight": 36.0}}],
+        }
+
+        partial = type("P", (), {})()
+        partial.name = "Test"
+        partial.id = "p-123"
+        partial.error = None
+        mock_list_profiles.return_value = [partial]
+
+        full = type("F", (), {})()
+        full.name = "Test"
+        full.temperature = 93.0
+        full.final_weight = 36.0
+        full.variables = []
+        full.stages = []
+        full.error = None
+        mock_get_profile.return_value = full
+
+        mock_local_analysis.return_value = {
+            "shot_summary": {"final_weight": 36.0, "total_time": 28.0},
+            "weight_analysis": {"actual": 36.0, "target": 36.0, "deviation_percent": 0.0},
+            "stage_analyses": [],
+            "shot_facts": {
+                "stages": [],
+                "phases": [],
+                "weight": {"actual": 36.0, "target": 36.0, "deviation_pct": 0.0},
+                "total_time_s": 28.0,
+            },
+        }
+
+        mock_model = MagicMock()
+        mock_model.async_generate_content = AsyncMock(
+            return_value=MagicMock(
+                text="## 1. Shot Performance\n**What Happened:**\n- ok\n**Assessment:** Good"
+            )
+        )
+        mock_get_model.return_value = mock_model
+
+        resp = client.post(
+            "/api/shots/analyze-llm",
+            data={
+                "profile_name": "Test",
+                "shot_date": "2024-01-15",
+                "shot_filename": "shot.json",
+                "force_refresh": "true",
+            },
+        )
+        assert resp.status_code == 200
+        prompt = mock_model.async_generate_content.call_args[0][0]
+        assert "EXIT TRIGGER CLASSIFICATION" in prompt          # ANALYSIS_KNOWLEDGE
+        assert "Deterministic Shot Facts" in prompt              # fact sheet
+        assert "Worked Example" in prompt                        # few-shot
+
+
+class TestAnalysisValidator:
+    def _facts_targeted_weight(self):
+        return {
+            "stages": [{
+                "stage_name": "Hold", "reached": True, "control_mode": "pressure",
+                "trigger_type": "weight",
+                "trigger_class": {"kind": "targeted", "label": "Targeted (yield reached)", "reason": ""},
+                "stall": {"stalled": False, "weight_gain": 30.0},
+                "channeling": {"channeling": False, "pressure_drop": 0.0, "flow_rise": 0.0},
+                "curve_adherence": None,
+            }],
+            "phases": [], "weight": {"actual": 36.0, "target": 36.0, "deviation_pct": 0.0},
+            "total_time_s": 28.0,
+        }
+
+    def test_flags_targeted_exit_called_early_termination(self):
+        from services.analysis_validator import validate_against_facts
+        text = "- The hold stage terminated early before reaching its goal."
+        r = validate_against_facts(text, self._facts_targeted_weight())
+        assert r["valid"] is False
+        assert "mischaracterized-targeted-exit" in r["issues"]
+
+    def test_accepts_success_framing(self):
+        from services.analysis_validator import validate_against_facts
+        text = "- The hold stage ended exactly on the weight target, a correct finish."
+        assert validate_against_facts(text, self._facts_targeted_weight())["valid"] is True
+
+    def test_flags_unsupported_channeling(self):
+        from services.analysis_validator import validate_against_facts
+        text = "- Severe channeling caused the pressure to collapse."
+        assert "unsupported-channeling" in validate_against_facts(text, self._facts_targeted_weight())["issues"]
+
+
+class TestAnalysisStructure:
+    def test_schema_lists_core_sections(self):
+        from analysis_schema import REQUIRED_ANALYSIS_SECTIONS
+        assert "Shot Performance" in REQUIRED_ANALYSIS_SECTIONS
+        assert len(REQUIRED_ANALYSIS_SECTIONS) >= 5
+
+    def test_check_structure_flags_missing_sections(self):
+        from services.analysis_validator import check_structure
+        r = check_structure("## 1. Shot Performance\n- ok")
+        assert r["valid"] is False
+        assert "missing-sections" in r["issues"]
+
+    def test_check_structure_accepts_full_text(self):
+        from analysis_schema import REQUIRED_ANALYSIS_SECTIONS
+        from services.analysis_validator import check_structure
+        text = "\n".join(f"## {i+1}. {s}\n- content" for i, s in enumerate(REQUIRED_ANALYSIS_SECTIONS))
+        assert check_structure(text)["valid"] is True
+
+
+class TestAnalysisCoverageMatrix:
+    def test_server_exposes_all_analysis_checks(self):
+        from services import analysis_validator as v
+        assert callable(v.validate_against_facts)
+        assert callable(v.check_structure)
+        from analysis_knowledge import build_fact_sheet, ANALYSIS_KNOWLEDGE  # noqa: F401
+        from services.shot_facts import build_shot_facts, classify_trigger  # noqa: F401
+        from services.compass_rules import compass_adjustments  # noqa: F401

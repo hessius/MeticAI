@@ -3,9 +3,13 @@
  * Used by both BrowserAIService and DirectModeInterceptor.
  */
 import i18n from 'i18next'
+import { AIServiceError } from './aiErrors'
 
 /** Check if an error is transient and retryable */
 export function isRetryableError(err: unknown): boolean {
+  if (err instanceof AIServiceError) {
+    return err.code === 'SERVICE_UNAVAILABLE' || err.code === 'QUOTA_EXCEEDED'
+  }
   const msg = err instanceof Error ? err.message : String(err)
   return (
     msg.includes('503') ||
@@ -40,6 +44,14 @@ export async function retryWithBackoff<T>(
 
 /** Map a raw Gemini error to a user-friendly message */
 export function formatGeminiError(err: unknown): string {
+  if (err instanceof AIServiceError) {
+    if (err.code === 'LOCAL_VISION_UNSUPPORTED') return i18n.t('error.localVisionUnsupported')
+    if (err.code === 'LOCAL_UNAVAILABLE') return i18n.t('error.localUnavailable')
+    if (err.code === 'LOCAL_TIMEOUT') return i18n.t('error.localTimeout')
+    if (err.code === 'LOCAL_MODEL_NOT_DOWNLOADED') return i18n.t('error.localModelNotDownloaded')
+    if (err.code === 'LOCAL_OUT_OF_MEMORY') return i18n.t('error.localOutOfMemory')
+    if (err.code === 'LOCAL_GENERATION_FAILED') return i18n.t('error.localGenerationFailed')
+  }
   const raw = err instanceof Error ? err.message : String(err)
   if (raw.includes('503') || raw.includes('UNAVAILABLE') || raw.includes('overloaded'))
     return i18n.t('error.aiModelUnavailable')

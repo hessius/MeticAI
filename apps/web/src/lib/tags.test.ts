@@ -6,7 +6,10 @@ import {
   getTagCategory,
   getTagColorClass,
   extractTagsFromPreferences,
-  getAllTagsFromEntries
+  getAllTagsFromEntries,
+  AI_TAG_LABELS,
+  parseAiTags,
+  stripTagsLine
 } from './tags'
 
 describe('tags', () => {
@@ -236,6 +239,74 @@ describe('tags', () => {
       const tags = getAllTagsFromEntries(entries)
       const sortedTags = [...tags].sort()
       expect(tags).toEqual(sortedTags)
+    })
+  })
+
+  describe('AI_TAG_LABELS', () => {
+    it('only contains sensory categories the AI can infer', () => {
+      const sensory = ['body', 'flavor', 'mouthfeel', 'roast', 'characteristic']
+      for (const label of AI_TAG_LABELS) {
+        const cat = PRESET_TAGS.find(t => t.label === label)?.category
+        expect(sensory).toContain(cat)
+      }
+    })
+
+    it('excludes structural / temperature / weight tags', () => {
+      expect(AI_TAG_LABELS).not.toContain('Pre-infusion')
+      expect(AI_TAG_LABELS).not.toContain('High temp (91–93°C)')
+      expect(AI_TAG_LABELS).not.toContain('Pressure-controlled')
+    })
+  })
+
+  describe('parseAiTags', () => {
+    it('extracts validated tags from the Tags line', () => {
+      const text = 'Description: nice\nSpecial Notes: none\nTags: Chocolate, Creamy, Medium Roast'
+      expect(parseAiTags(text)).toEqual(['Chocolate', 'Creamy', 'Medium Roast'])
+    })
+
+    it('drops unknown tags and de-duplicates case-insensitively', () => {
+      const text = 'Tags: Chocolate, NotARealTag, chocolate, Sweet'
+      expect(parseAiTags(text)).toEqual(['Chocolate', 'Sweet'])
+    })
+
+    it('returns [] when no Tags line is present', () => {
+      expect(parseAiTags('Just a description without tags')).toEqual([])
+      expect(parseAiTags('')).toEqual([])
+      expect(parseAiTags(null)).toEqual([])
+    })
+
+    it('handles an empty Tags line', () => {
+      expect(parseAiTags('Tags:')).toEqual([])
+      expect(parseAiTags('Tags:   ')).toEqual([])
+    })
+
+    it('tolerates literal brackets emitted by the model', () => {
+      expect(parseAiTags('Tags: [Chocolate, Sweet]')).toEqual(['Chocolate', 'Sweet'])
+      expect(parseAiTags('Tags: [Chocolate]')).toEqual(['Chocolate'])
+    })
+
+    it('tolerates markdown decoration from small on-device models', () => {
+      expect(parseAiTags('**Tags:** Chocolate, Sweet')).toEqual(['Chocolate', 'Sweet'])
+      expect(parseAiTags('**Tags: Chocolate, Sweet**')).toEqual(['Chocolate', 'Sweet'])
+      expect(parseAiTags('- Tags: Chocolate, Sweet')).toEqual(['Chocolate', 'Sweet'])
+      expect(parseAiTags('* **Tags**: Chocolate, Sweet')).toEqual(['Chocolate', 'Sweet'])
+      expect(parseAiTags('# Tags: Chocolate')).toEqual(['Chocolate'])
+    })
+  })
+
+  describe('stripTagsLine', () => {
+    it('removes the Tags line and trailing whitespace', () => {
+      const text = 'Special Notes: none\nTags: Chocolate, Sweet'
+      expect(stripTagsLine(text)).toBe('Special Notes: none')
+    })
+
+    it('removes a markdown-decorated Tags line', () => {
+      expect(stripTagsLine('Special Notes: none\n**Tags:** Chocolate, Sweet')).toBe('Special Notes: none')
+      expect(stripTagsLine('Special Notes: none\n- Tags: Chocolate')).toBe('Special Notes: none')
+    })
+
+    it('leaves descriptions without a Tags line unchanged', () => {
+      expect(stripTagsLine('Description: hi')).toBe('Description: hi')
     })
   })
 })

@@ -34,6 +34,13 @@ import {
 } from '@phosphor-icons/react'
 import { MeticLogo } from '@/components/MeticLogo'
 import { STORAGE_KEYS } from '@/lib/constants'
+import {
+  detectProviderFromKey,
+  setActiveProviderId,
+  apiKeyStorageKey,
+  isAppleIntelligenceSupported,
+  setAIMode,
+} from '@/services/ai/providers'
 import { isDemoMode, isNativePlatform, setMachineUrl } from '@/lib/machineMode'
 import { persistMachineUrl } from '@/services/machine/machineUrl'
 import { parseMachineInput, testMachineConnection, discoverMachines, type DiscoveredMachine } from '@/services/machine/discovery'
@@ -105,6 +112,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [geminiKey, setGeminiKey] = useState(
     () => localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
   )
+  // On-device AI (#373): offered only where Apple Intelligence is supported.
+  const localAiSupported = isAppleIntelligenceSupported()
+  const [useLocalAI, setUseLocalAI] = useState(false)
 
   // Language — initialize from i18n's detected language (device locale on fresh install)
   const [selectedLang, setSelectedLang] = useState<SupportedLanguage>(() => {
@@ -275,10 +285,19 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (authorName.trim()) {
       localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, authorName.trim())
     }
-    if (geminiKey.trim()) {
+    if (useLocalAI && localAiSupported) {
+      // On-device AI: no key, route everything through the local backend.
+      setAIMode('local')
+    } else if (geminiKey.trim()) {
+      const key = geminiKey.trim()
+      // Auto-detect the provider from the key shape and persist under its slot.
+      const provider = detectProviderFromKey(key) ?? 'gemini'
+      setAIMode('hosted')
+      setActiveProviderId(provider)
+      const slot = apiKeyStorageKey(provider)
       // Write to both localStorage (immediate) and secure storage (Keychain on native)
-      localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, geminiKey.trim())
-      secureSetItem(STORAGE_KEYS.GEMINI_API_KEY, geminiKey.trim())
+      localStorage.setItem(slot, key)
+      secureSetItem(slot, key)
     }
     // Language already applied via i18n.changeLanguage
     // Theme already applied via useThemePreference
@@ -294,7 +313,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }
 
     onComplete()
-  }, [authorName, geminiKey, onComplete, requestPermission, secureSetItem])
+  }, [authorName, geminiKey, useLocalAI, localAiSupported, onComplete, requestPermission, secureSetItem])
 
   // ── Step renderers ──────────────────────────────────────────────────────
 
@@ -514,6 +533,33 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         </div>
       </div>
 
+      {localAiSupported && (
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setUseLocalAI(true)}
+            className={`rounded-lg border p-3 text-left transition-colors ${useLocalAI ? 'border-primary bg-primary/10' : 'border-input hover:bg-muted/50'}`}
+          >
+            <span className="block text-sm font-medium">{t('onboarding.ai.localOption')}</span>
+            <span className="block text-xs text-muted-foreground mt-0.5">{t('onboarding.ai.localOptionHint')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setUseLocalAI(false)}
+            className={`rounded-lg border p-3 text-left transition-colors ${!useLocalAI ? 'border-primary bg-primary/10' : 'border-input hover:bg-muted/50'}`}
+          >
+            <span className="block text-sm font-medium">{t('onboarding.ai.cloudOption')}</span>
+            <span className="block text-xs text-muted-foreground mt-0.5">{t('onboarding.ai.cloudOptionHint')}</span>
+          </button>
+        </div>
+      )}
+
+      {useLocalAI && localAiSupported ? (
+        <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground space-y-1">
+          <p className="font-medium text-foreground">{t('onboarding.ai.localTitle')}</p>
+          <p className="text-xs">{t('onboarding.ai.localDescription')}</p>
+        </div>
+      ) : (
       <div className="space-y-2">
         <Label htmlFor="gemini-key">{t('onboarding.ai.keyLabel')}</Label>
         <Input
@@ -543,6 +589,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           {t('onboarding.ai.getKey')}
         </button>
       </div>
+      )}
 
       <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground space-y-1">
         <p className="font-medium text-foreground">{t('onboarding.ai.whatItDoes')}</p>
@@ -651,7 +698,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         <div className="flex justify-between">
           <span className="text-muted-foreground">{t('onboarding.complete.ai')}</span>
           <span className="font-medium">
-            {geminiKey.trim() ? t('onboarding.complete.aiConfigured') : t('onboarding.complete.aiSkipped')}
+            {(useLocalAI && localAiSupported) || geminiKey.trim() ? t('onboarding.complete.aiConfigured') : t('onboarding.complete.aiSkipped')}
           </span>
         </div>
         <div className="flex justify-between">

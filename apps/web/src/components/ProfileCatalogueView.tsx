@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, Reorder } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -21,7 +21,8 @@ import {
   FileJs,
   X,
   Plus,
-  Funnel
+  Funnel,
+  DotsSixVertical
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { getCatalogueCache, setCatalogueCache, invalidateCatalogueCache, CATALOGUE_CACHE_TTL } from '@/lib/catalogueCache'
@@ -50,6 +51,7 @@ interface MachineProfile {
   has_description: boolean
   user_preferences?: string | null
   derived_tags?: string[]
+  ai_tags?: string[]
   display?: {
     description?: string
     shortDescription?: string
@@ -437,6 +439,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
       const prefTags = extractTagsFromPreferences(profile.user_preferences ?? null)
       for (const tag of prefTags) allTags.add(tag)
       for (const tag of profile.derived_tags ?? []) allTags.add(tag)
+      for (const tag of profile.ai_tags ?? []) allTags.add(tag)
     }
     return Array.from(allTags).sort()
   }, [profiles])
@@ -446,7 +449,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
 
     return profiles.filter((profile) => {
       const prefTags = extractTagsFromPreferences(profile.user_preferences ?? null)
-      const merged = new Set([...prefTags, ...(profile.derived_tags ?? [])])
+      const merged = new Set([...prefTags, ...(profile.derived_tags ?? []), ...(profile.ai_tags ?? [])])
       if (filterMode === 'AND') {
         return selectedFilterTags.every((tag) => merged.has(tag))
       }
@@ -464,7 +467,213 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
     setSelectedFilterTags([])
   }
 
+  // Drag-to-reorder (edit mode). The machine persists ordering in its
+  // `profile_order` setting; we forward the new ID list and update the SWR
+  // cache so the order survives a remount. Persistence is debounced so a
+  // multi-step drag results in a single round-trip.
+  const reorderSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const persistProfileOrder = useCallback(async (ordered: MachineProfile[]) => {
+    const order = ordered.map((p) => p.id).filter(Boolean)
+    if (order.length === 0) return
+    try {
+      const serverUrl = await getServerUrl()
+      const response = await fetch(`${serverUrl}/api/machine/profiles/order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order }),
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      invalidateCatalogueCache()
+      setCatalogueCache<MachineProfile>({ profiles: ordered, offline: isOffline, ts: Date.now() })
+    } catch {
+      toast.error(t('profileCatalogue.reorderError'))
+      fetchProfiles()
+    }
+  }, [isOffline, t, fetchProfiles])
+
+  const handleReorder = useCallback((ordered: MachineProfile[]) => {
+    setProfiles(ordered)
+    if (reorderSaveTimer.current) clearTimeout(reorderSaveTimer.current)
+    reorderSaveTimer.current = setTimeout(() => { persistProfileOrder(ordered) }, 600)
+  }, [persistProfileOrder])
+
+  useEffect(() => () => {
+    if (reorderSaveTimer.current) clearTimeout(reorderSaveTimer.current)
+  }, [])
+
+  const canReorder =
+    isEditing &&
+    selectedFilterTags.length === 0 &&
+    !isLoading &&
+    renamingId === null &&
+    filteredProfiles.length > 1
+
+  const renderProfileCard = (profile: MachineProfile, draggable: boolean) => (
+    <Card
+      className={`p-4 ${isOrphaned(profile.name) ? 'opacity-50' : ''} ${!isEditing ? 'cursor-pointer active:bg-accent/50 transition-colors' : ''}`}
+      onClick={() => !isEditing && onViewProfile?.(profile)}
+    >
+      <div className="flex items-start gap-4">
+        {draggable && (
+          <DotsSixVertical
+            aria-hidden
+            weight="bold"
+            className="w-5 h-5 shrink-0 self-center text-muted-foreground/50 cursor-grab active:cursor-grabbing touch-none"
+          />
+        )}
+        {/* Profile image — prefer machine's direct URL over image-proxy cache */}
+        <ProfileImage imageUrl={
+          (directImageMode
+            ? (resolvedMachineUrl ? resolveDisplayImage(getProfileImageValue(profile), resolvedMachineUrl) : null)
+            : getProfileImageValue(profile)
+          ) ?? getImageUrl(profile.name) ?? undefined
+        } />
+
+        {/* Profile info */}
+        <div className="flex-1 min-w-0">
+          {renamingId === profile.id ? (
+            <div className="flex items-center gap-2">
+              <Input
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                className="flex-1"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleRename(profile.id)
+                  if (e.key === 'Escape') cancelRename()
+                }}
+                disabled={isRenaming}
+              />
+              <Button
+                size="sm"
+                onClick={() => handleRename(profile.id)}
+                disabled={isRenaming}
+              >
+                {isRenaming ? (
+                  <SpinnerGap className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-4 h-4" />
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={cancelRename}
+                disabled={isRenaming}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <h3 className="font-medium truncate">{profile.name}</h3>
+                {isOrphaned(profile.name) && (
+                  <Badge variant="outline" className="text-amber-600 border-amber-600 shrink-0">
+                    <Warning className="w-3 h-3 mr-1" />
+                    {t('profileCatalogue.orphaned')}
+                  </Badge>
+                )}
+                {staleProfileNames.has(profile.name) && !isOrphaned(profile.name) && (
+                  <Badge variant="outline" className="text-blue-600 border-blue-600 shrink-0">
+                    <ArrowsClockwise className="w-3 h-3 mr-1" />
+                    {t('profileCatalogue.sync.stale')}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                {profile.author && <span>{profile.author}</span>}
+                {profile.temperature && (
+                  <span>{profile.temperature}°C</span>
+                )}
+                {profile.final_weight && (
+                  <span>{profile.final_weight}g</span>
+                )}
+              </div>
+              {getShortDescription(profile) && (
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                  {getShortDescription(profile)}
+                </p>
+              )}
+              <div className="flex items-center gap-3 mt-1">
+                {!isOrphaned(profile.name) && (
+                  <span className="inline-flex items-center text-xs text-blue-600 dark:text-blue-400">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    {t('profileCatalogue.onMachine')}
+                  </span>
+                )}
+                {profile.in_history && (
+                  <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    {t('profileCatalogue.inHistory')}
+                  </span>
+                )}
+              </div>
+              {(() => {
+                const prefTags = extractTagsFromPreferences(profile.user_preferences ?? null)
+                const allTags = [...new Set([...prefTags, ...(profile.derived_tags ?? []), ...(profile.ai_tags ?? [])])].sort()
+                return allTags.length > 0 ? (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {allTags.slice(0, 4).map((tag) => (
+                      <Badge
+                        key={tag}
+                        className={`px-1.5 py-0.5 text-[10px] font-medium border ${getTagColorClass(tag, false)}`}
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                    {allTags.length > 4 && (
+                      <Badge className="px-1.5 py-0.5 text-[10px] font-medium bg-muted/50 border-transparent text-muted-foreground">
+                        +{allTags.length - 4}
+                      </Badge>
+                    )}
+                  </div>
+                ) : null
+              })()}
+            </>
+          )}
+        </div>
+
+        {/* Actions */}
+        {renamingId !== profile.id && isEditing && (
+          <div
+            className="flex items-center gap-1"
+            onPointerDownCapture={(e) => e.stopPropagation()}
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleExport(profile)}
+              title={t('profileCatalogue.export')}
+              aria-label={t('profileCatalogue.export')}
+            >
+              <FileJs className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => startRename(profile)}
+              title={t('profileCatalogue.rename')}
+              aria-label={t('profileCatalogue.rename')}
+            >
+              <PencilSimple className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => openDeleteDialog(profile)}
+              title={t('profileCatalogue.delete')}
+              aria-label={t('profileCatalogue.delete')}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </Card>
+  )
 
   return (
     <div className="min-h-screen">
@@ -733,6 +942,17 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
           </Card>
         )}
         
+        {/* Reorder hint (edit mode) */}
+        {isEditing && profiles.length > 1 && (
+          <p className="text-xs text-muted-foreground -mt-1">
+            {canReorder
+              ? t('profileCatalogue.reorderHint')
+              : selectedFilterTags.length > 0
+                ? t('profileCatalogue.reorderDisabledFilter')
+                : null}
+          </p>
+        )}
+
         {!isLoading && profiles.length > 0 && filteredProfiles.length === 0 ? (
           <div className="text-center py-16">
             <div className="p-4 rounded-2xl bg-secondary/40 inline-block mb-4">
@@ -752,6 +972,20 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
             </Button>
           </div>
         ) : (
+        canReorder ? (
+        <Reorder.Group axis="y" values={filteredProfiles} onReorder={handleReorder} layoutScroll className="flex flex-col gap-3">
+          {filteredProfiles.map((profile) => (
+            <Reorder.Item
+              key={profile.id}
+              value={profile}
+              layout="position"
+              transition={{ duration: 0.2 }}
+            >
+              {renderProfileCard(profile, true)}
+            </Reorder.Item>
+          ))}
+        </Reorder.Group>
+        ) : (
         <div className="space-y-3">
           <AnimatePresence mode="popLayout">
             {filteredProfiles.map((profile) => (
@@ -763,163 +997,12 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
                 exit={{ opacity: 0, x: -100 }}
                 transition={{ duration: 0.2 }}
               >
-                  <Card
-                    className={`p-4 ${isOrphaned(profile.name) ? 'opacity-50' : ''} ${!isEditing ? 'cursor-pointer active:bg-accent/50 transition-colors' : ''}`}
-                    onClick={() => !isEditing && onViewProfile?.(profile)}
-                  >
-                    <div className="flex items-start gap-4">
-                      {/* Profile image — prefer machine's direct URL over image-proxy cache */}
-                      <ProfileImage imageUrl={
-                        (directImageMode
-                          ? (resolvedMachineUrl ? resolveDisplayImage(getProfileImageValue(profile), resolvedMachineUrl) : null)
-                          : getProfileImageValue(profile)
-                        ) ?? getImageUrl(profile.name) ?? undefined
-                      } />
-                      
-                      {/* Profile info */}
-                      <div className="flex-1 min-w-0">
-                        {renamingId === profile.id ? (
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={renameValue}
-                              onChange={(e) => setRenameValue(e.target.value)}
-                              className="flex-1"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleRename(profile.id)
-                                if (e.key === 'Escape') cancelRename()
-                              }}
-                              disabled={isRenaming}
-                            />
-                            <Button
-                              size="sm"
-                              onClick={() => handleRename(profile.id)}
-                              disabled={isRenaming}
-                            >
-                              {isRenaming ? (
-                                <SpinnerGap className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <CheckCircle className="w-4 h-4" />
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={cancelRename}
-                              disabled={isRenaming}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-medium truncate">{profile.name}</h3>
-                              {isOrphaned(profile.name) && (
-                                <Badge variant="outline" className="text-amber-600 border-amber-600 shrink-0">
-                                  <Warning className="w-3 h-3 mr-1" />
-                                  {t('profileCatalogue.orphaned')}
-                                </Badge>
-                              )}
-                              {staleProfileNames.has(profile.name) && !isOrphaned(profile.name) && (
-                                <Badge variant="outline" className="text-blue-600 border-blue-600 shrink-0">
-                                  <ArrowsClockwise className="w-3 h-3 mr-1" />
-                                  {t('profileCatalogue.sync.stale')}
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              {profile.author && <span>{profile.author}</span>}
-                              {profile.temperature && (
-                                <span>{profile.temperature}°C</span>
-                              )}
-                              {profile.final_weight && (
-                                <span>{profile.final_weight}g</span>
-                              )}
-                            </div>
-                            {getShortDescription(profile) && (
-                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                {getShortDescription(profile)}
-                              </p>
-                            )}
-                            <div className="flex items-center gap-3 mt-1">
-                              {!isOrphaned(profile.name) && (
-                                <span className="inline-flex items-center text-xs text-blue-600 dark:text-blue-400">
-                                  <CheckCircle className="w-3 h-3 mr-1" />
-                                  {t('profileCatalogue.onMachine')}
-                                </span>
-                              )}
-                              {profile.in_history && (
-                                <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400">
-                                  <CheckCircle className="w-3 h-3 mr-1" />
-                                  {t('profileCatalogue.inHistory')}
-                                </span>
-                              )}
-                            </div>
-                            {(() => {
-                              const prefTags = extractTagsFromPreferences(profile.user_preferences ?? null)
-                              const allTags = [...new Set([...prefTags, ...(profile.derived_tags ?? [])])].sort()
-                              return allTags.length > 0 ? (
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                  {allTags.slice(0, 4).map((tag) => (
-                                    <Badge
-                                      key={tag}
-                                      className={`px-1.5 py-0.5 text-[10px] font-medium border ${getTagColorClass(tag, false)}`}
-                                    >
-                                      {tag}
-                                    </Badge>
-                                  ))}
-                                  {allTags.length > 4 && (
-                                    <Badge className="px-1.5 py-0.5 text-[10px] font-medium bg-muted/50 border-transparent text-muted-foreground">
-                                      +{allTags.length - 4}
-                                    </Badge>
-                                  )}
-                                </div>
-                              ) : null
-                            })()}
-                          </>
-                        )}
-                      </div>
-                      
-                      {/* Actions */}
-                      {renamingId !== profile.id && isEditing && (
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleExport(profile)}
-                            title={t('profileCatalogue.export')}
-                            aria-label={t('profileCatalogue.export')}
-                          >
-                            <FileJs className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => startRename(profile)}
-                            title={t('profileCatalogue.rename')}
-                            aria-label={t('profileCatalogue.rename')}
-                          >
-                            <PencilSimple className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openDeleteDialog(profile)}
-                            title={t('profileCatalogue.delete')}
-                            aria-label={t('profileCatalogue.delete')}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
+                  {renderProfileCard(profile, false)}
               </motion.div>
             ))}
           </AnimatePresence>
         </div>
+        )
         )}
 
         {/* Orphaned entries section */}

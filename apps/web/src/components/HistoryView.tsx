@@ -46,8 +46,10 @@ import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { FindSimilarOverlay } from '@/components/FindSimilarOverlay'
 import { ImagePickerGrid, type BatchImage } from '@/components/ImagePickerGrid'
 import { getServerUrl } from '@/lib/config'
+import { invalidateCatalogueCache } from '@/lib/catalogueCache'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { hasFeature } from '@/lib/featureFlags'
+import { useUnsavedChangesGuard } from '@/lib/unsavedChanges'
 import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { profileService } from '@/services/profileService'
 
@@ -714,6 +716,9 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
     return () => window.removeEventListener('beforeunload', handler)
   }, [hasEditChanges])
 
+  // Guard in-app navigation (e.g. Android hardware back) against losing edits.
+  useUnsavedChangesGuard(hasEditChanges)
+
   const handleStartEdit = (section: 'title' | 'details') => {
     const pj = entry.profile_json as ProfileData | null
     setEditName(entry.profile_name)
@@ -1181,6 +1186,13 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
         }
 
         const data = await response.json()
+        if (data.status === 'error' || typeof data.description !== 'string') {
+          return {
+            ok: false as const,
+            status: response.status,
+            detail: data.message || data.detail || 'Failed to generate AI description',
+          }
+        }
         return {
           ok: true as const,
           description: data.description as string,
@@ -1219,6 +1231,10 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
       setCurrentReply(regenerated.description)
       // Persist the description to the entry so it survives view reopens
       onEntryUpdated?.({ ...entry, reply: regenerated.description })
+      // Regeneration may have produced new AI tags; drop the catalogue cache
+      // so the next catalogue open reloads them (parity with server/native
+      // profile-list cache invalidation).
+      invalidateCatalogueCache()
       toast.success(t('history.aiDescriptionGenerated'))
     } catch (err) {
       console.error('Failed to regenerate description:', err)
@@ -1597,8 +1613,12 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
           )}
         </div>
 
-        {/* Generate AI Explanation button — shown for static summaries when AI is available */}
-        {!isCapturing && aiConfigured && currentReply?.includes('generated without AI assistance') && (
+        {/* Generate / re-generate AI Explanation button — shown whenever AI is
+            available and there's a description. Static summaries get "generate";
+            existing AI descriptions can be re-generated (e.g. to refresh tags). */}
+        {!isCapturing && aiConfigured && currentReply && (() => {
+          const isStatic = currentReply.includes('generated without AI assistance')
+          return (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1616,11 +1636,12 @@ export function ProfileDetailView({ entry, onBack, onRunProfile, onEntryUpdated,
                 <MagicWand size={16} className="mr-2" weight="bold" />
               )}
               {isRegeneratingDescription
-                ? t('history.generatingAiDescription')
-                : t('history.generateAiDescription')}
+                ? (isStatic ? t('history.generatingAiDescription') : t('history.regeneratingAiDescription'))
+                : (isStatic ? t('history.generateAiDescription') : t('history.regenerateAiDescription'))}
             </Button>
           </motion.div>
-        )}
+          )
+        })()}
 
         {/* Personal Notes Section */}
         {!isCapturing && (

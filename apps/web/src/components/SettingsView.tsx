@@ -37,6 +37,21 @@ import {
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isDemoMode, isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
+import {
+  PROVIDERS,
+  HOSTED_PROVIDER_IDS,
+  getActiveProviderId,
+  getActiveHostedProviderId,
+  setActiveProviderId,
+  apiKeyStorageKey,
+  modelStorageKey,
+  detectProviderFromKey,
+  getAIMode,
+  setAIMode,
+  isLocalLLMSupported,
+  type ProviderId,
+  type AIMode,
+} from '@/services/ai/providers'
 import { persistMachineUrl } from '@/services/machine/machineUrl'
 import { getAiEnabled, getHideAiWhenUnavailable, setAiEnabled, setHideAiWhenUnavailable, AI_PREFS_CHANGED_EVENT } from '@/lib/aiPreferences'
 import { getSoundsEnabled, setSoundsEnabled } from '@/lib/soundPreferences'
@@ -44,6 +59,7 @@ import { useSoundEffects } from '@/hooks/useSoundEffects'
 import { useUpdateStatus } from '@/hooks/useUpdateStatus'
 import { useUpdateTrigger } from '@/hooks/useUpdateTrigger'
 import { MarkdownText } from '@/components/MarkdownText'
+import { LocalAISettings } from '@/components/LocalAISettings'
 import { LanguageSelector } from '@/components/LanguageSelector'
 import { useSecureStorage } from '@/hooks/useSecureStorage'
 import { useBiometrics } from '@/hooks/useBiometrics'
@@ -130,7 +146,7 @@ function normalizeMachineUrl(value: string): string | null {
 
 export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleBlobs, isDark, isFollowSystem, onToggleTheme, onSetFollowSystem, onNavigateToStatus }: SettingsViewProps) {
   const { t } = useTranslation()
-  const { getItem: secureGetItem, setItem: secureSetItem } = useSecureStorage()
+  const { getItem: secureGetItem, setItem: secureSetItem, removeItem: secureRemoveItem } = useSecureStorage()
   const { authenticate: biometricAuth } = useBiometrics()
   const { copyToClipboard } = useClipboard()
   const { toggleOn: playToggleOn, toggleOff: playToggleOff, confirmSoundToggle } = useSoundEffects()
@@ -145,6 +161,8 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     geminiModel: 'gemini-2.5-flash',
     mqttEnabled: true
   })
+  const [aiProvider, setAiProviderState] = useState<ProviderId>(getActiveHostedProviderId())
+  const [aiMode, setAiModeState] = useState<AIMode>(getAIMode())
   const [isRestarting, setIsRestarting] = useState(false)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
   const [restartStatus, setRestartStatus] = useState<'idle' | 'success' | 'error'>('idle')
@@ -198,6 +216,13 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   const [hideAiWhenUnavailable, setHideAiWhenUnavailableState] = useState(false)
   const [soundsEnabled, setSoundsEnabledState] = useState(false)
   const hasGeminiKey = Boolean((settings.geminiApiKey || '').trim()) || settings.geminiApiKeyConfigured === true
+  // On-device AI needs no API key, so AI can be enabled where local is supported.
+  const canEnableAi = hasGeminiKey || isLocalLLMSupported()
+  const localSupported = isLocalLLMSupported()
+  // Hosted provider block shows for cloud/both modes (and always when on-device
+  // is unsupported); the on-device block shows for local/both modes.
+  const showHostedAi = !localSupported || aiMode === 'hosted' || aiMode === 'both'
+  const showLocalAi = localSupported && (aiMode === 'local' || aiMode === 'both')
 
   // Beta channel state
   const [betaChannelEnabled, setBetaChannelEnabled] = useState(false)
@@ -253,10 +278,14 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
       ])
 
     const loadSettings = async () => {
+      const providerId = getActiveProviderId()
+      const keyStorageKey = apiKeyStorageKey(providerId)
+      const modelKey = modelStorageKey(providerId)
+      const defaultModel = PROVIDERS[providerId].defaultModel
       if (isLocalMode()) {
         try {
           const storedKey = await withTimeout(
-            secureGetItem(STORAGE_KEYS.GEMINI_API_KEY).then(v => v || ''),
+            secureGetItem(keyStorageKey).then(v => v || ''),
             5000,
           )
           if (cancelled) return
@@ -264,7 +293,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             geminiApiKey: storedKey,
             meticulousIp: new URL(getDefaultMachineUrl()).hostname,
             authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
-            geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash',
+            geminiModel: localStorage.getItem(modelKey) || defaultModel,
             mqttEnabled: true,
             geminiApiKeyMasked: false,
             geminiApiKeyConfigured: Boolean(storedKey.trim()),
@@ -272,12 +301,12 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
         } catch (err) {
           if (cancelled) return
           console.error('Failed to load secure settings, falling back to localStorage:', err)
-          const fallbackKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) || ''
+          const fallbackKey = localStorage.getItem(keyStorageKey) || ''
           setSettings({
             geminiApiKey: fallbackKey,
             meticulousIp: new URL(getDefaultMachineUrl()).hostname,
             authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
-            geminiModel: localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash',
+            geminiModel: localStorage.getItem(modelKey) || defaultModel,
             mqttEnabled: true,
             geminiApiKeyMasked: false,
             geminiApiKeyConfigured: Boolean(fallbackKey.trim()),
@@ -478,10 +507,25 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             }
           }
           if (nextSettings.geminiApiKey && !nextSettings.geminiApiKey.startsWith('*')) {
+            const apiKey = nextSettings.geminiApiKey
+            const keyStorageKey = apiKeyStorageKey(aiProvider)
+            // Write localStorage synchronously first so synchronous readers
+            // (provider getStoredApiKey, the App AI-gate handler) see the
+            // key immediately. This mirrors the proven onboarding path and avoids
+            // depending on the awaited native Keychain write, which on iOS can be
+            // slow/throw/hang and otherwise blocks both the mirror and the event.
             try {
-              await secureSetItem(STORAGE_KEYS.GEMINI_API_KEY, nextSettings.geminiApiKey)
-            } catch {
-              localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, nextSettings.geminiApiKey)
+              localStorage.setItem(keyStorageKey, apiKey)
+            } catch { /* localStorage unavailable — non-critical */ }
+            // Persist to the Keychain in the background; must not block the UI gate.
+            void Promise.resolve(secureSetItem(keyStorageKey, apiKey)).catch(() => {})
+            // Mirror onboarding: saving a hosted key must move AI into a
+            // hosted-inclusive mode. Without this, a stored 'none'/degraded mode
+            // leaves the freshly entered key inert until the user re-onboards.
+            const rawMode = localStorage.getItem(STORAGE_KEYS.AI_MODE)
+            if (rawMode !== 'hosted' && rawMode !== 'both') {
+              setAIMode('hosted')
+              setAiModeState('hosted')
             }
             window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { apiKeyChanged: true } }))
           }
@@ -489,7 +533,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             localStorage.setItem(STORAGE_KEYS.AUTHOR_NAME, nextSettings.authorName)
           }
           if (nextSettings.geminiModel) {
-            localStorage.setItem(STORAGE_KEYS.GEMINI_MODEL, nextSettings.geminiModel)
+            localStorage.setItem(modelStorageKey(aiProvider), nextSettings.geminiModel)
           }
         } else {
           const serverUrl = await getServerUrl()
@@ -498,8 +542,10 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             meticulousIp: nextSettings.meticulousIp,
             mqttEnabled: nextSettings.mqttEnabled,
             geminiModel: nextSettings.geminiModel,
+            aiProvider,
           }
-          if (nextSettings.geminiApiKey && !nextSettings.geminiApiKey.startsWith('*')) {
+          const apiKeyChanged = Boolean(nextSettings.geminiApiKey && !nextSettings.geminiApiKey.startsWith('*'))
+          if (apiKeyChanged) {
             payload.geminiApiKey = nextSettings.geminiApiKey
             payload.geminiApiKeyMasked = false
           }
@@ -516,6 +562,11 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             } catch { /* use default */ }
             throw new Error(errorMsg)
           }
+          // Notify the app that the API key changed so the AI gate refreshes
+          // immediately, instead of staying stale until Settings is closed.
+          if (apiKeyChanged) {
+            window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { apiKeyChanged: true } }))
+          }
         }
         setAutoSaveStatus('saved')
         if (autoSaveFadeRef.current) clearTimeout(autoSaveFadeRef.current)
@@ -527,7 +578,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
         autoSaveFadeRef.current = setTimeout(() => setAutoSaveStatus('idle'), 4000)
       }
     }, 800)
-  }, [t, secureSetItem])
+  }, [t, secureSetItem, aiProvider])
 
   const handleChange = (field: keyof Settings, value: string) => {
     setSettings(prev => {
@@ -535,13 +586,87 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
       // Model selection is critical — save immediately (no debounce)
       if (field === 'geminiModel') {
         if (isLocalMode()) {
-          localStorage.setItem(STORAGE_KEYS.GEMINI_MODEL, value)
+          localStorage.setItem(modelStorageKey(aiProvider), value)
         }
         window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { modelChanged: true } }))
+      }
+      // Auto-detect the provider from a freshly entered key (manual dropdown
+      // stays the source of truth, but a pasted key updates the selection).
+      if (field === 'geminiApiKey' && value && !value.startsWith('*')) {
+        const detected = detectProviderFromKey(value)
+        if (detected && detected !== aiProvider) {
+          setActiveProviderId(detected)
+          setAiProviderState(detected)
+        }
+      }
+      // Clearing the key field must delete the stored key from both the
+      // localStorage mirror and the secure store; otherwise debouncedSave skips
+      // the empty value and the old key reappears when switching providers back.
+      if (field === 'geminiApiKey' && value === '' && isLocalMode()) {
+        const keyStorageKey = apiKeyStorageKey(aiProvider)
+        try { localStorage.removeItem(keyStorageKey) } catch { /* non-critical */ }
+        void Promise.resolve(secureRemoveItem(keyStorageKey)).catch(() => {})
+        window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { apiKeyChanged: true } }))
       }
       debouncedSave(next)
       return next
     })
+  }
+
+  const handleProviderChange = (id: ProviderId) => {
+    setActiveProviderId(id)
+    setAiProviderState(id)
+    const keyStorageKey = apiKeyStorageKey(id)
+    const storedKey = (() => {
+      try { return localStorage.getItem(keyStorageKey) || '' } catch { return '' }
+    })()
+    const storedModel = (() => {
+      try { return localStorage.getItem(modelStorageKey(id)) || PROVIDERS[id].defaultModel } catch { return PROVIDERS[id].defaultModel }
+    })()
+    setSettings(prev => ({
+      ...prev,
+      geminiApiKey: storedKey,
+      geminiModel: storedModel,
+      geminiApiKeyMasked: false,
+      geminiApiKeyConfigured: Boolean(storedKey.trim()),
+    }))
+    window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { providerChanged: true } }))
+  }
+
+  // Refresh the model picker whenever the active provider changes.
+  useEffect(() => {
+    if (isDemoMode()) return
+    let cancelled = false
+    ;(async () => {
+      setModelsLoading(true)
+      // Clear any models carried over from the previous provider so the picker
+      // never shows a stale cross-provider entry (e.g. "Apple Intelligence")
+      // while the new provider's models are loading.
+      setAvailableModels([])
+      try {
+        const serverUrl = await getServerUrl()
+        const response = await fetch(`${serverUrl}/api/available-models`)
+        if (cancelled) return
+        if (response.ok) {
+          const data = await response.json()
+          setModelsError(false)
+          if (data.models?.length > 0) setAvailableModels(data.models)
+        } else {
+          setModelsError(true)
+        }
+      } catch {
+        if (!cancelled) setModelsError(true)
+      } finally {
+        if (!cancelled) setModelsLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [aiProvider])
+
+  const handleModeChange = (mode: AIMode) => {
+    setAIMode(mode)
+    setAiModeState(mode)
+    window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { providerChanged: true } }))
   }
 
   const handleDetectMachine = async () => {
@@ -1129,14 +1254,71 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     setAiEnabled(next)
                     if (next) playToggleOn(); else playToggleOff()
                   }}
-                  disabled={!hasGeminiKey}
+                  disabled={!canEnableAi}
                 />
               </div>
 
+              {/* AI mode selector (#373) — on-device / cloud / both. Only shown
+                  where on-device AI is available (native iOS/Android). */}
+              {localSupported && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">{t('settings.aiMode')}</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['local', 'hosted', 'both'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => handleModeChange(mode)}
+                        className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                          aiMode === mode
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-input bg-background text-muted-foreground hover:bg-accent'
+                        }`}
+                      >
+                        {mode === 'local'
+                          ? t('settings.aiModeLocal')
+                          : mode === 'hosted'
+                            ? t('settings.aiModeHosted')
+                            : t('settings.aiModeBoth')}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('settings.aiModeHint')}</p>
+                </div>
+              )}
+
+              {/* AI provider selector (#491) — hosted providers only. */}
+              {showHostedAi && (
+              <div className="space-y-2">
+                <Label htmlFor="aiProvider" className="text-sm font-medium">
+                  {t('settings.aiProvider')}
+                </Label>
+                <select
+                  id="aiProvider"
+                  value={aiProvider}
+                  onChange={(e) => handleProviderChange(e.target.value as ProviderId)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  {HOSTED_PROVIDER_IDS.map((id) => (
+                    <option key={id} value={id}>
+                      {PROVIDERS[id].label}
+                    </option>
+                  ))}
+                </select>
+                {!PROVIDERS[aiProvider].capabilities.imageGen && (
+                  <p className="text-xs text-muted-foreground">
+                    {t('settings.aiProviderImageHint')}
+                  </p>
+                )}
+              </div>
+              )}
+
+              {showHostedAi && (
+              <>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="apiKey" className="text-sm font-medium">
-                    {t('settings.geminiApiKey')}
+                    {t('settings.providerApiKey', { provider: PROVIDERS[aiProvider].label })}
                   </Label>
                   {hasGeminiKey && (
                     <span className="text-xs text-success flex items-center gap-1">
@@ -1151,7 +1333,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     type="password"
                     value={settings.geminiApiKey}
                     onChange={(e) => handleChange('geminiApiKey', e.target.value)}
-                    placeholder={hasGeminiKey ? t('settings.apiKeyPlaceholderNew') : t('settings.apiKeyPlaceholder')}
+                    placeholder={hasGeminiKey ? t('settings.apiKeyPlaceholderNew') : t('settings.providerApiKeyPlaceholder', { provider: PROVIDERS[aiProvider].label })}
                     className="pr-10"
                     readOnly={settings.geminiApiKeyMasked && settings.geminiApiKey.startsWith('*')}
                     onClick={async () => {
@@ -1166,16 +1348,18 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                 <p className="text-xs text-muted-foreground">
                   {hasGeminiKey
                     ? t('settings.apiKeyConfiguredExtended')
-                    : <>{t('settings.aiAssistantOptional')} {t('settings.getApiKey')}{' '}
-                      <a
-                        href="https://aistudio.google.com/app/apikey"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        {t('settings.googleAIStudio')}
-                      </a>
-                    </>
+                    : aiProvider === 'gemini'
+                      ? <>{t('settings.aiAssistantOptional')} {t('settings.getApiKey')}{' '}
+                        <a
+                          href="https://aistudio.google.com/app/apikey"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          {t('settings.googleAIStudio')}
+                        </a>
+                      </>
+                      : t('settings.aiAssistantOptional')
                   }
                 </p>
               </div>
@@ -1193,20 +1377,30 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     disabled={modelsLoading}
                   >
-                    {availableModels.length > 0 ? (
+                    {modelsLoading ? (
+                      <option value={settings.geminiModel || 'gemini-2.5-flash'}>
+                        {t('settings.modelsLoading')}
+                      </option>
+                    ) : availableModels.length > 0 ? (
                       availableModels.map((model) => (
                         <option key={model.id} value={model.id}>
                           {model.display_name}
                         </option>
                       ))
                     ) : (
-                      <>
-                        <option value="gemini-2.5-flash">{t('settings.geminiModel25Flash')}</option>
-                        <option value="gemini-2.5-pro">{t('settings.geminiModel25Pro')}</option>
-                        <option value="gemini-2.5-flash-lite">{t('settings.geminiModel25FlashLite')}</option>
-                        <option value="gemini-3.1-pro-preview">{t('settings.geminiModel31Pro')}</option>
-                        <option value="gemini-3.1-flash-lite">{t('settings.geminiModel31FlashLite')}</option>
-                      </>
+                      aiProvider === 'gemini' ? (
+                        <>
+                          <option value="gemini-2.5-flash">{t('settings.geminiModel25Flash')}</option>
+                          <option value="gemini-2.5-pro">{t('settings.geminiModel25Pro')}</option>
+                          <option value="gemini-2.5-flash-lite">{t('settings.geminiModel25FlashLite')}</option>
+                          <option value="gemini-3.1-pro-preview">{t('settings.geminiModel31Pro')}</option>
+                          <option value="gemini-3.1-flash-lite">{t('settings.geminiModel31FlashLite')}</option>
+                        </>
+                      ) : (
+                        <option value={settings.geminiModel || ''}>
+                          {settings.geminiModel || t('settings.modelDefault')}
+                        </option>
+                      )
                     )}
                   </select>
                   {modelsLoading && (
@@ -1223,6 +1417,11 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                       : t('settings.geminiModelDescription')}
                 </p>
               </div>
+              </>
+              )}
+
+              {/* On-device AI settings (#373) — local/both modes. */}
+              {showLocalAi && <LocalAISettings mode={aiMode} />}
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">

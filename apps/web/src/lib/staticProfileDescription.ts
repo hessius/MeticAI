@@ -26,81 +26,91 @@ interface ProfileJson {
   summary?: string
 }
 
+export function buildStaticProfileSummary(profileJson: ProfileJson): string {
+  const existing =
+    profileJson.description ?? profileJson.notes ?? profileJson.summary
+  if (existing) return String(existing).trim()
+  return generateStaticProfileSummary(profileJson)
+}
+
+/**
+ * Generate the trait-based one-line summary from the profile's stage structure
+ * and metadata, *ignoring* any explicit description/notes/summary. Used by the
+ * pre-shot heating view, which always wants the derived "what this shot does"
+ * sentence rather than an author's freeform blurb.
+ */
+export function generateStaticProfileSummary(profileJson: ProfileJson): string {
+  const temperature = profileJson.temperature
+  const finalWeight = profileJson.final_weight
+  const stages: Stage[] = profileJson.stages ?? []
+
+  const shotTraits: string[] = []
+
+  for (let i = 0; i < stages.length; i++) {
+    const stage = stages[i]
+    if (!stage || typeof stage !== 'object') continue
+    const sname = (stage.name ?? '').toLowerCase()
+    const dynamics = stage.dynamics ?? ''
+    const points = stage.dynamics_points
+
+    if (i === 0 && (/pre/.test(sname) || /infus/.test(sname))) {
+      shotTraits.push('pre-infusion')
+    } else if (/bloom|soak/.test(sname)) {
+      shotTraits.push('bloom')
+    } else if (/ramp/.test(sname) || dynamics === 'ramp') {
+      shotTraits.push('ramp')
+    } else if (/flat/.test(sname) || dynamics === 'flat') {
+      shotTraits.push('flat')
+    } else if (/decline|taper/.test(sname)) {
+      shotTraits.push('decline')
+    }
+
+    // Detect flat pressure at ~9 bar (classic espresso)
+    if (Array.isArray(points) && points.length >= 2) {
+      try {
+        const pressures = points
+          .filter((p): p is [number, number] => Array.isArray(p) && p.length >= 2)
+          .map(p => Number(p[1]))
+        if (
+          pressures.length > 0 &&
+          pressures.every(p => Math.abs(p - pressures[0]) < 0.3) &&
+          pressures[0] >= 8.0 &&
+          pressures[0] <= 10.0 &&
+          !shotTraits.includes('flat')
+        ) {
+          shotTraits.push('flat')
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  // Deduplicate while preserving order
+  const uniqueTraits = [...new Map(shotTraits.map(t => [t, t])).values()]
+
+  const parts: string[] = []
+  if (stages.length > 0) {
+    const stageCount = `${stages.length}-stage`
+    if (uniqueTraits.length > 0) {
+      parts.push(`A ${stageCount} extraction featuring ${uniqueTraits.join(', ')}`)
+    } else {
+      parts.push(`A ${stageCount} extraction profile`)
+    }
+  }
+  if (temperature != null) parts.push(`brewed at ${temperature}°C`)
+  if (finalWeight != null) parts.push(`targeting ~${finalWeight}g yield`)
+
+  return parts.length > 0 ? parts.join(' ') + '.' : 'Profile imported successfully.'
+}
+
 export function buildStaticProfileDescription(profileJson: ProfileJson): string {
   const profileName = profileJson.name ?? 'Imported Profile'
   const temperature = profileJson.temperature
   const finalWeight = profileJson.final_weight
   const stages: Stage[] = profileJson.stages ?? []
 
-  const existing =
-    profileJson.description ?? profileJson.notes ?? profileJson.summary
-  let description: string
-
-  if (existing) {
-    description = String(existing).trim()
-  } else {
-    const shotTraits: string[] = []
-
-    for (let i = 0; i < stages.length; i++) {
-      const stage = stages[i]
-      if (!stage || typeof stage !== 'object') continue
-      const sname = (stage.name ?? '').toLowerCase()
-      const dynamics = stage.dynamics ?? ''
-      const points = stage.dynamics_points
-
-      if (i === 0 && (/pre/.test(sname) || /infus/.test(sname))) {
-        shotTraits.push('pre-infusion')
-      } else if (/bloom|soak/.test(sname)) {
-        shotTraits.push('bloom')
-      } else if (/ramp/.test(sname) || dynamics === 'ramp') {
-        shotTraits.push('ramp')
-      } else if (/flat/.test(sname) || dynamics === 'flat') {
-        shotTraits.push('flat')
-      } else if (/decline|taper/.test(sname)) {
-        shotTraits.push('decline')
-      }
-
-      // Detect flat pressure at ~9 bar (classic espresso)
-      if (Array.isArray(points) && points.length >= 2) {
-        try {
-          const pressures = points
-            .filter((p): p is [number, number] => Array.isArray(p) && p.length >= 2)
-            .map(p => Number(p[1]))
-          if (
-            pressures.length > 0 &&
-            pressures.every(p => Math.abs(p - pressures[0]) < 0.3) &&
-            pressures[0] >= 8.0 &&
-            pressures[0] <= 10.0 &&
-            !shotTraits.includes('flat')
-          ) {
-            shotTraits.push('flat')
-          }
-        } catch {
-          // ignore
-        }
-      }
-    }
-
-    // Deduplicate while preserving order
-    const uniqueTraits = [...new Map(shotTraits.map(t => [t, t])).values()]
-
-    const parts: string[] = []
-    if (stages.length > 0) {
-      const stageCount = `${stages.length}-stage`
-      if (uniqueTraits.length > 0) {
-        parts.push(`A ${stageCount} extraction featuring ${uniqueTraits.join(', ')}`)
-      } else {
-        parts.push(`A ${stageCount} extraction profile`)
-      }
-    }
-    if (temperature != null) parts.push(`brewed at ${temperature}°C`)
-    if (finalWeight != null) parts.push(`targeting ~${finalWeight}g yield`)
-
-    description =
-      parts.length > 0
-        ? parts.join(' ') + '.'
-        : 'Profile imported successfully.'
-  }
+  const description = buildStaticProfileSummary(profileJson)
 
   // Calculate expected time from stage dynamics_points
   let expectedTime = 'Not specified'
@@ -137,7 +147,7 @@ export function buildStaticProfileDescription(profileJson: ProfileJson): string 
     `• Expected Time: ${expectedTime}\n\n` +
     `Why This Works:\n` +
     `This is a summary generated from the profile's stage structure and metadata. ` +
-    `Enable AI features in Settings and configure a Gemini API key for a detailed ` +
+    `Enable AI features in Settings for a detailed ` +
     `barista-level analysis with expert brewing recommendations.\n\n` +
     `Special Notes:\n` +
     `This description was generated without AI assistance and may not capture ` +

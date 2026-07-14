@@ -52,3 +52,7 @@ ios/App/DerivedData/
 ios/App/*.xcworkspace/xcuserdata/
 ios/App/*.xcodeproj/xcuserdata/
 *.ipa
+
+# Visual-regression diff output from local test-storybook runs (baselines are
+# committed from CI artifacts; see .github/workflows/tests.yml visual-regression)
+__image_snapshots__/**/__diff_output__/

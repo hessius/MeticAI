@@ -1,0 +1,48 @@
+{
+  "$comment": [
+    "Declarative suppression list for AI Guard (eslint-plugin-ai-guard) findings.",
+    "Consumed by .github/scripts/ai-guard-sarif-filter.mjs, which strips matching",
+    "results from the SARIF before it is uploaded to GitHub Code Scanning. This is",
+    "the 'suppress the existing baseline of false positives' step referenced in",
+    ".github/workflows/ai-guard.yml. Every entry below is a reviewed false positive;",
+    "add new entries only with a justification so the guard stays meaningful."
+  ],
+  "ignorePaths": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/test/**",
+    "**/*.stories.tsx"
+  ],
+  "ignorePathsReason": "Test, mock and story files routinely use async test callbacks without await and placeholder credentials; these are fixtures, not shipped code.",
+  "ignoreRulePaths": [
+    {
+      "rule": "ai-guard/no-hardcoded-secret",
+      "path": "apps/web/src/lib/constants.ts",
+      "reason": "STORAGE_KEYS values (e.g. GEMINI_API_KEY: 'meticai-gemini-key') are localStorage key NAMES, not secret values."
+    },
+    {
+      "rule": "ai-guard/no-async-without-await",
+      "path": "apps/web/src/services/ai/providers/localLLM.ts",
+      "reason": "generateLocalText is async by its Promise<string> contract; it chains work via generationChain.then() instead of a literal await."
+    },
+    {
+      "rule": "ai-guard/no-async-without-await",
+      "path": "apps/web/src/services/ai/providers/LocalLLMProvider.ts",
+      "reason": "AIProvider interface methods are async by contract even when a branch returns a static value (e.g. listModels)."
+    },
+    {
+      "rule": "ai-guard/no-async-without-await",
+      "path": "apps/web/src/services/ai/BrowserAIService.ts",
+      "reason": "AIService interface methods are async by contract; some branches return synchronously to satisfy the uniform signature."
+    },
+    {
+      "rule": "ai-guard/no-unsafe-deserialize",
+      "path": "apps/web/src/services/interceptor/DirectModeInterceptor.ts",
+      "reason": "JSON.parse targets the app's OWN first-party fetch bodies it intercepts in direct mode, inside try/catch; not untrusted external network input."
+    }
+  ]
+}

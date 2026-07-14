@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request, Form, HTTPException
 from typing import Optional
 import asyncio
 import json
+import math
 import re
 import time
 import logging
@@ -35,6 +36,12 @@ from services.gemini_service import (
     compute_taste_hash,
 )
 from prompt_builder import build_taste_context
+from services.analysis_validator import validate_against_facts, check_structure
+from analysis_knowledge import (
+    ANALYSIS_KNOWLEDGE,
+    FEW_SHOT_ANALYSIS_EXAMPLE,
+    build_fact_sheet,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -459,12 +466,8 @@ async def get_shots_by_profile(
                     return None
 
                 shot_profile_name = shot_data.get("profile_name", "")
-                if not shot_profile_name and isinstance(
-                    shot_data.get("profile"), dict
-                ):
-                    shot_profile_name = (
-                        shot_data.get("profile", {}).get("name", "")
-                    )
+                if not shot_profile_name and isinstance(shot_data.get("profile"), dict):
+                    shot_profile_name = shot_data.get("profile", {}).get("name", "")
 
                 profile_id = ""
                 if isinstance(shot_data.get("profile"), dict):
@@ -498,9 +501,7 @@ async def get_shots_by_profile(
                     "timestamp": shot_data.get("time"),
                     "profile_name": shot_profile_name,
                     "final_weight": final_weight,
-                    "total_time": total_time_ms / 1000
-                    if total_time_ms
-                    else None,
+                    "total_time": total_time_ms / 1000 if total_time_ms else None,
                 }
                 if include_data:
                     shot_info["data"] = shot_data
@@ -518,25 +519,19 @@ async def get_shots_by_profile(
 
         # Collect matches from new scans
         new_matches = [
-            r
-            for r in scan_results
-            if r is not None and not isinstance(r, Exception)
+            r for r in scan_results if r is not None and not isinstance(r, Exception)
         ]
 
         # Combine with matches from already-indexed dates
         indexed_matches = lookup_shots_by_profile(profile_name, limit) or []
         # Filter indexed matches to only already-indexed dates
         idx_from_cache = [
-            m
-            for m in indexed_matches
-            if m["date"] in already_indexed_dates
+            m for m in indexed_matches if m["date"] in already_indexed_dates
         ]
 
         matching_shots = new_matches + idx_from_cache
         # Sort newest first, trim to limit
-        matching_shots.sort(
-            key=lambda x: x.get("timestamp") or "", reverse=True
-        )
+        matching_shots.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
         matching_shots = matching_shots[:limit]
 
         logger.info(
@@ -695,9 +690,11 @@ async def analyze_shot(
                                     # Convert to list of dicts if needed
                                     if isinstance(val, list):
                                         stage_dict[attr] = [
-                                            dict(item)
-                                            if hasattr(item, "__dict__")
-                                            else item
+                                            (
+                                                dict(item)
+                                                if hasattr(item, "__dict__")
+                                                else item
+                                            )
                                             for item in val
                                         ]
                                     else:
@@ -943,9 +940,11 @@ async def analyze_shot_with_llm(
                                 if val is not None:
                                     if isinstance(val, list):
                                         stage_dict[attr] = [
-                                            dict(item)
-                                            if hasattr(item, "__dict__")
-                                            else item
+                                            (
+                                                dict(item)
+                                                if hasattr(item, "__dict__")
+                                                else item
+                                            )
                                             for item in val
                                         ]
                                     else:
@@ -960,6 +959,8 @@ async def analyze_shot_with_llm(
 
         # Run local analysis first to extract data
         local_analysis = _perform_local_shot_analysis(shot_data, profile_data)
+        shot_facts = local_analysis.get("shot_facts", {})
+        fact_sheet = build_fact_sheet(shot_facts)
 
         # Prepare profile data (clean, no image)
         clean_profile = _prepare_profile_for_llm(profile_data, profile_description)
@@ -993,6 +994,9 @@ async def analyze_shot_with_llm(
 ## Expert Knowledge
 {PROFILING_KNOWLEDGE}
 
+## Analysis Framework
+{ANALYSIS_KNOWLEDGE}
+
 ## Profile Being Used
 Name: {clean_profile["name"]}
 Temperature: {clean_profile.get("temperature", "Not set")}°C
@@ -1007,16 +1011,20 @@ Target Weight: {clean_profile.get("final_weight", "Not set")}g
 ### Profile Stages
 {json.dumps(clean_profile.get("stages", []), indent=2)}
 
-## Full Local Analysis
-This is the complete algorithmic analysis of the shot. Use this data to inform your expert analysis.
+## Shot Facts (digested — authoritative; trust over raw telemetry)
+Each stage lists its exit classification. A Targeted exit means the stage reached its intended
+outcome (e.g. its weight target); a Failsafe exit means a backstop fired before the real target.
+A Targeted exit — including a short stage that hit its weight target — is NORMAL and CORRECT
+behavior; never describe it as "early termination". The final weight reflects the settled weight
+after the machine's piston retraction completes, so do NOT penalize weight deviation unless it
+exceeds ±5%.
 
-IMPORTANT: Each stage includes 'cumulative_weight_at_end' which shows the total weight when that stage ended.
-If a stage ended early but the cumulative weight was near the target weight, the shot likely terminated 
-correctly due to reaching the final weight target - this is NORMAL and EXPECTED behavior.
-A stage that appears "short" may simply mean the target yield was reached, which is the correct outcome.
-
-{json.dumps(local_analysis, indent=2)}
+{fact_sheet}
 {taste_context}
+
+---
+
+{FEW_SHOT_ANALYSIS_EXAMPLE}
 
 ---
 
@@ -1099,7 +1107,8 @@ END_RECOMMENDATIONS_JSON
 
 Rules for recommendations:
 - Only include recommendations where you have a SPECIFIC numeric change to suggest
-- Use actual variable keys from the Profile Variables section above
+- The "variable" MUST be copied verbatim from the "key" field of an entry in the Profile Variables section above (for example "pressure_Max Pressure"). Do NOT invent positional names like "pressure_2" or "flow_0", and do NOT use the display name.
+- Always include the variable's existing value as "current_value" so the change can be verified
 - For top-level settings (temperature, final_weight), use stage="global"
 - For stage-specific changes, use the stage name from Profile Stages
 - For exit trigger changes, use these variable keys with the stage name:
@@ -1129,6 +1138,18 @@ Rules for recommendations:
         response = await model.async_generate_content(prompt)
 
         llm_analysis = response.text if response else "Analysis generation failed"
+        first_ok = (
+            validate_against_facts(llm_analysis, shot_facts)["valid"]
+            and check_structure(llm_analysis)["valid"]
+        )
+        if not first_ok:
+            retry = await model.async_generate_content(prompt)
+            retry_text = retry.text if retry else llm_analysis
+            if (
+                validate_against_facts(retry_text, shot_facts)["valid"]
+                and check_structure(retry_text)["valid"]
+            ):
+                llm_analysis = retry_text
 
         # Save to cache
         save_llm_analysis_to_cache(
@@ -1297,9 +1318,11 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
                     result = await async_get_shot_files(date)
                     if hasattr(result, "error") and result.error:
                         return date, []
-                    return date, sorted(
-                        [f.name for f in result], reverse=True
-                    ) if result else (date, [])
+                    return date, (
+                        sorted([f.name for f in result], reverse=True)
+                        if result
+                        else (date, [])
+                    )
                 except Exception:
                     return date, []
 
@@ -1377,8 +1400,7 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
 
         # Combine new scans with indexed data
         new_shots = [
-            r for r in scan_results
-            if r is not None and not isinstance(r, Exception)
+            r for r in scan_results if r is not None and not isinstance(r, Exception)
         ]
         # Also include already-indexed shots
         idx_shots = get_all_indexed_shots(limit=needed + 10, offset=0) or []
@@ -1386,10 +1408,7 @@ async def get_recent_shots(request: Request, limit: int = 50, offset: int = 0):
             annotation = get_annotation(shot["date"], shot["filename"])
             shot["has_annotation"] = annotation is not None
 
-        all_shots = new_shots + [
-            s for s in idx_shots
-            if s["date"] in indexed_dates
-        ]
+        all_shots = new_shots + [s for s in idx_shots if s["date"] in indexed_dates]
 
         # Sort by timestamp descending (handle None timestamps)
         all_shots.sort(
@@ -1612,20 +1631,90 @@ async def get_all_shot_annotations(request: Request):
 # ============================================================================
 
 
-def _parse_recommendations_json(analysis_text: str) -> list[dict]:
-    """Extract and parse the RECOMMENDATIONS_JSON block from analysis text."""
+def _locate_recommendations_json(analysis_text: str) -> str | None:
+    """Locate the recommendations JSON array text (delimited or bare).
+
+    Weak models (small on-device / non-Gemini LLMs) frequently omit the
+    RECOMMENDATIONS_JSON / END_RECOMMENDATIONS_JSON delimiters and emit a bare
+    array, sometimes embedded in prose. Prefer the delimited block; otherwise
+    fall back to bracket-matching a bare array that contains a
+    recommendation-shaped object.
+    """
     match = re.search(
-        r"RECOMMENDATIONS_JSON:\s*\n\s*(\[.*?\])\s*\n\s*END_RECOMMENDATIONS_JSON",
+        r"RECOMMENDATIONS_JSON:\s*\n\s*(\[.*?\])\s*\n?\s*END_RECOMMENDATIONS_JSON",
         analysis_text,
         re.DOTALL,
     )
-    if not match:
+    if match:
+        return match.group(1)
+
+    key = re.search(r'"(?:variable|recommended_value)"\s*:', analysis_text)
+    if not key:
+        return None
+    open_idx = analysis_text.rfind("[", 0, key.start())
+    if open_idx == -1:
+        return None
+
+    depth = 0
+    in_str = False
+    esc = False
+    for i in range(open_idx, len(analysis_text)):
+        ch = analysis_text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                return analysis_text[open_idx : i + 1]
+    return None
+
+
+def _is_actionable_recommendation(rec: dict) -> bool:
+    """Drop hallucinated / non-actionable recommendations.
+
+    Weak on-device models sometimes emit garbage variable ids (e.g. "flow_0")
+    with NaN values that render as "adjust from NaN to NaN". A recommendation is
+    only usable if it names a variable and its numeric values (when present) are
+    finite. Missing values are treated as 0 (kept, for advisory recommendations).
+    """
+    if not str(rec.get("variable", "")).strip():
+        return False
+    for key in ("current_value", "recommended_value"):
+        raw = rec.get(key)
+        if raw is None:
+            continue
+        try:
+            if not math.isfinite(float(raw)):
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
+def _parse_recommendations_json(analysis_text: str) -> list[dict]:
+    """Extract and parse the recommendations JSON (delimited or bare)."""
+    json_text = _locate_recommendations_json(analysis_text)
+    if not json_text:
         return []
+    # Tolerate trailing commas that weak models emit.
+    cleaned = re.sub(r",(\s*[\]}])", r"\1", json_text)
     try:
-        recs = json.loads(match.group(1))
+        recs = json.loads(cleaned)
         if not isinstance(recs, list):
             return []
-        return recs
+        return [
+            r for r in recs if isinstance(r, dict) and _is_actionable_recommendation(r)
+        ]
     except (json.JSONDecodeError, TypeError):
         return []
 

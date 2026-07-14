@@ -36,6 +36,7 @@ vi.mock('@phosphor-icons/react', () => {
     PencilSimple: Icon,
     FloppyDisk: Icon,
     FloppyDiskBack: Icon,
+    Thermometer: Icon,
   }
 })
 
@@ -201,5 +202,26 @@ describe('RunShotView scheduled-shot guards', () => {
 
     expect(helpers.getSchedulePreheatInfo?.({ preheat: true, minutes: 10, t })).toBe('runShot.preheatStartsBefore:10')
     expect(helpers.getSchedulePreheatInfo?.({ preheat: false, minutes: 10, t })).toBe('')
+  })
+})
+
+describe('RunShotView temperature boost helpers', () => {
+  it('adds 3 °C to base temperature', () => {
+    expect(runShotHelpers.getBoostedTemperature(90)).toBe(93)
+    expect(runShotHelpers.getBoostedTemperature(93)).toBe(96)
+  })
+
+  it('caps boosted temperature at 99 °C', () => {
+    expect(runShotHelpers.getBoostedTemperature(97)).toBe(99)
+    expect(runShotHelpers.getBoostedTemperature(99)).toBe(99)
+    expect(runShotHelpers.getBoostedTemperature(100)).toBe(99)
+  })
+
+  it('shows boost option only when profile has a temperature', () => {
+    expect(runShotHelpers.canShowTemperatureBoost({ hasSelectedProfile: true, profileTemperature: 93 })).toBe(true)
+    expect(runShotHelpers.canShowTemperatureBoost({ hasSelectedProfile: true, profileTemperature: 0 })).toBe(true)
+    expect(runShotHelpers.canShowTemperatureBoost({ hasSelectedProfile: true, profileTemperature: null })).toBe(false)
+    expect(runShotHelpers.canShowTemperatureBoost({ hasSelectedProfile: true, profileTemperature: undefined })).toBe(false)
+    expect(runShotHelpers.canShowTemperatureBoost({ hasSelectedProfile: false, profileTemperature: 93 })).toBe(false)
   })
 })

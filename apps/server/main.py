@@ -373,7 +373,7 @@ async def _httpx_connect_timeout(_request: Request, exc: httpx.ConnectTimeout):
 
 
 # Import route modules
-from api.routes import (
+from api.routes import (  # noqa: E402
     coffee,
     system,
     history,
@@ -490,11 +490,14 @@ app.include_router(machine_status.router)
 # ============================================================================
 # Imports used by lifespan()
 # ============================================================================
-from services.scheduling_state import (
+from services.scheduling_state import (  # noqa: E402
     _scheduled_shots,  # noqa: F401 — accessed by tests via main._scheduled_shots
     _scheduled_tasks,
     _recurring_schedules,
     restore_scheduled_shots as _restore_scheduled_shots,
     load_recurring_schedules as _load_recurring_schedules,
 )
-from api.routes.profiles import _schedule_next_recurring, _recurring_schedule_checker
+from api.routes.profiles import (  # noqa: E402
+    _schedule_next_recurring,
+    _recurring_schedule_checker,
+)

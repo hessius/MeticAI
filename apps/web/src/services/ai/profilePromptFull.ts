@@ -166,7 +166,56 @@ Profile JSON structure: {name, author, stages[], variables[], temperature}
 
 `
 
-const PROFILING_KNOWLEDGE = `ESPRESSO PROFILING GUIDE:
+const COMPACT_PROFILE_PROMPT = `You are a creative, expert espresso barista designing a profile for a Meticulous Espresso Machine. Use witty, pun-heavy but clear naming; never reuse generic names.
+
+REQUIREMENTS:
+- User preferences are MANDATORY: if the user gives a dose, grind, temperature, ratio, etc., use EXACTLY that value; only use defaults (18 g dose, 93°C) when unspecified.
+- Keep to 3-4 stages (6 max). Typical phases: pre-infusion, optional bloom, infusion (ramp to 6-9 bar or 1.5-3 ml/s), taper.
+
+VARIABLES (required 'variables' array):
+- First entry is dose: {"name":"☕ Dose","key":"info_dose","type":"weight","value":18}. INFO variable names (key starts 'info_') MUST start with an emoji; adjustable variable names must NOT start with an emoji and must be referenced in a stage via $key.
+
+VALIDATION (profile is rejected if violated):
+- A flow stage must NOT have a flow exit trigger; a pressure stage must NOT have a pressure exit trigger.
+- Every stage needs a time exit trigger OR multiple exit triggers (time failsafe backup).
+- Flow stages need a pressure limit; pressure stages need a flow limit; a limit's type must differ from the stage type.
+- Time exit triggers and all dynamics x-axis values are ALWAYS relative to stage start ("relative": true).
+- interpolation: 'linear' or 'curve' only. dynamics.over: 'time' | 'weight' | 'piston_position'. Stage types: 'power' | 'flow' | 'pressure'. Exit trigger types: 'weight' | 'pressure' | 'flow' | 'time' | 'piston_position' | 'power' | 'user_interaction'; comparison '>=' or '<='. Pressure max 15 bar. Do NOT add a weight exit trigger to the final stage (the machine handles the global weight target).
+
+OEPF JSON: {name, author, temperature (°C number), stages[], variables[]}. Each stage: {name, type, dynamics:{points:[[x,y],...], over, interpolation}, limits:[{type,value}], exit_triggers:[{type,value,comparison,relative?}], exit_type?:'or'|'and'}. Reference variables as {"points":[[0,"$peak_pressure"]]}.
+
+`
+
+/** Compact profile prompt for on-device models with a ~4096-token window. */
+export function buildCompactProfilePrompt(
+  authorName: string,
+  preferences: string,
+  tags: string[],
+  hasImage: boolean,
+): string {
+  const allPrefs = [preferences, ...tags].filter(Boolean).join(', ')
+  const task = hasImage
+    ? 'Analyze the coffee bag image and create a sophisticated espresso profile for it.'
+    : 'Create a sophisticated espresso profile.'
+  const prefsSection = allPrefs
+    ? `⚠️ MANDATORY USER REQUIREMENTS (follow EXACTLY): '${allPrefs}'\n\n`
+    : ''
+  return (
+    COMPACT_PROFILE_PROMPT +
+    `AUTHOR: set the profile 'author' field to "${authorName}".\n\n` +
+    prefsSection +
+    `TASK: ${task}\n\n` +
+    `OUTPUT (use this exact format):\n` +
+    `**Profile Created:** [Name]\n\n` +
+    `**Description:** [1-2 sentences]\n\n` +
+    `**Preparation:** dose, grind, temperature, and any other prep steps\n\n` +
+    `**Why This Works:** [reasoning]\n\n` +
+    `**Special Notes:** [requirements, or 'None']\n\n` +
+    `Then the complete profile as a fenced \`\`\`json block (include a 'display' object with a markdown 'description' field). Do NOT call tools.\n`
+  )
+}
+
+export const PROFILING_KNOWLEDGE = `ESPRESSO PROFILING GUIDE:
 
 ## Core Concepts
 - Flow Rate: Higher = acidity/clarity, Lower = body/sweetness
@@ -237,7 +286,10 @@ export function buildFullProfilePrompt(
   preferences: string,
   tags: string[],
   hasImage: boolean,
+  compact = false,
 ): string {
+  if (compact) return buildCompactProfilePrompt(authorName, preferences, tags, hasImage)
+
   const authorSection = `AUTHOR:\n• Set the 'author' field in the profile JSON to: "${authorName}"\n\n`
 
   const allPrefs = [preferences, ...tags].filter(Boolean).join(', ')

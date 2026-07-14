@@ -29,6 +29,7 @@ import {
   type ProfileTargetPoint,
   type TooltipPayloadItem
 } from '@/components/charts/chartConstants'
+import { pointAtTime } from '@/components/charts/pointAtTime'
 
 // Custom tooltip for the chart
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipPayloadItem[]; label?: number }) {
@@ -59,6 +60,57 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
+// Fixed current-values readout rendered *outside* the plot area during replay,
+// so users can read live values without the floating tooltip covering the
+// curves/legend (issue #493 follow-up).
+function ReplayValuesReadout({
+  point,
+  currentTime,
+  hasGravFlow,
+}: {
+  point?: ChartDataPoint
+  currentTime: number
+  hasGravFlow: boolean
+}) {
+  const { t } = useTranslation()
+  const fmt = (v?: number) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(1) : '–')
+  return (
+    <div
+      className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-1 text-xs tabular-nums"
+      role="status"
+      aria-live="polite"
+      aria-label={t('shotCharts.currentValues')}
+    >
+      <span className="font-semibold text-foreground">
+        {t('shotCharts.tooltipTime')}: {currentTime.toFixed(1)}s
+      </span>
+      {point?.stage && typeof point.stage === 'string' && (
+        <span className="font-medium text-primary">
+          {t('shotCharts.tooltipStage')}: {point.stage}
+        </span>
+      )}
+      <span className="flex items-center gap-1 font-medium" style={{ color: CHART_COLORS.pressure }}>
+        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.pressure }} />
+        {t('shotCharts.pressure')}: {fmt(point?.pressure)}
+      </span>
+      <span className="flex items-center gap-1 font-medium" style={{ color: CHART_COLORS.flow }}>
+        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.flow }} />
+        {t('shotCharts.flow')}: {fmt(point?.flow)}
+      </span>
+      <span className="flex items-center gap-1 font-medium" style={{ color: CHART_COLORS.weight }}>
+        <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.weight }} />
+        {t('shotCharts.weight')}: {fmt(point?.weight)}
+      </span>
+      {hasGravFlow && (
+        <span className="flex items-center gap-1 font-medium" style={{ color: CHART_COLORS.gravimetricFlow }}>
+          <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS.gravimetricFlow }} />
+          Grav. Flow: {fmt(point?.gravimetricFlow)}
+        </span>
+      )}
+    </div>
+  )
+}
+
 interface ReplayChartProps {
   displayData: ChartDataPoint[]
   displayStageRanges: StageRange[]
@@ -69,6 +121,7 @@ interface ReplayChartProps {
   hasGravFlow: boolean
   isShowingReplay: boolean
   currentTime: number
+  readoutPoint?: ChartDataPoint
   isPlaying: boolean
   playbackSpeed: number
   isDark: boolean
@@ -85,6 +138,7 @@ export function ReplayChart({
   hasGravFlow,
   isShowingReplay,
   currentTime,
+  readoutPoint,
   isPlaying,
   playbackSpeed,
   isDark,
@@ -123,7 +177,7 @@ export function ReplayChart({
               <XAxis dataKey="time" stroke={theme.axisStroke} fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
               <YAxis yAxisId="left" stroke={theme.axisStroke} fontSize={10} domain={[0, maxLeftAxis]} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} width={35} allowDataOverflow={true} />
               <YAxis yAxisId="right" orientation="right" stroke={theme.axisStroke} fontSize={10} domain={[0, maxRightAxis]} axisLine={{ stroke: theme.axisLineStroke }} tickLine={{ stroke: theme.axisLineStroke }} width={35} allowDataOverflow={true} />
-              <Tooltip content={<CustomTooltip />} />
+              {!isShowingReplay && <Tooltip content={<CustomTooltip />} />}
               <Line yAxisId="left" type="monotone" dataKey="pressure" stroke={CHART_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure (bar)" legendType="none" isAnimationActive={false} />
               <Line yAxisId="left" type="monotone" dataKey="flow" stroke={CHART_COLORS.flow} strokeWidth={2} dot={false} name="Flow (ml/s)" legendType="none" isAnimationActive={false} />
               <Line yAxisId="right" type="monotone" dataKey="weight" stroke={CHART_COLORS.weight} strokeWidth={2} dot={false} name="Weight (g)" legendType="none" isAnimationActive={false} />
@@ -132,6 +186,14 @@ export function ReplayChart({
           </ResponsiveContainer>
         </div>
       </div>
+      {/* Live values readout — always visible so the row never disappears at
+          the start/end of a scrub (which caused the layout to jump). Follows
+          the current scrub position; shows the resting shot values otherwise. */}
+      <ReplayValuesReadout
+        point={readoutPoint ?? displayData[displayData.length - 1]}
+        currentTime={Math.max(0, Math.min(currentTime, dataMaxTime))}
+        hasGravFlow={hasGravFlow}
+      />
       {/* Grouped Legend: Shot + Stages */}
       <div className="space-y-1.5 pt-1">
         {/* Shot lines */}
@@ -176,6 +238,51 @@ interface CombinedDataPoint {
   weightB?: number
 }
 
+// Fixed A/B values readout rendered outside the comparison plot during replay,
+// so the floating tooltip never covers the curves/legend (issue #493 follow-up).
+function CompareValuesReadout({
+  point,
+  currentTime,
+}: {
+  point?: CombinedDataPoint
+  currentTime: number
+}) {
+  const { t } = useTranslation()
+  const fmt = (v?: number) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(1) : '–')
+  const metric = (label: string, value?: number, color?: string) => (
+    <span className="flex items-center gap-1 font-medium" style={{ color }}>
+      <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+      {label}: {fmt(value)}
+    </span>
+  )
+  return (
+    <div
+      className="space-y-1 pt-1 text-xs tabular-nums"
+      role="status"
+      aria-live="polite"
+      aria-label={t('shotCharts.currentValues')}
+    >
+      <div className="flex items-center justify-center">
+        <span className="font-semibold text-foreground">
+          {t('shotCharts.tooltipTime')}: {currentTime.toFixed(1)}s
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+        <span className="font-semibold text-foreground">{t('shotCharts.shotASolid')}:</span>
+        {metric(t('shotCharts.pressure'), point?.pressureA, COMPARISON_COLORS.pressure)}
+        {metric(t('shotCharts.flow'), point?.flowA, COMPARISON_COLORS.flow)}
+        {metric(t('shotCharts.weight'), point?.weightA, COMPARISON_COLORS.weight)}
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 opacity-70">
+        <span className="font-semibold text-foreground">{t('shotCharts.shotBDashed')}:</span>
+        {metric(t('shotCharts.pressure'), point?.pressureB, COMPARISON_COLORS.pressure)}
+        {metric(t('shotCharts.flow'), point?.flowB, COMPARISON_COLORS.flow)}
+        {metric(t('shotCharts.weight'), point?.weightB, COMPARISON_COLORS.weight)}
+      </div>
+    </div>
+  )
+}
+
 interface CompareChartProps {
   combinedData: CombinedDataPoint[]
   dataMaxTime: number
@@ -207,6 +314,8 @@ export function CompareChart({
   const padding = isMobile ? 'p-1' : 'p-2'
   const theme = getChartTheme(isDark)
   const displayData = isShowingReplay ? combinedData.filter(d => d.time <= comparisonCurrentTime) : combinedData
+  const readoutTime = Math.max(0, Math.min(comparisonCurrentTime, dataMaxTime))
+  const readoutPoint = pointAtTime(combinedData, readoutTime)
   
   return (
     <>
@@ -231,7 +340,7 @@ export function CompareChart({
               <XAxis dataKey="time" stroke={theme.axisStroke} fontSize={10} tickFormatter={(v) => `${Math.round(v)}s`} domain={[0, dataMaxTime]} type="number" allowDataOverflow={false} />
               <YAxis yAxisId="left" stroke={theme.axisStroke} fontSize={10} domain={[0, leftDomain]} width={30} allowDataOverflow={true} />
               <YAxis yAxisId="right" orientation="right" stroke={theme.axisStroke} fontSize={10} domain={[0, rightDomain]} width={30} allowDataOverflow={true} />
-              <Tooltip content={<CustomTooltip />} />
+              {!isShowingReplay && <Tooltip content={<CustomTooltip />} />}
               <Legend wrapperStyle={{ fontSize: '9px', paddingTop: '4px' }} iconSize={7} />
               <Line yAxisId="left" type="monotone" dataKey="pressureA" stroke={COMPARISON_COLORS.pressure} strokeWidth={2} dot={false} name="Pressure A" isAnimationActive={false} />
               <Line yAxisId="left" type="monotone" dataKey="flowA" stroke={COMPARISON_COLORS.flow} strokeWidth={2} dot={false} name="Flow A" isAnimationActive={false} />
@@ -243,6 +352,12 @@ export function CompareChart({
           </ResponsiveContainer>
         </div>
       </div>
+      {/* Live A/B values readout — always visible so the row never disappears
+          at the start/end of a scrub (which caused the layout to jump). */}
+      <CompareValuesReadout
+        point={readoutPoint}
+        currentTime={readoutTime}
+      />
       <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary rounded" /> {t('shotCharts.shotASolid')}</span>
         <span className="flex items-center gap-1"><div className="w-4 h-0.5 bg-primary/50 rounded border-dashed" /> {t('shotCharts.shotBDashed')}</span>

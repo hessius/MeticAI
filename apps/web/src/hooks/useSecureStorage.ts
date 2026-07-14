@@ -36,17 +36,19 @@ export function useSecureStorage() {
         localStorage.setItem(key, value)
         return
       }
-      // On native: write to Keychain AND mirror to localStorage
-      // so synchronous readers (BrowserAIService, App.tsx) can find it.
-      try {
-        await SecureStorage.setItem(key, value)
-      } catch {
-        // Keychain write failed — non-critical
-      }
+      // On native: mirror to localStorage FIRST (synchronous) so synchronous
+      // readers (BrowserAIService, App.tsx AI-gate) can find the value
+      // immediately, even if the native Keychain write below is slow, throws,
+      // or hangs. The Keychain write is best-effort persistence on top.
       try {
         localStorage.setItem(key, value)
       } catch {
         // localStorage fallback — non-critical
+      }
+      try {
+        await SecureStorage.setItem(key, value)
+      } catch {
+        // Keychain write failed — non-critical
       }
     },
     [isNative],

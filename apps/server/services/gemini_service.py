@@ -22,12 +22,17 @@ _DEFAULT_MODEL = "gemini-2.5-flash"
 
 
 def get_model_name() -> str:
-    """Return the configured Gemini model name, resolved at call time.
+    """Return the configured model name for the active provider, resolved now.
 
-    Reads GEMINI_MODEL from the environment on every call so that
-    hot-reloaded service restarts pick up changes.  Treats blank /
-    whitespace-only values as unset and falls back to the default.
+    For Gemini, reads ``GEMINI_MODEL`` from the environment on every call so
+    that hot-reloaded service restarts pick up changes (blank values fall back
+    to the default). For non-Gemini providers, delegates to the provider
+    registry (``AI_MODEL`` / provider default).
     """
+    from services.ai_providers import get_provider_model, is_gemini_active
+
+    if not is_gemini_active():
+        return get_provider_model()
     value = os.environ.get("GEMINI_MODEL", "").strip()
     return value or _DEFAULT_MODEL
 
@@ -47,7 +52,17 @@ async def validate_model(model_name: str) -> bool:
 
 
 async def get_available_models() -> list[dict]:
-    """Return list of available Gemini models suitable for text generation."""
+    """Return list of available models suitable for text generation.
+
+    For non-Gemini providers, delegates to the OpenAI-compatible provider's
+    ``/models`` endpoint; for Gemini, queries the Gemini SDK and filters to
+    text-capable models.
+    """
+    from services.ai_providers import is_gemini_active, list_provider_models
+
+    if not is_gemini_active():
+        return await list_provider_models()
+
     try:
         client = get_gemini_client()
     except ValueError:
@@ -698,18 +713,26 @@ def get_gemini_client() -> genai.Client:
 
 
 def is_ai_available() -> bool:
-    """Return True when Gemini API key is configured."""
-    return bool(os.environ.get("GEMINI_API_KEY", "").strip())
+    """Return True when an API key is configured for the active provider."""
+    from services.ai_providers import is_provider_available
+
+    return is_provider_available()
 
 
 def get_vision_model():
     """Return a wrapper that provides the old model.generate_content() interface.
 
-    This exists for backward compatibility. Callers can do:
+    Routes to the OpenAI-compatible provider when a non-Gemini provider is
+    active, otherwise returns the Gemini SDK wrapper. Both expose the same
+    ``generate_content`` / ``async_generate_content`` interface:
         model = get_vision_model()
         response = model.generate_content([prompt, image])
         text = response.text
     """
+    from services.ai_providers import OpenAICompatModel, is_gemini_active
+
+    if not is_gemini_active():
+        return OpenAICompatModel()
     return _GeminiModelWrapper(get_gemini_client())
 
 

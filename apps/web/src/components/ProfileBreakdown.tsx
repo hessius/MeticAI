@@ -231,6 +231,12 @@ interface ProfileBreakdownProps {
   disabled?: boolean
   /** Optional action element rendered inline with the title (e.g. edit button) */
   headerAction?: React.ReactNode
+  /**
+   * Runtime/pre-shot mode: hides the variable-issue warnings and the variable
+   * chips (info + adjustable), leaving only the resolved stage breakdown so the
+   * view reads as "exactly what this specific shot will do".
+   */
+  hideVariables?: boolean
 }
 
 function getTypeIcon(type: string) {
@@ -496,7 +502,7 @@ function formatLimits(limits?: StageLimit[], variables?: ProfileVariable[]): str
   }).join(', ')
 }
 
-export function ProfileBreakdown({ profile, className = '', currentStage, editMode, editTemperature, onTemperatureChange, editFinalWeight, onFinalWeightChange, editVariables, onVariableChange, disabled, headerAction }: ProfileBreakdownProps) {
+export function ProfileBreakdown({ profile, className = '', currentStage, editMode, editTemperature, onTemperatureChange, editFinalWeight, onFinalWeightChange, editVariables, onVariableChange, disabled, headerAction, hideVariables }: ProfileBreakdownProps) {
   const { t } = useTranslation()
   const stageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
@@ -651,7 +657,7 @@ export function ProfileBreakdown({ profile, className = '', currentStage, editMo
         )}
         
         {/* Variables */}
-        {hasVariables && (
+        {hasVariables && !hideVariables && (
           <div className="space-y-3">
             {/* Validation Warnings */}
             {warnings.length > 0 && (

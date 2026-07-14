@@ -8,13 +8,18 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build & upload (e.g. v2.5.0). Defaults to the VERSION file.'
+        required: false
+        type: string
 
 permissions:
   contents: write
 
 jobs:
   release-android:
-    name: Build & attach signed APK
+    name: Build & upload signed APK
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -22,13 +27,19 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          # On manual dispatch with a tag, build that release's source so the
+          # APK matches the published code (not the workflow's default ref).
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Resolve release tag
         id: tag
         run: |
           if [ -n "${{ github.event.release.tag_name }}" ]; then
             TAG="${{ github.event.release.tag_name }}"
+          elif [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
           else
             TAG="v$(cat "$GITHUB_WORKSPACE/VERSION")"
           fi
@@ -36,7 +47,7 @@ jobs:
           echo "🏷️ Release tag: $TAG"
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -92,14 +103,14 @@ jobs:
           ls -lh "$DEST"
 
       - name: Upload signed APK as workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: metic-android-release-apk
           path: ${{ env.apk }}
           if-no-files-found: error
 
       - name: Upload APK to release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${{ steps.tag.outputs.tag }}" "$apk" --clobber --repo "$GITHUB_REPOSITORY"

@@ -33,6 +33,9 @@ interface ShotListProps {
   onBack: () => void
   onSelectShot: (shot: ShotInfo) => void
   onRefresh: () => void
+  hasMore?: boolean
+  isLoadingMore?: boolean
+  onLoadMore?: () => void
 }
 
 export function ShotList({
@@ -46,6 +49,9 @@ export function ShotList({
   onBack,
   onSelectShot,
   onRefresh,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
 }: ShotListProps) {
   const { t } = useTranslation()
 
@@ -195,6 +201,25 @@ export function ShotList({
               ))}
             </AnimatePresence>
           </div>
+        )}
+
+        {/* Load more */}
+        {!isLoading && hasMore && onLoadMore && (
+          <Button
+            variant="secondary"
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+            className="w-full h-9 text-sm font-medium"
+          >
+            {isLoadingMore ? (
+              <>
+                <ArrowsCounterClockwise size={16} weight="bold" className="mr-2 animate-spin" />
+                {t('shotHistory.loadingMore')}
+              </>
+            ) : (
+              t('shotHistory.loadMore')
+            )}
+          </Button>
         )}
         
         {/* Last Updated & Refresh */}

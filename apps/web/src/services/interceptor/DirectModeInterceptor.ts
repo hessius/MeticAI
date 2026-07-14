@@ -1,11 +1,19 @@
 import { STORAGE_KEYS } from '@/lib/constants'
-import { createBrowserAIService, generateTextWithRetry } from '@/services/ai/BrowserAIService'
+import { createBrowserAIService } from '@/services/ai/BrowserAIService'
+import { getActiveProviderId, getActiveHostedProviderId, getProvider, getProviderForMethod, getProviderModel, isAIConfigured, needsCompactPrompt, PROVIDERS } from '@/services/ai/providers'
 import { retryWithBackoff, formatGeminiError } from '@/services/ai/retryUtils'
+import { AIServiceError } from '@/services/ai/aiErrors'
 import { isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
 import { CapacitorHttp } from '@capacitor/core'
 import { getDirectRequestContext, isMeticAIProxyApiPath, jsonResponse } from './directModeHttp'
 import { deriveStructuralTags } from '@/lib/profileAnalysis'
 import type { AnalyzableProfile } from '@/lib/profileAnalysis'
+import { AI_TAGS_PROMPT, parseAiTags, stripTagsLine } from '@/lib/tags'
+import { resolveDescriptionPlaceholders, type ProfileVariable } from '@/lib/descriptionText'
+import { buildShotFacts } from '@/lib/shotFacts'
+import { lintShotAnalysis, repairShotAnalysis, validateAgainstFacts, checkStructure } from '@/lib/analysisLint'
+import { buildAnalyzeLlmPrompt } from './analyzeLlmPrompt'
+import { buildTasteContext } from '../ai/prompts'
 import {
   addDirectDialInIteration,
   clearDirectHistory,
@@ -57,6 +65,17 @@ interface MachineHistoryEntry {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * Provider-aware "not configured" message. The single API-key field auto-detects
+ * the provider, so the error must name the *active* provider (e.g. OpenAI) rather
+ * than always blaming Gemini. On-device AI has no key, so it gets its own copy.
+ */
+function aiNotConfiguredMessage(): string {
+  const id = getActiveProviderId()
+  if (id === 'local') return 'On-device AI is not available on this device.'
+  return `${PROVIDERS[id].label} API key not configured. Please set your API key in Settings.`
 }
 
 function normalizeProfileIdent(value: unknown): CachedProfile | null {
@@ -371,6 +390,67 @@ function resolveProfileValue(value: unknown, variables: Array<Record<string, unk
 }
 
 /**
+ * Mean of a pressure/flow stage's resolved dynamics setpoints — the intended
+ * scalar target (bar or ml/s) consumed by shotFacts.curveAdherence. Returns
+ * null for non-pressure/flow stages or when no numeric setpoints exist.
+ * Mirror of the server analysis_service._mean_dynamics_target — keep in sync.
+ */
+function meanDynamicsTarget(
+  stageType: string,
+  points: unknown,
+  variables: Array<Record<string, unknown>>,
+): number | null {
+  if (stageType !== 'pressure' && stageType !== 'flow') return null
+  if (!Array.isArray(points)) return null
+  const values: number[] = []
+  for (const point of points) {
+    if (!Array.isArray(point) || point.length === 0) continue
+    const raw = point.length > 1 ? point[1] : point[0]
+    let resolved: unknown = raw
+    if (typeof raw === 'string' && raw.startsWith('$')) {
+      const key = raw.slice(1)
+      const variable = variables.find((item) => item.key === key || item.name === key)
+      resolved = variable?.value
+    }
+    const num = typeof resolved === 'number' ? resolved : Number(resolved)
+    if (Number.isFinite(num)) values.push(num)
+  }
+  if (values.length === 0) return null
+  return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 100) / 100
+}
+
+/**
+ * Peak of a pressure/flow stage's resolved dynamics setpoints (#423).
+ *
+ * Feeds effectiveControlMode() so an aggressive flow stage paired with a
+ * pressure limit can be recognised as effectively pressure-controlled.
+ * Mirror of the server _max_dynamics_target — keep the two in sync.
+ */
+function maxDynamicsTarget(
+  stageType: string,
+  points: unknown,
+  variables: Array<Record<string, unknown>>,
+): number | null {
+  if (stageType !== 'pressure' && stageType !== 'flow') return null
+  if (!Array.isArray(points)) return null
+  const values: number[] = []
+  for (const point of points) {
+    if (!Array.isArray(point) || point.length === 0) continue
+    const raw = point.length > 1 ? point[1] : point[0]
+    let resolved: unknown = raw
+    if (typeof raw === 'string' && raw.startsWith('$')) {
+      const key = raw.slice(1)
+      const variable = variables.find((item) => item.key === key || item.name === key)
+      resolved = variable?.value
+    }
+    const num = typeof resolved === 'number' ? resolved : Number(resolved)
+    if (Number.isFinite(num)) values.push(num)
+  }
+  if (values.length === 0) return null
+  return Math.round(Math.max(...values) * 100) / 100
+}
+
+/**
  * Build target-curve points for a time-based, multi-point stage.
  *
  * Dynamics point x-values are absolute seconds measured from the start of the
@@ -602,6 +682,404 @@ function generateShotAlignedTargetCurves(
   return curves.sort((a, b) => safeNumber(a.time) - safeNumber(b.time))
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type HistStage = { name: string; type: string; key?: string; dynamics?: any; dynamics_points?: any; dynamics_over?: any; exit_triggers?: any[]; limits?: any[] }
+type HistVar = { key: string; name: string; type: string; value: number }
+type HistEntry = {
+  id: string; time: number; name: string; file?: string;
+  profile?: { name?: string; final_weight?: number; temperature?: number; stages?: HistStage[]; variables?: HistVar[] };
+  data?: { shot?: { pressure?: number; flow?: number; weight?: number; gravimetric_flow?: number }; time?: number; profile_time?: number; status?: string }[];
+}
+
+export function computeRichLocalAnalysis(entry: HistEntry, profileName: string) {
+          // ── Helper functions (matching server analysis_service.py) ──
+
+          const _sf = (v: unknown, d = 0): number => {
+            if (v == null) return d
+            const n = Number(v)
+            return Number.isFinite(n) ? n : d
+          }
+          const _round1 = (v: number) => Math.round(v * 10) / 10
+
+          const _resolveVar = (val: unknown, vars: HistVar[]): number => {
+            if (typeof val === 'string' && val.startsWith('$')) {
+              const key = val.slice(1)
+              const v = vars.find(x => x.key === key)
+              return v ? _sf(v.value) : 0
+            }
+            return _sf(val)
+          }
+
+          const FLOW_IGNORE_WINDOW = 3.5
+          const PREINFUSION_KW = ['bloom', 'soak', 'preinfusion', 'pre-infusion', 'pre infusion', 'wet', 'fill', 'landing']
+
+          // ── Extract per-stage telemetry ──
+          const pts = entry.data ?? []
+          type StageStats = {
+            startTime: number; endTime: number; duration: number
+            startWeight: number; endWeight: number
+            startPressure: number; endPressure: number; avgPressure: number; maxPressure: number; minPressure: number
+            startFlow: number; endFlow: number; avgFlow: number; maxFlow: number
+            boundaryPressure?: number; boundaryFlow?: number; boundaryWeight?: number; boundaryTime?: number
+          }
+          const shotStages = new Map<string, StageStats>()
+          {
+            let curStage: string | null = null
+            let stagePts: typeof pts = []
+            const flush = () => {
+              if (!curStage || stagePts.length === 0) return
+              const times = stagePts.map(p => (p.time ?? 0) / 1000)
+              const prs = stagePts.map(p => p.shot?.pressure ?? 0)
+              const wts = stagePts.map(p => p.shot?.weight ?? 0)
+              const fls = stagePts.map(p => p.shot?.flow ?? 0)
+              const flsFiltered = stagePts.filter(p => (p.time ?? 0) / 1000 >= FLOW_IGNORE_WINDOW).map(p => p.shot?.flow ?? 0)
+              const flowSrc = flsFiltered.length > 0 ? flsFiltered : fls
+              shotStages.set(curStage, {
+                startTime: Math.min(...times), endTime: Math.max(...times),
+                duration: Math.max(...times) - Math.min(...times),
+                startWeight: wts[0], endWeight: wts[wts.length - 1],
+                startPressure: prs[0], endPressure: prs[prs.length - 1],
+                avgPressure: prs.reduce((a, b) => a + b, 0) / prs.length,
+                maxPressure: Math.max(...prs), minPressure: Math.min(...prs),
+                startFlow: fls[0], endFlow: fls[fls.length - 1],
+                avgFlow: flowSrc.reduce((a, b) => a + b, 0) / flowSrc.length,
+                maxFlow: Math.max(...flowSrc),
+              })
+            }
+            for (const pt of pts) {
+              const st = (pt.status ?? '').trim()
+              if (!st || st.toLowerCase() === 'retracting') continue
+              if (st !== curStage) { flush(); curStage = st; stagePts = [] }
+              stagePts.push(pt)
+            }
+            flush()
+          }
+
+          // Attach boundary (transition) values. The machine flips a sample's
+          // status to the next stage on the control tick where the current
+          // stage's exit condition becomes true, so the sample that satisfies a
+          // rising pressure/flow trigger is labeled as the FIRST sample of the
+          // next stage. Expose it (the next stage's start_* values) so exit
+          // evaluation credits the stage for the value that ended it; otherwise
+          // a stage that exits exactly when its target is reached is falsely
+          // assessed as "failed".
+          {
+            const ordered = [...shotStages.entries()]
+            for (let i = 0; i < ordered.length - 1; i++) {
+              const cur = ordered[i][1]
+              const nxt = ordered[i + 1][1]
+              cur.boundaryPressure = nxt.startPressure
+              cur.boundaryFlow = nxt.startFlow
+              cur.boundaryWeight = nxt.startWeight
+              cur.boundaryTime = nxt.startTime
+            }
+          }
+
+          // ── Overall metrics ──
+          let maxPressure = 0, maxFlow = 0
+          for (const pt of pts) {
+            if ((pt.shot?.pressure ?? 0) > maxPressure) maxPressure = pt.shot?.pressure ?? 0
+            const t = (pt.time ?? 0) / 1000
+            if (t >= FLOW_IGNORE_WINDOW && (pt.shot?.flow ?? 0) > maxFlow) maxFlow = pt.shot?.flow ?? 0
+          }
+          const lastPt = pts[pts.length - 1]
+          const finalWeight = lastPt?.shot?.weight ?? entry.profile?.final_weight ?? 0
+          const totalTime = lastPt ? (lastPt.profile_time ?? lastPt.time ?? 0) / 1000 : 0
+          const targetWeight = entry.profile?.final_weight ?? null
+
+          // ── Format helpers ──
+          const vars = entry.profile?.variables ?? []
+          const unitMap: Record<string, string> = { time: 's', weight: 'g', pressure: 'bar', flow: 'ml/s' }
+          const compMap: Record<string, string> = { '>=': '≥', '<=': '≤', '>': '>', '<': '<', '==': '=' }
+
+          // Profiles come in two shapes: a flat one (dynamics_points/dynamics_over)
+          // and the canonical nested one (dynamics.points/dynamics.over). Read
+          // both so curve-adherence deltas and #423 effective-mode detection work
+          // for every profile (e.g. "Slayer at Home", which is nested). Mirror of
+          // the server _stage_dynamics helper.
+          const stageDynamicsPoints = (stage: HistStage): any[] => {
+            if (Array.isArray(stage.dynamics_points)) return stage.dynamics_points
+            if (Array.isArray(stage.dynamics?.points)) return stage.dynamics.points
+            return []
+          }
+          const stageDynamicsOver = (stage: HistStage): string => {
+            if (typeof stage.dynamics_over === 'string') return stage.dynamics_over
+            if (typeof stage.dynamics?.over === 'string') return stage.dynamics.over
+            return 'time'
+          }
+
+          const fmtDynamics = (stage: HistStage): string => {
+            const dp = stageDynamicsPoints(stage)
+            if (!dp.length) return `${stage.type} stage`
+            const unit = stage.type === 'pressure' ? 'bar' : 'ml/s'
+            if (dp.length === 1) {
+              const v = _resolveVar(dp[0][1] ?? dp[0][0], vars)
+              return `Constant ${stage.type} at ${v} ${unit}`
+            }
+            if (dp.length === 2) {
+              const sy = _resolveVar(dp[0][1], vars), ey = _resolveVar(dp[1][1], vars), ex = _sf(dp[1][0])
+              const ou = stageDynamicsOver(stage) === 'time' ? 's' : 'g'
+              if (sy === ey) return `Constant ${stage.type} at ${sy} ${unit} for ${ex}${ou}`
+              const dir = ey > sy ? 'ramp up' : 'ramp down'
+              return `${stage.type[0].toUpperCase() + stage.type.slice(1)} ${dir} from ${sy} to ${ey} ${unit} over ${ex}${ou}`
+            }
+            const vals = dp.map((p: number[]) => _resolveVar(p[1], vars))
+            return `${stage.type[0].toUpperCase() + stage.type.slice(1)} curve: ${vals.join(' → ')} ${unit}`
+          }
+
+          const fmtTriggers = (triggers: any[]) => triggers.map((t: any) => {
+            const v = _resolveVar(t.value, vars)
+            const c = compMap[t.comparison] ?? t.comparison
+            const u = unitMap[t.type] ?? ''
+            return { type: t.type, value: v, comparison: t.comparison, description: `${t.type} ${c} ${v}${u}` }
+          })
+
+          const fmtLimits = (limits: any[]) => limits.map((l: any) => {
+            const v = _resolveVar(l.value, vars)
+            const u = unitMap[l.type] ?? ''
+            return { type: l.type, value: v, description: `Limit ${l.type} to ${v}${u}` }
+          })
+
+          // ── Stage analysis ──
+          const profileStages = entry.profile?.stages ?? []
+          const stageAnalyses: any[] = []
+          const unreachedStages: string[] = []
+          let preinfusionTime = 0
+          const preinfusionStages: string[] = []
+
+          for (const ps of profileStages) {
+            const stageName = (ps.name ?? '').trim()
+            const stageType = ps.type ?? 'unknown'
+            // Match shot stage by name (trimmed, case-insensitive)
+            let shotData: StageStats | undefined
+            for (const [k, v] of shotStages) {
+              if (k.trim().toLowerCase() === stageName.toLowerCase()) { shotData = v; break }
+            }
+
+            const profileTarget = fmtDynamics(ps)
+            const exitTriggers = fmtTriggers(ps.exit_triggers ?? [])
+            const limits = fmtLimits(ps.limits ?? [])
+            const executed = !!shotData
+
+            const stageResult: any = {
+              stage_name: stageName,
+              stage_key: (ps.key ?? stageName).toLowerCase().replace(/\s+/g, '_'),
+              stage_type: stageType,
+              profile_target: profileTarget,
+              profile_target_value: meanDynamicsTarget(
+                stageType,
+                stageDynamicsPoints(ps),
+                vars as Array<Record<string, unknown>>,
+              ),
+              profile_max_target: maxDynamicsTarget(
+                stageType,
+                stageDynamicsPoints(ps),
+                vars as Array<Record<string, unknown>>,
+              ),
+              exit_triggers: exitTriggers,
+              limits,
+              executed,
+              execution_data: null,
+              exit_trigger_result: null,
+              limit_hit: null,
+              assessment: null,
+            }
+
+            if (!executed) {
+              unreachedStages.push(stageName)
+              stageResult.assessment = { status: 'not_reached', message: 'This stage was never executed during the shot' }
+              stageAnalyses.push(stageResult)
+              continue
+            }
+
+            const sd = shotData!
+            const wGain = sd.endWeight - sd.startWeight
+            // Execution description
+            const descParts: string[] = []
+            const pDelta = sd.endPressure - sd.startPressure
+            if (Math.abs(pDelta) > 0.5) {
+              descParts.push(pDelta > 0
+                ? `Pressure rose from ${_round1(sd.startPressure)} to ${_round1(sd.endPressure)} bar`
+                : `Pressure declined from ${_round1(sd.startPressure)} to ${_round1(sd.endPressure)} bar`)
+            } else if (sd.maxPressure > 0) {
+              descParts.push(`Pressure held around ${_round1((sd.startPressure + sd.endPressure) / 2)} bar`)
+            }
+            const fDelta = sd.endFlow - sd.startFlow
+            if (Math.abs(fDelta) > 0.3) {
+              descParts.push(fDelta > 0
+                ? `Flow increased from ${_round1(sd.startFlow)} to ${_round1(sd.endFlow)} ml/s`
+                : `Flow decreased from ${_round1(sd.startFlow)} to ${_round1(sd.endFlow)} ml/s`)
+            } else if (sd.maxFlow > 0) {
+              descParts.push(`Flow steady at ${_round1((sd.startFlow + sd.endFlow) / 2)} ml/s`)
+            }
+            if (wGain > 1) descParts.push(`extracted ${_round1(wGain)}g`)
+            if (sd.duration > 0) descParts.push(`over ${_round1(sd.duration)}s`)
+            const execDesc = descParts.length > 0 ? descParts.join(', ').replace(/^./, c => c.toUpperCase()) : `Stage executed for ${_round1(sd.duration)}s`
+
+            stageResult.execution_data = {
+              duration: _round1(sd.duration), weight_gain: _round1(wGain),
+              start_weight: _round1(sd.startWeight), end_weight: _round1(sd.endWeight),
+              start_pressure: _round1(sd.startPressure), end_pressure: _round1(sd.endPressure),
+              avg_pressure: _round1(sd.avgPressure), max_pressure: _round1(sd.maxPressure), min_pressure: _round1(sd.minPressure),
+              start_flow: _round1(sd.startFlow), end_flow: _round1(sd.endFlow),
+              avg_flow: _round1(sd.avgFlow), max_flow: _round1(sd.maxFlow),
+              description: execDesc,
+            }
+
+            // Determine exit trigger hit
+            if (ps.exit_triggers?.length) {
+              let triggered: any = null
+              const notTriggered: any[] = []
+              for (const tr of ps.exit_triggers) {
+                const tType = tr.type ?? ''
+                const tVal = _resolveVar(tr.value, vars)
+                const comp = tr.comparison ?? '>='
+                let actual = 0
+                let boundaryActual: number | undefined
+                if (tType === 'time') {
+                  actual = sd.duration
+                  if (sd.boundaryTime !== undefined) boundaryActual = sd.boundaryTime - sd.startTime
+                } else if (tType === 'weight') {
+                  actual = sd.endWeight
+                  boundaryActual = sd.boundaryWeight
+                } else if (tType === 'pressure') {
+                  actual = comp === '>=' || comp === '>' ? sd.maxPressure : sd.endPressure
+                  boundaryActual = sd.boundaryPressure
+                } else if (tType === 'flow') {
+                  actual = comp === '>=' || comp === '>' ? sd.maxFlow : sd.endFlow
+                  boundaryActual = sd.boundaryFlow
+                }
+                const tol = (tType === 'time' || tType === 'weight') ? 0.5 : 0.2
+                const evalHit = (a: number) => {
+                  if (comp === '>=') return a >= tVal - tol
+                  if (comp === '>') return a > tVal
+                  if (comp === '<=') return a <= tVal + tol
+                  if (comp === '<') return a < tVal
+                  return false
+                }
+                let hit = evalHit(actual)
+                // The machine advances stages on the tick where the exit
+                // condition fires, so the satisfying sample is labeled as the
+                // next stage. If the in-stage value falls short, rescue the
+                // trigger with that transition (boundary) value rather than
+                // falsely reporting the stage as failed.
+                if (!hit && boundaryActual !== undefined && evalHit(boundaryActual)) {
+                  actual = boundaryActual
+                  hit = true
+                }
+                const u = unitMap[tType] ?? ''
+                const info = { type: tType, target: tVal, actual: _round1(actual), description: `${tType} >= ${tVal}${u}` }
+                if (hit && !triggered) triggered = info
+                else if (!hit) notTriggered.push(info)
+              }
+              stageResult.exit_trigger_result = { triggered, not_triggered: notTriggered }
+            }
+
+            // Limit hit check
+            for (const lim of (ps.limits ?? [])) {
+              const lType = lim.type ?? ''
+              const lVal = _resolveVar(lim.value, vars)
+              let actual = 0
+              if (lType === 'flow') actual = sd.maxFlow
+              else if (lType === 'pressure') actual = sd.maxPressure
+              else if (lType === 'time') actual = sd.duration
+              else if (lType === 'weight') actual = sd.endWeight
+              const u = unitMap[lType] ?? ''
+              if (actual >= lVal - 0.2) {
+                stageResult.limit_hit = { type: lType, limit_value: lVal, actual_value: _round1(actual), description: `Hit ${lType} limit of ${lVal}${u}` }
+                break
+              }
+            }
+
+            // Assessment
+            const etr = stageResult.exit_trigger_result
+            if (etr?.triggered) {
+              stageResult.assessment = stageResult.limit_hit
+                ? { status: 'hit_limit', message: `Stage exited but hit a limit (${stageResult.limit_hit.description})` }
+                : { status: 'reached_goal', message: `Exited via: ${etr.triggered.description}` }
+            } else if (etr && etr.not_triggered?.length) {
+              stageResult.assessment = { status: 'failed', message: 'Stage ended before exit triggers were satisfied' }
+            } else {
+              stageResult.assessment = { status: 'executed', message: 'Stage executed (no exit triggers defined)' }
+            }
+
+            stageAnalyses.push(stageResult)
+
+            // Pre-infusion tracking
+            const nl = stageName.toLowerCase()
+            if (PREINFUSION_KW.some(kw => nl.includes(kw))) {
+              preinfusionTime += sd.duration
+              preinfusionStages.push(stageName)
+            }
+          }
+
+          const preinfusionWeight = (() => {
+            let w = 0
+            for (const ps2 of profileStages) {
+              const sn = (ps2.name ?? '').trim().toLowerCase()
+              if (!PREINFUSION_KW.some(kw => sn.includes(kw))) continue
+              for (const [k, v] of shotStages) {
+                if (k.trim().toLowerCase() === sn) { w += Math.max(0, v.endWeight - v.startWeight); break }
+              }
+            }
+            return w
+          })()
+
+          const analysis = {
+            shot_summary: {
+              final_weight: _round1(finalWeight),
+              target_weight: targetWeight,
+              total_time: _round1(totalTime),
+              max_pressure: _round1(maxPressure),
+              max_flow: _round1(maxFlow),
+            },
+            weight_analysis: {
+              status: targetWeight
+                ? Math.abs(finalWeight - targetWeight) / targetWeight < 0.05 ? 'on_target'
+                  : finalWeight < targetWeight ? 'under' : 'over'
+                : 'on_target',
+              target: targetWeight,
+              actual: _round1(finalWeight),
+              deviation_percent: targetWeight
+                ? Math.round(((finalWeight - targetWeight) / targetWeight) * 1000) / 10
+                : 0,
+            },
+            stage_analyses: stageAnalyses,
+            unreached_stages: unreachedStages,
+            preinfusion_summary: {
+              stages: preinfusionStages,
+              total_time: _round1(preinfusionTime),
+              proportion_of_shot: totalTime > 0 ? _round1(preinfusionTime / totalTime * 100) : 0,
+              weight_accumulated: _round1(preinfusionWeight),
+              weight_percent_of_total: finalWeight > 0 ? _round1(preinfusionWeight / finalWeight * 100) : 0,
+              issues: [],
+              recommendations: [],
+            },
+            profile_info: {
+              name: profileName,
+              temperature: entry.profile?.temperature ?? null,
+              stage_count: profileStages.length,
+            },
+            profile_target_curves: (() => {
+              // Generate shot-aligned target curves from profile dynamics
+              if (!entry.profile) return []
+              const stageTimings = new Map<string, { startTime: number; endTime: number }>()
+              for (const [name, stats] of shotStages) {
+                stageTimings.set(name, { startTime: stats.startTime, endTime: stats.endTime })
+              }
+              return generateShotAlignedTargetCurves(
+                entry.profile as unknown as CachedProfile,
+                stageTimings,
+                pts as unknown as Array<Record<string, unknown>>,
+              )
+            })(),
+          }
+          ;(analysis as Record<string, unknown>).shot_facts = buildShotFacts(analysis as Parameters<typeof buildShotFacts>[0])
+
+  return analysis
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 type ProfileFingerprint = {
   controlMode: 'pressure' | 'flow' | 'mixed' | 'unknown'
   techniqueTags: Set<string>
@@ -799,10 +1277,27 @@ function parseRecommendationsJson(analysisText: string): Array<Record<string, un
   if (!match) return []
   try {
     const parsed = JSON.parse(match[1])
-    return Array.isArray(parsed) ? parsed.filter(isRecord) : []
+    return Array.isArray(parsed) ? parsed.filter(isRecord).filter(isActionableRecommendation) : []
   } catch {
     return []
   }
+}
+
+/**
+ * Drop hallucinated / non-actionable recommendations. Weak on-device models
+ * sometimes emit garbage variable ids (e.g. "flow_0") with NaN values that
+ * render as "adjust from NaN to NaN". A recommendation is only usable if it
+ * names a variable and its numeric values (when present) are finite. Missing
+ * values are treated as 0 (kept, for advisory recommendations).
+ */
+function isActionableRecommendation(rec: Record<string, unknown>): boolean {
+  if (String(rec.variable ?? '').trim() === '') return false
+  for (const key of ['current_value', 'recommended_value'] as const) {
+    const raw = rec[key]
+    if (raw === undefined || raw === null) continue
+    if (!Number.isFinite(Number(raw))) return false
+  }
+  return true
 }
 
 function isRecommendationPatchable(recommendation: Record<string, unknown>, variables: Array<Record<string, unknown>>): boolean {
@@ -860,6 +1355,66 @@ function updateStageValue(
   return { applied: true }
 }
 
+const KNOWN_VARIABLE_TYPES = ['pressure', 'flow', 'temperature', 'weight', 'time', 'volume'] as const
+
+/**
+ * Determine which value type a recommendation's variable refers to. Handles
+ * real keys ("pressure_Max Pressure"), invented positional ids ("pressure_2",
+ * "flow_0") and bare types ("pressure").
+ */
+function variableTypeOf(raw: string): string | null {
+  const lower = raw.trim().toLowerCase()
+  for (const type of KNOWN_VARIABLE_TYPES) {
+    if (lower === type || lower.startsWith(`${type}_`)) return type
+  }
+  return null
+}
+
+/**
+ * Recover the real profile variable a recommendation targets when a model
+ * invents a positional identifier (e.g. "pressure_2" instead of the actual
+ * key "pressure_Max Pressure"). This class of mistake happens across every
+ * model. Matches by value type, disambiguating on the reported current_value
+ * and finally the stage name. Returns null when the match is ambiguous so the
+ * caller can surface a clear "could not resolve" skip instead of guessing.
+ */
+function resolveFuzzyVariable(
+  variables: Array<Record<string, unknown>> | undefined,
+  rawVariable: string,
+  currentValue: unknown,
+  stage: string,
+): Record<string, unknown> | null {
+  if (!Array.isArray(variables) || variables.length === 0) return null
+  const type = variableTypeOf(rawVariable)
+  if (!type) return null
+
+  const adjustable = variables.filter((item) => {
+    const key = String(item.key ?? '')
+    if (key.startsWith('info_') || item.adjustable === false) return false
+    const itemType = String(item.type ?? '').toLowerCase() || variableTypeOf(key)
+    return itemType === type
+  })
+  if (adjustable.length === 0) return null
+  if (adjustable.length === 1) return adjustable[0]
+
+  const cur = optionalNumber(currentValue)
+  if (cur !== null) {
+    const byValue = adjustable.filter((item) => optionalNumber(item.value) === cur)
+    if (byValue.length === 1) return byValue[0]
+  }
+
+  const stageLower = stage.trim().toLowerCase()
+  if (stageLower && stageLower !== 'global') {
+    const byStage = adjustable.filter((item) =>
+      String(item.name ?? '').toLowerCase().includes(stageLower) ||
+      String(item.key ?? '').toLowerCase().includes(stageLower),
+    )
+    if (byStage.length === 1) return byStage[0]
+  }
+  return null
+}
+
+
 
 // ── Exported installer ──────────────────────────────────────────────────────
 
@@ -906,6 +1461,7 @@ export function installDirectModeInterceptor(): void {
         in_history: true,
         has_description: !!(p.display?.description || p.display?.shortDescription),
         derived_tags: deriveStructuralTags(p as AnalyzableProfile),
+        ai_tags: _aiTagsCache.get(p.name) ?? [],
       }))
     }
     try { localStorage.setItem(PROFILE_LIST_CACHE_KEY, JSON.stringify(result)) } catch { /* ignore */ }
@@ -951,6 +1507,29 @@ export function installDirectModeInterceptor(): void {
       const obj: Record<string, string> = {}
       _descriptionCache.forEach((v, k) => { obj[k] = v })
       localStorage.setItem(DESC_CACHE_KEY, JSON.stringify(obj))
+    } catch { /* ignore */ }
+  }
+
+  // ── AI sensory-tag overlay cache (#400) ───────────────────────────────────
+  // Stores AI-inferred sensory tags keyed by profile, persisted alongside the
+  // description overlay and surfaced in the catalogue next to derived_tags.
+  const AI_TAGS_CACHE_KEY = STORAGE_KEYS.AI_TAGS_CACHE
+  const _aiTagsCache = new Map<string, string[]>()
+  try {
+    const stored = localStorage.getItem(AI_TAGS_CACHE_KEY)
+    if (stored) {
+      const parsed: Record<string, string[]> = JSON.parse(stored)
+      for (const [k, v] of Object.entries(parsed)) {
+        if (Array.isArray(v)) _aiTagsCache.set(k, v)
+      }
+    }
+  } catch { /* ignore */ }
+
+  function _persistAiTagsCache() {
+    try {
+      const obj: Record<string, string[]> = {}
+      _aiTagsCache.forEach((v, k) => { obj[k] = v })
+      localStorage.setItem(AI_TAGS_CACHE_KEY, JSON.stringify(obj))
     } catch { /* ignore */ }
   }
 
@@ -1021,6 +1600,35 @@ export function installDirectModeInterceptor(): void {
   }
 
   async function _loadHistory(): Promise<MachineHistoryEntry[]> {
+    // The machine's GET /history short-listing is capped to a small set of the
+    // most-recent shots, which made direct mode show only ~20 shots regardless
+    // of how deep the profile's history went. Use the search endpoint with a
+    // generous max_results (metadata-only, dump_data:false) to retrieve the
+    // full history, falling back to the short-listing if the search fails.
+    try {
+      const searchResponse = await _fetch('/api/v1/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: '',
+          ids: [],
+          start_date: '',
+          end_date: '',
+          order_by: ['date'],
+          sort: 'desc',
+          max_results: 1000,
+          dump_data: false,
+        }),
+      })
+      if (searchResponse.ok) {
+        const raw = await searchResponse.json()
+        const entries = Array.isArray(raw)
+          ? raw as MachineHistoryEntry[]
+          : (isRecord(raw) && Array.isArray(raw.history) ? raw.history as MachineHistoryEntry[] : null)
+        if (entries) return entries
+      }
+    } catch { /* fall through to the short-listing */ }
+
     const response = await _fetch('/api/v1/history')
     if (!response.ok) return []
     const raw = await response.json()
@@ -1725,6 +2333,30 @@ export function installDirectModeInterceptor(): void {
       })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to rename profile' }, 500))
     }
 
+    // POST /api/machine/profiles/order → persist new order via machine settings
+    // The machine stores profile ordering in the `profile_order` user setting
+    // (a list of IDs); /api/v1/profile/list is served in that order.
+    if (url.match(/\/api\/machine\/profiles\/order$/) && method === 'POST') {
+      return (async () => {
+        try {
+          const { order } = await new Response(init?.body || '{}').json() as { order?: unknown }
+          if (!Array.isArray(order) || order.length === 0 || !order.every((id) => typeof id === 'string' && id)) {
+            return jsonResponse({ status: 'error', error: 'order must be a non-empty list of profile IDs' }, 400)
+          }
+          const resp = await _fetch('/api/v1/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile_order: order }),
+          })
+          if (!resp.ok) return jsonResponse({ status: 'error', error: `Machine rejected order (HTTP ${resp.status})` }, 502)
+          _invalidateProfileListCache()
+          return jsonResponse({ status: 'success', order })
+        } catch (err) {
+          return jsonResponse({ status: 'error', error: err instanceof Error ? err.message : 'Failed to reorder profiles' }, 500)
+        }
+      })()
+    }
+
     // DELETE /api/machine/profile/:id → DELETE /api/v1/profile/delete/:id
     const deleteMatch = url.match(/\/api\/machine\/profile\/([^/?]+)$/)
     if (deleteMatch && method === 'DELETE') {
@@ -2010,6 +2642,25 @@ export function installDirectModeInterceptor(): void {
             skipped.push({ variable, reason: limitResult.reason })
             continue
           }
+          // Fuzzy fallback: models routinely invent positional ids like
+          // "pressure_2" / "flow_0" instead of the real variable key. Recover
+          // the intended variable by type + current_value before giving up.
+          const fuzzyVariable = resolveFuzzyVariable(
+            updated.variables,
+            variable,
+            recommendation.current_value,
+            stage,
+          )
+          if (fuzzyVariable) {
+            fuzzyVariable.value = recommendedValue
+            applied.push({
+              variable: String(fuzzyVariable.key ?? variable),
+              stage,
+              value: recommendedValue,
+              matched_from: variable,
+            })
+            continue
+          }
           skipped.push({ variable, reason: 'variable not found in profile' })
         }
 
@@ -2176,8 +2827,25 @@ export function installDirectModeInterceptor(): void {
           display: profile.display,
         }
         if (includeStages) {
-          responseProfile.stages = profile.stages ?? []
-          responseProfile.variables = profile.variables ?? []
+          // The list cache (_findProfileByName) frequently omits stages and
+          // variables, which left the pre-shot breakdown empty and forced the
+          // auto-description to a generic fallback. Fetch the full profile by id
+          // when the cached copy lacks stages so the breakdown + summary match
+          // the server runtime.
+          let stages = Array.isArray(profile.stages) ? profile.stages : []
+          let variables = Array.isArray(profile.variables) ? profile.variables : []
+          if (stages.length === 0) {
+            try {
+              const fullResp = await _fetch(`/api/v1/profile/get/${profile.id}`)
+              if (fullResp.ok) {
+                const full = await fullResp.json() as CachedProfile
+                if (Array.isArray(full?.stages)) stages = full.stages
+                if (Array.isArray(full?.variables)) variables = full.variables
+              }
+            } catch { /* fall back to the cached profile */ }
+          }
+          responseProfile.stages = stages
+          responseProfile.variables = variables
         }
         return jsonResponse({ status: 'success', profile: responseProfile })
       })().catch((err) => jsonResponse({ detail: err instanceof Error ? err.message : 'Failed to get profile info' }, 500))
@@ -2413,10 +3081,16 @@ export function installDirectModeInterceptor(): void {
     const byProfileMatch = url.match(/\/api\/shots\/by-profile\/([^?]+)/)
     if (byProfileMatch) {
       const profileName = decodeURIComponent(byProfileMatch[1])
+      const limitParam = Number(new URL(url, 'http://x').searchParams.get('limit'))
+      const limit = Number.isFinite(limitParam) && limitParam > 0 ? limitParam : 20
       return (async () => {
           const all = await _loadVisibleHistory()
-          const filtered = all.filter(e => getHistoryProfileName(e) === profileName)
-          const shots = filtered.map(e => {
+          const filtered = all
+            .filter(e => getHistoryProfileName(e) === profileName)
+            // Newest first so pagination reveals older shots as the limit grows.
+            .sort((a, b) => (Number(b.time) || 0) - (Number(a.time) || 0))
+          const paged = filtered.slice(0, limit)
+          const shots = paged.map(e => {
             const metrics = getHistoryMetrics(e)
             return {
               date: getHistoryEntryDate(e),
@@ -2427,8 +3101,10 @@ export function installDirectModeInterceptor(): void {
               total_time: metrics.total_time,
             }
           })
-          return jsonResponse({ profile_name: profileName, shots, count: shots.length, limit: 20 })
-      })().catch(() => jsonResponse({ profile_name: profileName, shots: [], count: 0, limit: 20 }))
+          // Mirror the server: count reflects the returned page so the client's
+          // "Load more" (hasMore = count >= requestedLimit) works identically.
+          return jsonResponse({ profile_name: profileName, shots, count: shots.length, limit })
+      })().catch(() => jsonResponse({ profile_name: profileName, shots: [], count: 0, limit }))
     }
 
     // GET /api/shots/data/:date/:filename → /api/v1/history (find entry and convert data)
@@ -2437,12 +3113,12 @@ export function installDirectModeInterceptor(): void {
       const shotDate = decodeURIComponent(shotDataMatch[1])
       const shotFilename = decodeURIComponent(shotDataMatch[2])
       return (async () => {
-          type HistEntry = {
+          type HistDataEntry = {
             id: string; time: number; name: string; file?: string;
             profile?: { name?: string; id?: string; final_weight?: number; temperature?: number; author?: string; stages?: { name: string; type: string; key?: string }[] };
             data?: { shot?: { pressure?: number; flow?: number; weight?: number }; time?: number; profile_time?: number; sensors?: { external_1?: number } }[];
           }
-          const entry = await _findVisibleShot(shotDate, shotFilename) as HistEntry | null
+          const entry = await _findVisibleShot(shotDate, shotFilename) as HistDataEntry | null
           if (!entry) return jsonResponse({ detail: 'Shot not found' }, 404)
           const pts = entry.data ?? []
           const timeArr: number[] = []
@@ -2538,331 +3214,10 @@ export function installDirectModeInterceptor(): void {
           const shotFilename = (body.get('shot_filename') as string) || ''
           const profileName = (body.get('profile_name') as string) || 'Unknown'
 
-          /* eslint-disable @typescript-eslint/no-explicit-any */
-          type HistStage = { name: string; type: string; key?: string; dynamics?: any; exit_triggers?: any[]; limits?: any[] }
-          type HistVar = { key: string; name: string; type: string; value: number }
-          type HistEntry = {
-            id: string; time: number; name: string; file?: string;
-            profile?: { name?: string; final_weight?: number; temperature?: number; stages?: HistStage[]; variables?: HistVar[] };
-            data?: { shot?: { pressure?: number; flow?: number; weight?: number; gravimetric_flow?: number }; time?: number; profile_time?: number; status?: string }[];
-          }
-          /* eslint-enable @typescript-eslint/no-explicit-any */
           const entry = await _findVisibleShot(shotDate, shotFilename) as HistEntry | null
           if (!entry) return jsonResponse({ status: 'error', message: 'Shot not found' })
 
-          // ── Helper functions (matching server analysis_service.py) ──
-
-          const _sf = (v: unknown, d = 0): number => {
-            if (v == null) return d
-            const n = Number(v)
-            return Number.isFinite(n) ? n : d
-          }
-          const _round1 = (v: number) => Math.round(v * 10) / 10
-
-          const _resolveVar = (val: unknown, vars: HistVar[]): number => {
-            if (typeof val === 'string' && val.startsWith('$')) {
-              const key = val.slice(1)
-              const v = vars.find(x => x.key === key)
-              return v ? _sf(v.value) : 0
-            }
-            return _sf(val)
-          }
-
-          const FLOW_IGNORE_WINDOW = 3.5
-          const PREINFUSION_KW = ['bloom', 'soak', 'preinfusion', 'pre-infusion', 'pre infusion', 'wet', 'fill', 'landing']
-
-          // ── Extract per-stage telemetry ──
-          const pts = entry.data ?? []
-          type StageStats = {
-            startTime: number; endTime: number; duration: number
-            startWeight: number; endWeight: number
-            startPressure: number; endPressure: number; avgPressure: number; maxPressure: number; minPressure: number
-            startFlow: number; endFlow: number; avgFlow: number; maxFlow: number
-          }
-          const shotStages = new Map<string, StageStats>()
-          {
-            let curStage: string | null = null
-            let stagePts: typeof pts = []
-            const flush = () => {
-              if (!curStage || stagePts.length === 0) return
-              const times = stagePts.map(p => (p.time ?? 0) / 1000)
-              const prs = stagePts.map(p => p.shot?.pressure ?? 0)
-              const wts = stagePts.map(p => p.shot?.weight ?? 0)
-              const fls = stagePts.map(p => p.shot?.flow ?? 0)
-              const flsFiltered = stagePts.filter(p => (p.time ?? 0) / 1000 >= FLOW_IGNORE_WINDOW).map(p => p.shot?.flow ?? 0)
-              const flowSrc = flsFiltered.length > 0 ? flsFiltered : fls
-              shotStages.set(curStage, {
-                startTime: Math.min(...times), endTime: Math.max(...times),
-                duration: Math.max(...times) - Math.min(...times),
-                startWeight: wts[0], endWeight: wts[wts.length - 1],
-                startPressure: prs[0], endPressure: prs[prs.length - 1],
-                avgPressure: prs.reduce((a, b) => a + b, 0) / prs.length,
-                maxPressure: Math.max(...prs), minPressure: Math.min(...prs),
-                startFlow: fls[0], endFlow: fls[fls.length - 1],
-                avgFlow: flowSrc.reduce((a, b) => a + b, 0) / flowSrc.length,
-                maxFlow: Math.max(...flowSrc),
-              })
-            }
-            for (const pt of pts) {
-              const st = (pt.status ?? '').trim()
-              if (!st || st.toLowerCase() === 'retracting') continue
-              if (st !== curStage) { flush(); curStage = st; stagePts = [] }
-              stagePts.push(pt)
-            }
-            flush()
-          }
-
-          // ── Overall metrics ──
-          let maxPressure = 0, maxFlow = 0
-          for (const pt of pts) {
-            if ((pt.shot?.pressure ?? 0) > maxPressure) maxPressure = pt.shot?.pressure ?? 0
-            const t = (pt.time ?? 0) / 1000
-            if (t >= FLOW_IGNORE_WINDOW && (pt.shot?.flow ?? 0) > maxFlow) maxFlow = pt.shot?.flow ?? 0
-          }
-          const lastPt = pts[pts.length - 1]
-          const finalWeight = lastPt?.shot?.weight ?? entry.profile?.final_weight ?? 0
-          const totalTime = lastPt ? (lastPt.profile_time ?? lastPt.time ?? 0) / 1000 : 0
-          const targetWeight = entry.profile?.final_weight ?? null
-
-          // ── Format helpers ──
-          const vars = entry.profile?.variables ?? []
-          const unitMap: Record<string, string> = { time: 's', weight: 'g', pressure: 'bar', flow: 'ml/s' }
-          const compMap: Record<string, string> = { '>=': '≥', '<=': '≤', '>': '>', '<': '<', '==': '=' }
-
-          const fmtDynamics = (stage: HistStage): string => {
-            const dp = stage.dynamics?.points ?? []
-            if (!dp.length) return `${stage.type} stage`
-            const unit = stage.type === 'pressure' ? 'bar' : 'ml/s'
-            if (dp.length === 1) {
-              const v = _resolveVar(dp[0][1] ?? dp[0][0], vars)
-              return `Constant ${stage.type} at ${v} ${unit}`
-            }
-            if (dp.length === 2) {
-              const sy = _resolveVar(dp[0][1], vars), ey = _resolveVar(dp[1][1], vars), ex = _sf(dp[1][0])
-              const ou = (stage.dynamics?.over ?? 'time') === 'time' ? 's' : 'g'
-              if (sy === ey) return `Constant ${stage.type} at ${sy} ${unit} for ${ex}${ou}`
-              const dir = ey > sy ? 'ramp up' : 'ramp down'
-              return `${stage.type[0].toUpperCase() + stage.type.slice(1)} ${dir} from ${sy} to ${ey} ${unit} over ${ex}${ou}`
-            }
-            const vals = dp.map((p: number[]) => _resolveVar(p[1], vars))
-            return `${stage.type[0].toUpperCase() + stage.type.slice(1)} curve: ${vals.join(' → ')} ${unit}`
-          }
-
-          const fmtTriggers = (triggers: any[]) => triggers.map((t: any) => {
-            const v = _resolveVar(t.value, vars)
-            const c = compMap[t.comparison] ?? t.comparison
-            const u = unitMap[t.type] ?? ''
-            return { type: t.type, value: v, comparison: t.comparison, description: `${t.type} ${c} ${v}${u}` }
-          })
-
-          const fmtLimits = (limits: any[]) => limits.map((l: any) => {
-            const v = _resolveVar(l.value, vars)
-            const u = unitMap[l.type] ?? ''
-            return { type: l.type, value: v, description: `Limit ${l.type} to ${v}${u}` }
-          })
-
-          // ── Stage analysis ──
-          const profileStages = entry.profile?.stages ?? []
-          const stageAnalyses: any[] = []
-          const unreachedStages: string[] = []
-          let preinfusionTime = 0
-          const preinfusionStages: string[] = []
-
-          for (const ps of profileStages) {
-            const stageName = (ps.name ?? '').trim()
-            const stageType = ps.type ?? 'unknown'
-            // Match shot stage by name (trimmed, case-insensitive)
-            let shotData: StageStats | undefined
-            for (const [k, v] of shotStages) {
-              if (k.trim().toLowerCase() === stageName.toLowerCase()) { shotData = v; break }
-            }
-
-            const profileTarget = fmtDynamics(ps)
-            const exitTriggers = fmtTriggers(ps.exit_triggers ?? [])
-            const limits = fmtLimits(ps.limits ?? [])
-            const executed = !!shotData
-
-            const stageResult: any = {
-              stage_name: stageName,
-              stage_key: (ps.key ?? stageName).toLowerCase().replace(/\s+/g, '_'),
-              stage_type: stageType,
-              profile_target: profileTarget,
-              exit_triggers: exitTriggers,
-              limits,
-              executed,
-              execution_data: null,
-              exit_trigger_result: null,
-              limit_hit: null,
-              assessment: null,
-            }
-
-            if (!executed) {
-              unreachedStages.push(stageName)
-              stageResult.assessment = { status: 'not_reached', message: 'This stage was never executed during the shot' }
-              stageAnalyses.push(stageResult)
-              continue
-            }
-
-            const sd = shotData!
-            const wGain = sd.endWeight - sd.startWeight
-            // Execution description
-            const descParts: string[] = []
-            const pDelta = sd.endPressure - sd.startPressure
-            if (Math.abs(pDelta) > 0.5) {
-              descParts.push(pDelta > 0
-                ? `Pressure rose from ${_round1(sd.startPressure)} to ${_round1(sd.endPressure)} bar`
-                : `Pressure declined from ${_round1(sd.startPressure)} to ${_round1(sd.endPressure)} bar`)
-            } else if (sd.maxPressure > 0) {
-              descParts.push(`Pressure held around ${_round1((sd.startPressure + sd.endPressure) / 2)} bar`)
-            }
-            const fDelta = sd.endFlow - sd.startFlow
-            if (Math.abs(fDelta) > 0.3) {
-              descParts.push(fDelta > 0
-                ? `Flow increased from ${_round1(sd.startFlow)} to ${_round1(sd.endFlow)} ml/s`
-                : `Flow decreased from ${_round1(sd.startFlow)} to ${_round1(sd.endFlow)} ml/s`)
-            } else if (sd.maxFlow > 0) {
-              descParts.push(`Flow steady at ${_round1((sd.startFlow + sd.endFlow) / 2)} ml/s`)
-            }
-            if (wGain > 1) descParts.push(`extracted ${_round1(wGain)}g`)
-            if (sd.duration > 0) descParts.push(`over ${_round1(sd.duration)}s`)
-            const execDesc = descParts.length > 0 ? descParts.join(', ').replace(/^./, c => c.toUpperCase()) : `Stage executed for ${_round1(sd.duration)}s`
-
-            stageResult.execution_data = {
-              duration: _round1(sd.duration), weight_gain: _round1(wGain),
-              start_weight: _round1(sd.startWeight), end_weight: _round1(sd.endWeight),
-              start_pressure: _round1(sd.startPressure), end_pressure: _round1(sd.endPressure),
-              avg_pressure: _round1(sd.avgPressure), max_pressure: _round1(sd.maxPressure), min_pressure: _round1(sd.minPressure),
-              start_flow: _round1(sd.startFlow), end_flow: _round1(sd.endFlow),
-              avg_flow: _round1(sd.avgFlow), max_flow: _round1(sd.maxFlow),
-              description: execDesc,
-            }
-
-            // Determine exit trigger hit
-            if (ps.exit_triggers?.length) {
-              let triggered: any = null
-              const notTriggered: any[] = []
-              for (const tr of ps.exit_triggers) {
-                const tType = tr.type ?? ''
-                const tVal = _resolveVar(tr.value, vars)
-                const comp = tr.comparison ?? '>='
-                let actual = 0
-                if (tType === 'time') actual = sd.duration
-                else if (tType === 'weight') actual = sd.endWeight
-                else if (tType === 'pressure') actual = comp === '>=' || comp === '>' ? sd.maxPressure : sd.endPressure
-                else if (tType === 'flow') actual = comp === '>=' || comp === '>' ? sd.maxFlow : sd.endFlow
-                const tol = (tType === 'time' || tType === 'weight') ? 0.5 : 0.2
-                let hit = false
-                if (comp === '>=') hit = actual >= tVal - tol
-                else if (comp === '>') hit = actual > tVal
-                else if (comp === '<=') hit = actual <= tVal + tol
-                else if (comp === '<') hit = actual < tVal
-                const u = unitMap[tType] ?? ''
-                const info = { type: tType, target: tVal, actual: _round1(actual), description: `${tType} >= ${tVal}${u}` }
-                if (hit && !triggered) triggered = info
-                else if (!hit) notTriggered.push(info)
-              }
-              stageResult.exit_trigger_result = { triggered, not_triggered: notTriggered }
-            }
-
-            // Limit hit check
-            for (const lim of (ps.limits ?? [])) {
-              const lType = lim.type ?? ''
-              const lVal = _resolveVar(lim.value, vars)
-              let actual = 0
-              if (lType === 'flow') actual = sd.maxFlow
-              else if (lType === 'pressure') actual = sd.maxPressure
-              else if (lType === 'time') actual = sd.duration
-              else if (lType === 'weight') actual = sd.endWeight
-              const u = unitMap[lType] ?? ''
-              if (actual >= lVal - 0.2) {
-                stageResult.limit_hit = { type: lType, limit_value: lVal, actual_value: _round1(actual), description: `Hit ${lType} limit of ${lVal}${u}` }
-                break
-              }
-            }
-
-            // Assessment
-            const etr = stageResult.exit_trigger_result
-            if (etr?.triggered) {
-              stageResult.assessment = stageResult.limit_hit
-                ? { status: 'hit_limit', message: `Stage exited but hit a limit (${stageResult.limit_hit.description})` }
-                : { status: 'reached_goal', message: `Exited via: ${etr.triggered.description}` }
-            } else if (etr && etr.not_triggered?.length) {
-              stageResult.assessment = { status: 'failed', message: 'Stage ended before exit triggers were satisfied' }
-            } else {
-              stageResult.assessment = { status: 'executed', message: 'Stage executed (no exit triggers defined)' }
-            }
-
-            stageAnalyses.push(stageResult)
-
-            // Pre-infusion tracking
-            const nl = stageName.toLowerCase()
-            if (PREINFUSION_KW.some(kw => nl.includes(kw))) {
-              preinfusionTime += sd.duration
-              preinfusionStages.push(stageName)
-            }
-          }
-
-          const preinfusionWeight = (() => {
-            let w = 0
-            for (const ps2 of profileStages) {
-              const sn = (ps2.name ?? '').trim().toLowerCase()
-              if (!PREINFUSION_KW.some(kw => sn.includes(kw))) continue
-              for (const [k, v] of shotStages) {
-                if (k.trim().toLowerCase() === sn) { w += Math.max(0, v.endWeight - v.startWeight); break }
-              }
-            }
-            return w
-          })()
-
-          const analysis = {
-            shot_summary: {
-              final_weight: _round1(finalWeight),
-              target_weight: targetWeight,
-              total_time: _round1(totalTime),
-              max_pressure: _round1(maxPressure),
-              max_flow: _round1(maxFlow),
-            },
-            weight_analysis: {
-              status: targetWeight
-                ? Math.abs(finalWeight - targetWeight) / targetWeight < 0.05 ? 'on_target'
-                  : finalWeight < targetWeight ? 'under' : 'over'
-                : 'on_target',
-              target: targetWeight,
-              actual: _round1(finalWeight),
-              deviation_percent: targetWeight
-                ? Math.round(((finalWeight - targetWeight) / targetWeight) * 1000) / 10
-                : 0,
-            },
-            stage_analyses: stageAnalyses,
-            unreached_stages: unreachedStages,
-            preinfusion_summary: {
-              stages: preinfusionStages,
-              total_time: _round1(preinfusionTime),
-              proportion_of_shot: totalTime > 0 ? _round1(preinfusionTime / totalTime * 100) : 0,
-              weight_accumulated: _round1(preinfusionWeight),
-              weight_percent_of_total: finalWeight > 0 ? _round1(preinfusionWeight / finalWeight * 100) : 0,
-              issues: [],
-              recommendations: [],
-            },
-            profile_info: {
-              name: profileName,
-              temperature: entry.profile?.temperature ?? null,
-              stage_count: profileStages.length,
-            },
-            profile_target_curves: (() => {
-              // Generate shot-aligned target curves from profile dynamics
-              if (!entry.profile) return []
-              const stageTimings = new Map<string, { startTime: number; endTime: number }>()
-              for (const [name, stats] of shotStages) {
-                stageTimings.set(name, { startTime: stats.startTime, endTime: stats.endTime })
-              }
-              return generateShotAlignedTargetCurves(
-                entry.profile as unknown as CachedProfile,
-                stageTimings,
-                pts as unknown as Array<Record<string, unknown>>,
-              )
-            })(),
-          }
+          const analysis = computeRichLocalAnalysis(entry, profileName)
           return jsonResponse({ status: 'success', analysis })
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Analysis failed'
@@ -2877,7 +3232,7 @@ export function installDirectModeInterceptor(): void {
         try {
           const aiService = createBrowserAIService()
           if (!aiService.isConfigured()) {
-            return jsonResponse({ status: 'error', message: 'Gemini API key not configured.' })
+            return jsonResponse({ status: 'error', message: aiNotConfiguredMessage() })
           }
           const body = init?.body as FormData
           const pName = (body.get('profile_name') as string) || 'Unknown'
@@ -2892,102 +3247,10 @@ export function installDirectModeInterceptor(): void {
           } | null
           if (!entry) return jsonResponse({ status: 'error', message: 'Shot not found' })
 
-          // 2. Compute shot summary metrics directly from shot data
+          // 2. Build the rich, server-shaped local analysis (parity with /analyze) for shot facts
           const pts = entry.data ?? []
           if (!pts.length) return jsonResponse({ status: 'error', message: 'Shot has no telemetry data' })
-          let totalTime = 0
-          let finalWeight = 0
-          let maxPressure = 0
-          let maxFlow = 0
-          const targetWeight = entry.profile?.final_weight ?? null
-          // Stage-level stats
-          type ShotStageInfo = { name: string; duration: number; avgPressure: number; avgFlow: number; weightGain: number; endWeight: number }
-          const stageInfos: ShotStageInfo[] = []
-          {
-            let curStage: string | null = null
-            let stageStart = 0
-            let pressureSum = 0
-            let flowSum = 0
-            let count = 0
-            let stageStartWeight = 0
-            const flushStage = (endTime: number, endWeight2: number) => {
-              if (!curStage || count === 0) return
-              stageInfos.push({
-                name: curStage,
-                duration: Math.round((endTime - stageStart) * 10) / 10,
-                avgPressure: Math.round(pressureSum / count * 10) / 10,
-                avgFlow: Math.round(flowSum / count * 10) / 10,
-                weightGain: Math.round((endWeight2 - stageStartWeight) * 10) / 10,
-                endWeight: Math.round(endWeight2 * 10) / 10,
-              })
-            }
-            for (const pt of pts) {
-              const status = String((pt as Record<string, unknown>).status ?? '').trim()
-              if (!status || status.toLowerCase() === 'retracting') continue
-              const timeSec = safeNumber((pt as Record<string, unknown>).profile_time ?? (pt as Record<string, unknown>).time) / 1000
-              const shot = ((pt as Record<string, Record<string, unknown>>).shot ?? {})
-              const p = safeNumber(shot.pressure)
-              const f = safeNumber(shot.flow) || safeNumber(shot.gravimetric_flow)
-              const w = safeNumber(shot.weight)
-              if (status !== curStage) {
-                flushStage(timeSec, finalWeight)
-                curStage = status
-                stageStart = timeSec
-                pressureSum = 0
-                flowSum = 0
-                count = 0
-                stageStartWeight = w
-              }
-              pressureSum += p
-              flowSum += f
-              count++
-              if (p > maxPressure) maxPressure = p
-              if (f > maxFlow) maxFlow = f
-              finalWeight = w
-              totalTime = timeSec
-            }
-            flushStage(totalTime, finalWeight)
-          }
-
-          // Use the actual settled final telemetry sample (including drip during piston retraction)
-          // so both time and weight reflect the same end-of-shot point as getHistoryMetrics()
-          const lastRawPt = (pts[pts.length - 1] ?? {}) as Record<string, unknown>
-          const lastShot = ((lastRawPt.shot as Record<string, unknown> | undefined) ?? {})
-          const actualFinalWeight = safeNumber(lastShot.weight) || finalWeight
-          const actualTotalTime = safeNumber(lastRawPt.profile_time ?? lastRawPt.time) / 1000 || totalTime
-
-          // If there was weight gain during retraction, add a synthetic drip stage so the AI
-          // sees how the gap between the last active stage and final_weight_g was filled
-          const dripWeight = Math.round((actualFinalWeight - finalWeight) * 10) / 10
-          if (dripWeight > 0.1) {
-            stageInfos.push({
-              name: 'Drip (post-retraction)',
-              duration: Math.round((actualTotalTime - totalTime) * 10) / 10,
-              avgPressure: 0,
-              avgFlow: 0,
-              weightGain: dripWeight,
-              endWeight: Math.round(actualFinalWeight * 10) / 10,
-            })
-          }
-
-          const localAnalysis = {
-            shot_summary: {
-              total_time_s: Math.round(actualTotalTime * 10) / 10,
-              final_weight_g: Math.round(actualFinalWeight * 10) / 10,
-              target_weight_g: targetWeight,
-              weight_deviation_pct: targetWeight ? Math.round(((actualFinalWeight - targetWeight) / targetWeight) * 1000) / 10 : 0,
-              max_pressure_bar: Math.round(maxPressure * 10) / 10,
-              max_flow_mls: Math.round(maxFlow * 10) / 10,
-            },
-            stages: stageInfos.map(s => ({
-              name: s.name,
-              duration_s: s.duration,
-              avg_pressure: s.avgPressure,
-              avg_flow: s.avgFlow,
-              weight_gain: s.weightGain,
-              cumulative_weight_at_end: s.endWeight,
-            })),
-          }
+          const richAnalysis = computeRichLocalAnalysis(entry as unknown as HistEntry, pName)
 
           // 3. Build profile context
           const shotProfile = entry.profile
@@ -3001,165 +3264,48 @@ export function installDirectModeInterceptor(): void {
             limits: s.limits,
           }))
 
-          // 4. Sample key data points from the shot for graph context
-          const dataEntries = entry.data ?? []
-          const graphSamples: Array<Record<string, unknown>> = []
-          if (dataEntries.length > 0) {
-            const indices = [0]
-            const n = dataEntries.length
-            for (const pct of [0.25, 0.5, 0.75]) {
-              const idx = Math.floor(n * pct)
-              if (!indices.includes(idx)) indices.push(idx)
-            }
-            indices.push(n - 1)
-            for (const idx of [...new Set(indices)].sort((a, b) => a - b)) {
-              const e = dataEntries[idx] as Record<string, unknown>
-              const shot = (e.shot ?? {}) as Record<string, unknown>
-              graphSamples.push({
-                time_s: Math.round(safeNumber(e.profile_time ?? e.time) / 100) / 10,
-                pressure: Math.round(safeNumber(shot.pressure) * 10) / 10,
-                flow: Math.round((safeNumber(shot.flow) || safeNumber(shot.gravimetric_flow)) * 10) / 10,
-                weight: Math.round(safeNumber(shot.weight) * 10) / 10,
-                stage: String(e.status ?? ''),
-              })
-            }
+          // 4. Build the comprehensive prompt
+          const tasteX = body.get('taste_x') != null ? Number(body.get('taste_x')) : null
+          const tasteY = body.get('taste_y') != null ? Number(body.get('taste_y')) : null
+          const tasteDescriptors = String(body.get('taste_descriptors') ?? '')
+            .split(',').map(s => s.trim()).filter(Boolean)
+          const tasteContext = (tasteX != null && tasteY != null)
+            ? buildTasteContext(tasteX, tasteY, tasteDescriptors)
+            : ''
+
+          const facts = buildShotFacts(richAnalysis as Parameters<typeof buildShotFacts>[0])
+
+          // 5. Call the AI provider for shot analysis (with retry on transient errors)
+          if (!isAIConfigured()) {
+            return jsonResponse({ status: 'error', message: aiNotConfiguredMessage() })
           }
+          const analyzeProvider = getProviderForMethod('analyzeShot')
+          const prompt = buildAnalyzeLlmPrompt({
+            profileName: pName,
+            temperature: shotProfile?.temperature ?? null,
+            targetWeight: shotProfile?.final_weight ?? null,
+            profileDescription: profileDescription ?? '',
+            profileVars,
+            cleanStages,
+            facts,
+            tasteContext,
+            compact: needsCompactPrompt(analyzeProvider),
+          })
 
-          // 5. Build the comprehensive prompt (matching server format)
-          const prompt = `You are an expert espresso barista and profiling specialist analyzing a shot from a Meticulous Espresso Machine.
-
-## Profile Being Used
-Name: ${pName}
-Temperature: ${shotProfile?.temperature ?? 'Not set'}°C
-Target Weight: ${shotProfile?.final_weight ?? 'Not set'}g
-
-### Profile Description
-${profileDescription || 'No description provided - analyze the profile structure to understand intent.'}
-
-### Profile Variables
-${JSON.stringify(profileVars, null, 2)}
-
-### Profile Stages
-${JSON.stringify(cleanStages, null, 2)}
-
-## Full Local Analysis
-This is the complete algorithmic analysis of the shot. Use this data to inform your expert analysis.
-
-IMPORTANT: Each stage includes 'cumulative_weight_at_end' which shows the total weight when that stage ended.
-If a stage ended early but the cumulative weight was near the target weight, the shot likely terminated
-correctly due to reaching the final weight target - this is NORMAL and EXPECTED behavior.
-A stage that appears "short" may simply mean the target yield was reached, which is the correct outcome.
-
-IMPORTANT: The 'final_weight_g' in shot_summary is the actual settled weight AFTER the machine's piston retraction completes.
-The Meticulous machine issues a stop signal BEFORE the target weight is reached, accounting for residual flow that will drip
-into the cup during piston retraction. This means the final weight accurately reflects the total liquid in the cup.
-Do NOT penalize the shot for weight deviation unless 'weight_deviation_pct' exceeds ±5%.
-
-${JSON.stringify(localAnalysis, null, 2)}
-
-### Graph Sample Points
-${JSON.stringify(graphSamples, null, 2)}
-
----
-
-Based on this data, provide a detailed expert analysis.
-
-CRITICAL FORMATTING RULES:
-1. You MUST use EXACTLY these 5 section headers with the exact format shown (## followed by number, period, space, then title)
-2. Each section MUST have the subsection headers shown (bold text with colon, like **What Happened:**)
-3. ALL content under subsections MUST be bullet points starting with "- "
-4. Keep bullet points concise (1-2 sentences max per bullet)
-5. Do NOT add extra sections or subsections beyond what's specified
-
-## 1. Shot Performance
-
-**What Happened:**
-- [Stage-by-stage description of the extraction]
-- [Notable events: pressure spikes, flow restrictions, early/late stage exits]
-- [Final weight accuracy relative to target]
-
-**Assessment:** [Choose exactly one: Good / Acceptable / Needs Improvement / Problematic]
-
-## 2. Root Cause Analysis
-
-**Primary Factors:**
-- [Most likely cause with brief explanation]
-- [Second most likely cause if applicable]
-
-**Secondary Considerations:**
-- [Other contributing factors]
-- [Environmental or equipment factors if relevant]
-
-## 3. Setup Recommendations
-
-**Priority Changes:**
-- [Most important change - be specific with numbers when possible]
-- [Second priority change]
-
-**Additional Suggestions:**
-- [Other tweaks to consider]
-
-## 4. Profile Recommendations
-
-**Recommended Adjustments:**
-- [Specific profile changes: timing, triggers, targets]
-- [Variable value changes if applicable]
-
-**Reasoning:**
-- [Why these changes would improve the shot]
-
-## 5. Profile Design Observations
-
-**Strengths:**
-- [Well-designed aspects of this profile]
-
-**Potential Improvements:**
-- [Exit trigger or safety limit suggestions]
-- [Robustness improvements]
-
-Focus on actionable insights. Be specific with numbers where possible (e.g., "grind 1-2 steps finer" not just "grind finer").
-
-## Structured Recommendations (MANDATORY)
-
-After your analysis sections, you MUST output a structured JSON block with specific, actionable profile variable recommendations.
-Use EXACTLY this format — the markers are parsed programmatically:
-
-RECOMMENDATIONS_JSON:
-[
-  {
-    "variable": "<variable key from the profile, e.g. 'pressure', 'temperature'>",
-    "current_value": <current numeric value>,
-    "recommended_value": <suggested numeric value>,
-    "stage": "<stage name this applies to, or 'global' for top-level settings>",
-    "confidence": "<high|medium|low>",
-    "reason": "<one-sentence explanation>"
-  }
-]
-END_RECOMMENDATIONS_JSON
-
-Rules for recommendations:
-- Only include recommendations where you have a SPECIFIC numeric change to suggest
-- Use actual variable keys from the Profile Variables section above
-- For top-level settings (temperature, final_weight), use stage="global"
-- For stage-specific changes, use the stage name from Profile Stages
-- confidence: "high" = strong evidence from data, "medium" = likely beneficial, "low" = worth trying
-- If no recommendations apply, output an empty array: RECOMMENDATIONS_JSON:\n[]\nEND_RECOMMENDATIONS_JSON
-`
-
-          // 6. Call Gemini (with retry on transient errors)
-          const { GoogleGenAI: GenAI } = await import('@google/genai')
-          const apiKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY) ?? ''
-          if (!apiKey) return jsonResponse({ status: 'error', message: 'Gemini API key not configured.' })
-          const client = new GenAI({ apiKey })
-          const modelId = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
-
-          const response = await retryWithBackoff(() =>
-            generateTextWithRetry(client as never, modelId, {
+          const gen = async () => {
+            const r = await retryWithBackoff(() => analyzeProvider.generateText({
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            })
-          ) as { text?: string }
-
-          const analysisText = response.text ?? ''
+            })) as { text?: string }
+            return r.text ?? ''
+          }
+          let analysisText = await gen()
+          const ok = (txt: string) =>
+            lintShotAnalysis(txt).valid && validateAgainstFacts(txt, facts).valid && checkStructure(txt).valid
+          if (!ok(analysisText)) {
+            const retry = await gen()
+            if (ok(retry)) analysisText = retry
+          }
+          if (!lintShotAnalysis(analysisText).valid) analysisText = repairShotAnalysis(analysisText)
           return jsonResponse({
             status: 'success',
             llm_analysis: analysisText,
@@ -3214,7 +3360,7 @@ Rules for recommendations:
         try {
           const aiService = createBrowserAIService()
           if (!aiService.isConfigured()) {
-            return jsonResponse({ status: 'error', reply: 'Gemini API key not configured. Please set your API key in Settings.', analysis: '' })
+            return jsonResponse({ status: 'error', reply: aiNotConfiguredMessage(), analysis: '' })
           }
 
           const body = init?.body as FormData
@@ -3601,23 +3747,42 @@ Rules for recommendations:
           const aiService = createBrowserAIService()
           if (aiService.isConfigured()) {
             try {
-              const { GoogleGenAI } = await import('@google/genai')
-              const key = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
-              if (!key) throw new Error('No API key')
-              const client = new GoogleGenAI({ apiKey: key })
               const resolvedName = (profileJson as {name?: string}).name || profileName || 'Unknown Profile'
-              const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]`
-              const configuredModel = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
-              const response = await generateTextWithRetry(client as never, configuredModel, {
+              const prompt = `You are a specialty coffee expert. Analyze this espresso machine profile JSON and write a detailed description.\n\nProfile name: ${resolvedName}\nProfile JSON:\n${JSON.stringify(profileJson, null, 2)}\n\nWrite the description in this exact format:\nProfile Created: [name]\nDescription: [1-2 sentence overview]\nPreparation: [brewing guidance]\nWhy This Works: [technical explanation]\nSpecial Notes: [any notable aspects]\n\nUse concrete numeric values with units (for example 9 bar, 2.0 ml/s, 30 s). Never output raw variable placeholders such as $name$ and never mention internal stage keys.${AI_TAGS_PROMPT}`
+              const response = await getProviderForMethod('generateProfile').generateText({
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
               }) as { text?: string }
-              const description = response.text?.trim()
-              if (description && !description.includes('generated without AI')) {
+              const rawText = response.text?.trim()
+              if (rawText && !rawText.includes('generated without AI')) {
+                const aiTags = parseAiTags(rawText)
+                const profileVars = (profileJson as { variables?: ProfileVariable[] }).variables ?? []
+                const description = resolveDescriptionPlaceholders(stripTagsLine(rawText), profileVars)
                 _descriptionCache.set(profileName, description)
                 _persistDescriptionCache()
+                if (aiTags.length) {
+                  _aiTagsCache.set(profileName, aiTags)
+                  _persistAiTagsCache()
+                  // The profile list cache embeds ai_tags per profile, so it
+                  // must be busted for regenerated tags to surface in the
+                  // catalogue (parity with the server invalidate call).
+                  _invalidateProfileListCache()
+                }
                 return jsonResponse({ status: 'success', description })
               }
-            } catch { /* AI generation failed — fall back to static */ }
+            } catch (err) {
+              // When the user has explicitly selected an on-device model that
+              // is not ready (not downloaded / unavailable), surface a clear
+              // error instead of silently emitting a static description with a
+              // misleading "generated successfully" toast.
+              if (
+                err instanceof AIServiceError &&
+                (err.code === 'LOCAL_MODEL_NOT_DOWNLOADED' ||
+                  err.code === 'LOCAL_UNAVAILABLE')
+              ) {
+                return jsonResponse({ status: 'error', message: formatGeminiError(err) })
+              }
+              /* Other AI failures — fall back to static description below. */
+            }
           }
 
           // Static fallback
@@ -3667,19 +3832,12 @@ Rules for recommendations:
 
     // GET /api/available-models → live discovery in direct mode, static fallback offline
     if (url.match(/\/api\/available-models$/)) {
-      const currentModel = localStorage.getItem(STORAGE_KEYS.GEMINI_MODEL) || 'gemini-2.5-flash'
       return (async () => {
+        const provider = getProvider(getActiveHostedProviderId())
+        const currentModel = getProviderModel(getActiveHostedProviderId())
         try {
-          const apiKey = localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
-          if (apiKey) {
-            const [{ listAvailableModels }, { GoogleGenAI }] = await Promise.all([
-              import('../ai/modelResolver'),
-              import('@google/genai'),
-            ])
-            const client = new GoogleGenAI({ apiKey })
-            const models = await listAvailableModels(
-              client as unknown as import('../ai/modelResolver').ModelClient,
-            )
+          if (provider.isConfigured()) {
+            const models = await provider.listModels()
             if (models.length) return jsonResponse({ models, current: currentModel })
           }
         } catch {

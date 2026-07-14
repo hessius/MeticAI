@@ -9,12 +9,155 @@ This module provides shot analysis functionality including:
 """
 
 import json
+import re
 from typing import Any, Optional
 
 from services.gemini_service import get_vision_model, PROFILING_KNOWLEDGE
+from services.shot_facts import build_shot_facts
 from logging_config import get_logger
 
 logger = get_logger()
+
+# Sensory tag vocabulary the AI may infer during description generation (#400).
+# Mirrors apps/web/src/lib/tags.ts AI_TAG_LABELS (body / flavor / mouthfeel /
+# roast / characteristic categories). Structural / temperature / weight /
+# pressure tags are derived deterministically elsewhere, not requested here.
+AI_TAG_LABELS = [
+    "Light Body",
+    "Medium Body",
+    "Heavy Body",
+    "Florals",
+    "Acidity",
+    "Fruitiness",
+    "Chocolate",
+    "Nutty",
+    "Caramel",
+    "Berry",
+    "Citrus",
+    "Funky",
+    "Thin",
+    "Mouthfeel",
+    "Creamy",
+    "Syrupy",
+    "Light Roast",
+    "Medium Roast",
+    "Dark Roast",
+    "Sweet",
+    "Balanced",
+]
+
+_AI_TAG_LOOKUP = {label.lower(): label for label in AI_TAG_LABELS}
+
+# Instruction appended to AI description prompts to request sensory tags (#400).
+_AI_TAGS_PROMPT = (
+    "\n\nFinally, on a separate last line, output:\n"
+    "Tags: [comma-separated subset of EXACTLY these labels that match the "
+    "coffee's likely sensory profile, or leave empty if unsure: "
+    + ", ".join(AI_TAG_LABELS)
+    + "]\nOnly use labels from that list; do not invent new ones."
+)
+
+# Small on-device models often decorate the line with markdown (e.g. "**Tags:**"
+# or "- Tags:"), so tolerate leading bullets/quotes and bold/italic markers.
+_TAGS_LINE_RE = re.compile(
+    r"^[ \t]*(?:[>*+\-#]+[ \t]*)?(?:\*\*|__|\*|_)?[ \t]*Tags[ \t]*(?:\*\*|__|\*|_)?[ \t]*:[ \t]*(.*)$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def parse_ai_tags(text: Optional[str]) -> list[str]:
+    """Extract and validate sensory tags from a description's ``Tags:`` line."""
+    if not text:
+        return []
+    match = _TAGS_LINE_RE.search(text)
+    if not match:
+        return []
+    result: list[str] = []
+    seen: set[str] = set()
+    for raw in match.group(1).split(","):
+        candidate = (
+            raw.replace("[", "").replace("]", "").replace("*", "").replace("_", "")
+            .strip()
+            .rstrip(".")
+            .strip()
+        )
+        canonical = _AI_TAG_LOOKUP.get(candidate.lower())
+        if canonical and canonical not in seen:
+            seen.add(canonical)
+            result.append(canonical)
+    return result
+
+
+def strip_tags_line(text: str) -> str:
+    """Remove the trailing ``Tags:`` line from a generated description body."""
+    if not text:
+        return text
+    return re.sub(r"[ \t]*$", "", _TAGS_LINE_RE.sub("", text)).rstrip()
+
+
+_UNIT_BY_TYPE = {
+    "pressure": " bar",
+    "flow": " ml/s",
+    "time": " s",
+    "weight": " g",
+}
+
+_PAIRED_PLACEHOLDER_RE = re.compile(r"\$[^\s$]{1,60}\$")
+
+
+def resolve_description_placeholders(
+    text: Optional[str], variables: Optional[list] = None
+) -> str:
+    """Resolve profile variable references in generated prose and strip invented
+    placeholders. Small models sometimes echo the profile's variable references
+    (``$pressure_Max Pressure``) or invent tokens (``$pressure_1$``) into the
+    text. Mirror of resolveDescriptionPlaceholders in
+    apps/web/src/lib/descriptionText.ts — keep the two in sync.
+    """
+    if not text:
+        return text or ""
+    # Models often markdown-escape underscores inside placeholders ($a\_1$).
+    out = text.replace("\\_", "_").replace("\\*", "*")
+    # Resolve real variable references, longest keys first so a key that is a
+    # prefix of another does not partially replace it.
+    resolved = [
+        v
+        for v in (variables or [])
+        if isinstance(v, dict)
+        and isinstance(v.get("key"), str)
+        and v.get("value") is not None
+    ]
+    for v in sorted(resolved, key=lambda x: len(x["key"]), reverse=True):
+        key = v["key"]
+        unit = _UNIT_BY_TYPE.get(key.split("_")[0], "")
+        val = f"{v['value']}{unit}"
+        out = out.replace(f"${key}$", val).replace(f"${key}", val)
+    # Strip any remaining paired $...$ placeholder tokens the model invented.
+    out = _PAIRED_PLACEHOLDER_RE.sub("", out)
+    # Tidy whitespace left behind by removals. The preceding collapse guarantees
+    # at most a single space/tab before punctuation, so match exactly one char
+    # (no `+`) to avoid polynomial backtracking on long whitespace runs.
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = re.sub(r"[ \t]([.,;:)])", r"\1", out)
+    return out
+
+
+class DescriptionResult(str):
+    """A profile description string that also carries inferred AI sensory tags.
+
+    Subclassing ``str`` keeps the existing call sites (which treat the return
+    value as a plain description and JSON-serialize it) working unchanged, while
+    exposing parsed tags via ``.ai_tags`` for the regenerate endpoint that
+    persists them. Static fallbacks return a plain ``str``, so consumers that
+    need the tags must use ``getattr(value, "ai_tags", [])``.
+    """
+
+    ai_tags: list[str]
+
+    def __new__(cls, value: str, ai_tags: Optional[list[str]] = None):
+        obj = super().__new__(cls, value)
+        obj.ai_tags = ai_tags or []
+        return obj
 
 # Constants
 STAGE_STATUS_RETRACTING = "retracting"
@@ -35,15 +178,35 @@ PREINFUSION_KEYWORDS = [
 # ============================================================================
 
 
+def _stage_dynamics(stage: dict) -> tuple[list, str]:
+    """Return ``(points, over)`` for a stage, handling both profile formats.
+
+    Meticulous profiles come in two shapes: a flat one
+    (``dynamics_points`` / ``dynamics_over``) and the canonical nested one
+    (``dynamics: {points, over}``). Readers that only looked at the flat keys
+    silently failed on nested profiles (e.g. "Slayer at Home"), returning no
+    target — which broke curve-adherence deltas and #423 effective-mode
+    detection. Mirror of the native ``stageDynamicsPoints`` helper.
+    """
+    points = stage.get("dynamics_points")
+    over = stage.get("dynamics_over")
+    if not points:
+        dynamics = stage.get("dynamics")
+        if isinstance(dynamics, dict):
+            points = dynamics.get("points")
+            if over is None:
+                over = dynamics.get("over")
+    return (points or [], over or "time")
+
+
 def _format_dynamics_description(stage: dict, variables: list | None = None) -> str:
     """Format a human-readable description of the stage dynamics.
 
-    Resolves $variable references in dynamics_points using the provided variables list.
+    Resolves $variable references in dynamics points using the provided variables list.
     """
     variables = variables or []
     stage_type = stage.get("type", "unknown")
-    dynamics_points = stage.get("dynamics_points", [])
-    dynamics_over = stage.get("dynamics_over", "time")
+    dynamics_points, dynamics_over = _stage_dynamics(stage)
 
     if not dynamics_points:
         return f"{stage_type} stage (no dynamics data)"
@@ -183,6 +346,60 @@ def _resolve_variable(value, variables: list) -> tuple[Any, str | None]:
     return value, var_key
 
 
+def _mean_dynamics_target(stage: dict, variables: list | None = None) -> float | None:
+    """Mean of a pressure/flow stage's resolved dynamics setpoints.
+
+    Returns the intended scalar target (bar or ml/s) used by
+    shot_facts._curve_adherence, or None for non-pressure/flow stages or when
+    no numeric setpoints are present. Mirror of the native
+    DirectModeInterceptor.meanDynamicsTarget — keep the two in sync.
+    """
+    stage_type = stage.get("type", "unknown")
+    if stage_type not in ("pressure", "flow"):
+        return None
+    variables = variables or []
+    values: list[float] = []
+    for point in _stage_dynamics(stage)[0]:
+        if not isinstance(point, (list, tuple)) or len(point) == 0:
+            continue
+        raw = point[1] if len(point) > 1 else point[0]
+        resolved, _ = _resolve_variable(raw, variables)
+        try:
+            values.append(float(resolved))
+        except (TypeError, ValueError):
+            continue
+    if not values:
+        return None
+    return round(sum(values) / len(values), 2)
+
+
+def _max_dynamics_target(stage: dict, variables: list | None = None) -> float | None:
+    """Peak of a pressure/flow stage's resolved dynamics setpoints.
+
+    Used by shot_facts.effective_control_mode (#423) to detect stages whose
+    control intent differs from their declared type — e.g. an aggressive flow
+    stage (high flow target) paired with a pressure limit is effectively
+    pressure-controlled. Mirror of the native DirectModeInterceptor.maxDynamicsTarget.
+    """
+    stage_type = stage.get("type", "unknown")
+    if stage_type not in ("pressure", "flow"):
+        return None
+    variables = variables or []
+    values: list[float] = []
+    for point in _stage_dynamics(stage)[0]:
+        if not isinstance(point, (list, tuple)) or len(point) == 0:
+            continue
+        raw = point[1] if len(point) > 1 else point[0]
+        resolved, _ = _resolve_variable(raw, variables)
+        try:
+            values.append(float(resolved))
+        except (TypeError, ValueError):
+            continue
+    if not values:
+        return None
+    return round(max(values), 2)
+
+
 def _format_exit_triggers(
     exit_triggers: list, variables: list | None = None
 ) -> list[dict]:
@@ -272,6 +489,17 @@ def _determine_exit_trigger_hit(
     max_flow = _safe_float(stage_data.get("max_flow", 0))
     end_flow = _safe_float(stage_data.get("end_flow", 0))
 
+    # Boundary (transition) values: the first sample of the next stage is the
+    # sample at which this stage's exit trigger actually fired (see
+    # _extract_shot_stage_data). Include it so a stage that exits exactly when a
+    # rising target is reached is credited for the crossing value instead of the
+    # last in-stage sample (which the machine already advanced past).
+    start_time = _safe_float(stage_data.get("start_time", 0))
+    boundary_pressure = stage_data.get("boundary_pressure")
+    boundary_flow = stage_data.get("boundary_flow")
+    boundary_weight = stage_data.get("boundary_weight")
+    boundary_time = stage_data.get("boundary_time")
+
     triggered = None
     not_triggered = []
 
@@ -285,41 +513,56 @@ def _determine_exit_trigger_hit(
         value = _safe_float(resolved_value)
 
         # Check if this trigger was satisfied
-        # Select the appropriate actual value based on comparison operator
+        # Select the in-stage actual value based on comparison operator, plus the
+        # boundary (transition-sample) value used to rescue a trigger that the
+        # in-stage value falls short of.
         actual_value = 0.0
+        boundary_actual = None
         if trigger_type == "time":
             actual_value = duration
+            if boundary_time is not None:
+                boundary_actual = _safe_float(boundary_time) - start_time
         elif trigger_type == "weight":
             actual_value = end_weight
+            if boundary_weight is not None:
+                boundary_actual = _safe_float(boundary_weight)
         elif trigger_type == "pressure":
             # For >= or >: we want to know if max reached the target
             # For <= or <: we want to know if pressure dropped below target (use end)
-            if comparison in (">=", ">"):
-                actual_value = max_pressure
-            else:  # <= or < or ==
-                actual_value = end_pressure
+            actual_value = max_pressure if comparison in (">=", ">") else end_pressure
+            if boundary_pressure is not None:
+                boundary_actual = _safe_float(boundary_pressure)
         elif trigger_type == "flow":
             # For >= or >: we want to know if max reached the target
             # For <= or <: we want to know if flow dropped below target (use end)
-            if comparison in (">=", ">"):
-                actual_value = max_flow
-            else:  # <= or < or ==
-                actual_value = end_flow
+            actual_value = max_flow if comparison in (">=", ">") else end_flow
+            if boundary_flow is not None:
+                boundary_actual = _safe_float(boundary_flow)
 
         # Evaluate comparison with small tolerance
         tolerance = 0.5 if trigger_type in ["time", "weight"] else 0.2
-        was_hit = False
 
-        if comparison == ">=":
-            was_hit = actual_value >= (value - tolerance)
-        elif comparison == ">":
-            was_hit = actual_value > value
-        elif comparison == "<=":
-            was_hit = actual_value <= (value + tolerance)
-        elif comparison == "<":
-            was_hit = actual_value < value
-        elif comparison == "==":
-            was_hit = abs(actual_value - value) < tolerance
+        def _eval_hit(actual: float) -> bool:
+            if comparison == ">=":
+                return actual >= (value - tolerance)
+            if comparison == ">":
+                return actual > value
+            if comparison == "<=":
+                return actual <= (value + tolerance)
+            if comparison == "<":
+                return actual < value
+            if comparison == "==":
+                return abs(actual - value) < tolerance
+            return False
+
+        was_hit = _eval_hit(actual_value)
+        # The machine advances stages on the tick where the exit condition fires,
+        # so the satisfying sample is labeled as the next stage. If the in-stage
+        # value falls short, rescue the trigger with that transition (boundary)
+        # value rather than falsely reporting the stage as failed.
+        if not was_hit and boundary_actual is not None and _eval_hit(boundary_actual):
+            actual_value = boundary_actual
+            was_hit = True
 
         # Build a proper description with the resolved value
         unit = {"time": "s", "weight": "g", "pressure": "bar", "flow": "ml/s",
@@ -366,6 +609,8 @@ def _analyze_stage_execution(
         "stage_key": stage_key,
         "stage_type": stage_type,
         "profile_target": dynamics_desc,
+        "profile_target_value": _mean_dynamics_target(profile_stage, variables),
+        "profile_max_target": _max_dynamics_target(profile_stage, variables),
         "exit_triggers": exit_triggers,
         "limits": limits,
         "executed": shot_stage_data is not None,
@@ -487,7 +732,7 @@ def _analyze_stage_execution(
         goal_reached = False
         goal_message = ""
 
-        dynamics_points = profile_stage.get("dynamics_points", [])
+        dynamics_points = _stage_dynamics(profile_stage)[0]
         if dynamics_points and len(dynamics_points) >= 1:
             # Get the target value (last point in dynamics)
             raw_target = (
@@ -576,6 +821,23 @@ def _extract_shot_stage_data(shot_data: dict) -> dict[str, dict]:
     # Save final stage
     if current_stage and stage_entries:
         stage_data[current_stage] = _compute_stage_stats(stage_entries)
+
+    # Attach boundary (transition) values. The machine flips ``status`` to the
+    # next stage on the control tick where the current stage's exit condition
+    # becomes true, so the sample that actually satisfied the trigger is labeled
+    # as the FIRST sample of the next stage. Expose that sample (the next
+    # stage's start_* values) so exit-trigger evaluation can credit the stage
+    # for the value that caused it to end. Without this, a stage that exits on a
+    # rising ``pressure >= X`` / ``flow >= X`` trigger under-reports its exit
+    # metric and is falsely assessed as "failed".
+    stage_names = list(stage_data.keys())
+    for i, name in enumerate(stage_names):
+        if i + 1 < len(stage_names):
+            nxt = stage_data[stage_names[i + 1]]
+            stage_data[name]["boundary_pressure"] = nxt.get("start_pressure")
+            stage_data[name]["boundary_flow"] = nxt.get("start_flow")
+            stage_data[name]["boundary_weight"] = nxt.get("start_weight")
+            stage_data[name]["boundary_time"] = nxt.get("start_time")
 
     return stage_data
 
@@ -1293,7 +1555,7 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
                 "Consider adding a weight-based exit trigger to limit pre-infusion volume"
             )
 
-    return {
+    analysis_result = {
         "shot_summary": {
             "final_weight": round(final_weight, 1),
             "target_weight": round(target_weight, 1) if target_weight else None,
@@ -1325,6 +1587,8 @@ def _perform_local_shot_analysis(shot_data: dict, profile_data: dict) -> dict:
         },
         "profile_target_curves": profile_target_curves,
     }
+    analysis_result["shot_facts"] = build_shot_facts(analysis_result)
+    return analysis_result
 
 
 def _prepare_shot_summary_for_llm(
@@ -1489,14 +1753,24 @@ Why This Works:
 Special Notes:
 [Any specific requirements or tips for using this profile]
 
-Be concise but informative. Focus on actionable barista guidance."""
+Be concise but informative. Focus on actionable barista guidance.
+
+Use concrete numeric values with units (for example 9 bar, 2.0 ml/s, 30 s). Never output raw variable placeholders such as $name$ and never mention internal stage keys."""
+
+    prompt += _AI_TAGS_PROMPT
 
     try:
         model = get_vision_model()
         response = await model.async_generate_content(prompt)
         text = getattr(response, "text", "") if response else ""
         if text and text.strip():
-            return text.strip()
+            variables = profile_json.get("variables") or []
+            return DescriptionResult(
+                resolve_description_placeholders(
+                    strip_tags_line(text.strip()), variables
+                ),
+                parse_ai_tags(text),
+            )
     except ValueError:
         logger.info(
             "Gemini API key not configured, using static profile description fallback",

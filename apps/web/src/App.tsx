@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect, useCallback, Suspense, lazy } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, Suspense, lazy } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { QrCode } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
+import { fetchProxyAiConfigured } from '@/lib/aiConfigStatus'
 import { invalidateCatalogueCache } from '@/lib/catalogueCache'
 import { isDirectMode, isDemoMode, isNativePlatform } from '@/lib/machineMode'
 import { hasFeature } from '@/lib/featureFlags'
@@ -13,6 +14,8 @@ import { cleanProfileName } from '@/components/MarkdownText'
 import { domToPng } from 'modern-screenshot'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
+import { notify, setHomeActive, isHomeActive } from '@/lib/notify'
+import { subscribeIslandNotifications, type IslandNotification } from '@/lib/islandNotifications'
 import { QRCodeDialog } from '@/components/QRCodeDialog'
 import { useIsDesktop } from '@/hooks/use-desktop'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -42,6 +45,7 @@ import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
 import { Sun, Moon, Gear, ArrowRight } from '@phosphor-icons/react'
 import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
+import { isAIConfigured, apiKeyStorageKey, getActiveProviderId } from '@/services/ai/providers'
 
 // Phase 3 — Control Center & live telemetry
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
@@ -72,6 +76,9 @@ import { useStorageMigration } from '@/services/storage'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { useBrewNotifications } from '@/hooks/useBrewNotifications'
 import { useSoundEffects, useGlobalSoundDelegation } from '@/hooks/useSoundEffects'
+import { useAndroidBackButton } from '@/hooks/useAndroidBackButton'
+import { closeTopmostOverlay } from '@/lib/backNavigation'
+import { hasUnsavedChanges } from '@/lib/unsavedChanges'
 
 function App() {
   const { t } = useTranslation()
@@ -143,6 +150,7 @@ function App() {
 
   // Live profile breakdown data (fetched when in live-shot view)
   const [liveProfileData, setLiveProfileData] = useState<ProfileData | null>(null)
+  const [liveProfileDescription, setLiveProfileDescription] = useState<string>('')
   const liveProfileFetchedRef = useRef<string | null>(null)
 
   // Resolve profile image for the desktop right-column header
@@ -155,6 +163,7 @@ function App() {
       liveProfileFetchedRef.current = null
       // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state on view change
       setLiveProfileData(null)
+      setLiveProfileDescription('')
       return
     }
     const profileName = machineState.active_profile
@@ -170,6 +179,13 @@ function App() {
         const data = await r.json()
         if (data?.profile) {
           setLiveProfileData(data.profile as ProfileData)
+          // The pre-shot heating view always shows the auto-generated one-line
+          // summary derived from stage structure — never an author's freeform
+          // description — so it reads as "what this specific shot will do".
+          try {
+            const { generateStaticProfileSummary } = await import('@/lib/staticProfileDescription')
+            setLiveProfileDescription(generateStaticProfileSummary(data.profile))
+          } catch { /* description is optional */ }
         }
       } catch { /* non-critical */ }
     })()
@@ -182,20 +198,24 @@ function App() {
       // In direct or demo mode, no MeticAI backend — use sensible defaults
       if (isDemoMode() || isDirectMode()) {
         setMqttEnabled(true) // DemoAdapter / Socket.IO provides telemetry
-        // On native, the API key may be in SecureStorage (Keychain) but not in localStorage.
-        // Mirror it so synchronous checks (BrowserAIService, feature flags) find it.
-        if (isNativePlatform() && !localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()) {
+        // On native, the active hosted provider's key may be in SecureStorage
+        // (Keychain) but not in localStorage. Mirror the ACTIVE provider's slot
+        // (not just Gemini) so synchronous checks (BrowserAIService, feature
+        // flags, the AI gate) find it and the key takes effect without
+        // re-onboarding.
+        const activeKeySlot = apiKeyStorageKey(getActiveProviderId())
+        if (isNativePlatform() && !localStorage.getItem(activeKeySlot)?.trim()) {
           try {
             const { SecureStorage } = await import('@aparajita/capacitor-secure-storage')
-            const secureKey = await SecureStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
+            const secureKey = await SecureStorage.getItem(activeKeySlot)
             if (secureKey?.trim()) {
-              localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, secureKey)
+              localStorage.setItem(activeKeySlot, secureKey)
             }
           } catch {
             // SecureStorage unavailable — skip migration
           }
         }
-        setIsAiConfigured(Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()))
+        setIsAiConfigured(isAIConfigured())
         return
       }
       try {
@@ -245,7 +265,14 @@ function App() {
       setHideAiWhenUnavailable(getHideAiWhenUnavailable())
       // Re-check API key availability (may have been added/removed in Settings)
       if (isDemoMode() || isDirectMode()) {
-        setIsAiConfigured(Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()))
+        setIsAiConfigured(isAIConfigured())
+      } else {
+        // Proxy/server mode: re-fetch from the backend so the AI gate refreshes
+        // immediately when a key is added in Settings, without waiting to leave
+        // the Settings view.
+        void fetchProxyAiConfigured().then(configured => {
+          if (configured !== null) setIsAiConfigured(configured)
+        })
       }
     }
     // Sync initial values in handler to avoid direct setState in effect
@@ -282,7 +309,7 @@ function App() {
         const data = await response.json()
         const total = (data.imported_count || 0) + (data.updated_count || 0)
         if (total > 0) {
-          toast.success(
+          notify.success(
             t('profileCatalogue.sync.autoSyncComplete', {
               imported: data.imported_count || 0,
               updated: data.updated_count || 0,
@@ -343,8 +370,12 @@ function App() {
     ) {
       notifyPreheatComplete()
       playMachineReady()
+      // Surface an in-app Dynamic Island notification when the machine becomes
+      // ready while the user is watching the home screen (#439). Off-home this
+      // is skipped — the sound + backgrounded OS notification already cover it.
+      if (isHomeActive()) notify.success(t('notifications.machineReady'))
     }
-  }, [machineState.state, notifyPreheatComplete, playMachineReady])
+  }, [machineState.state, notifyPreheatComplete, playMachineReady, t])
 
   // WKWebView layout fix: force reflow when app resumes from background.
   // iPadOS WKWebView can fail to recompute CSS grid after backgrounding.
@@ -375,8 +406,24 @@ function App() {
   const playIslandExpandRef = useRef(playIslandExpand)
   useEffect(() => { playIslandExpandRef.current = playIslandExpand }, [playIslandExpand])
 
+  // In-app Dynamic Island notification (#439): when active, the island shows the
+  // notification (tinted by tone) instead of the smart greeting, then restores
+  // the greeting once it dismisses.
+  const [islandNote, setIslandNote] = useState<IslandNotification | null>(null)
+  useEffect(() => subscribeIslandNotifications(setIslandNote), [])
+
+  // Keep the notification router aware of whether the home screen is active so
+  // it can route toasts into the island vs. the standard toast system.
+  useEffect(() => { setHomeActive(isHome) }, [isHome])
+
   useEffect(() => {
-    if (isHome && smartGreeting) {
+    if (islandNote) {
+      // A notification takes over the island immediately, fully expanded.
+      if (islandTimerRef.current) { clearTimeout(islandTimerRef.current); islandTimerRef.current = null }
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- expand to show notification
+      setIslandExpanded(true)
+      playIslandExpandRef.current()
+    } else if (isHome && smartGreeting) {
       islandTimerRef.current = setTimeout(() => { setIslandExpanded(true); playIslandExpandRef.current() }, 3000)
     } else {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset when leaving home
@@ -384,7 +431,7 @@ function App() {
     }
     return () => { if (islandTimerRef.current) clearTimeout(islandTimerRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHome, smartGreeting])
+  }, [isHome, smartGreeting, islandNote])
 
   // Detect vertical text overflow and enable scroll animation
   useEffect(() => {
@@ -420,7 +467,7 @@ function App() {
       clearTimeout(timer)
       observer.disconnect()
     }
-  }, [islandExpanded, smartGreeting])
+  }, [islandExpanded, smartGreeting, islandNote])
 
   const toggleIsland = useCallback(() => {
     if (islandTimerRef.current) { clearTimeout(islandTimerRef.current); islandTimerRef.current = null }
@@ -429,6 +476,23 @@ function App() {
       return !prev
     })
   }, [playIslandExpand, playIslandContract])
+
+  // Derived island display: a notification (#439) takes precedence over the
+  // smart greeting. Notifications are non-interactive (auto-dismiss) and carry
+  // no action chevron; the greeting remains tappable to toggle.
+  const islandMessage = islandNote?.message ?? smartGreeting?.message
+  const islandAction = islandNote ? undefined : smartGreeting?.action
+  const islandHasContent = !!(islandNote || smartGreeting)
+  const islandToggleable = !islandNote && !!smartGreeting
+  const islandTint = useMemo(() => {
+    if (!islandNote) return null
+    switch (islandNote.tone) {
+      case 'success': return { bg: 'rgba(16,185,129,0.20)', border: 'rgba(16,185,129,0.45)' }
+      case 'warning': return { bg: 'rgba(245,158,11,0.20)', border: 'rgba(245,158,11,0.45)' }
+      case 'error': return { bg: 'rgba(239,68,68,0.20)', border: 'rgba(239,68,68,0.45)' }
+      default: return { bg: 'rgba(59,130,246,0.18)', border: 'rgba(59,130,246,0.45)' }
+    }
+  }, [islandNote])
 
   // Check for existing profiles on mount
   useEffect(() => {
@@ -807,24 +871,23 @@ function App() {
     setViewState('start')
   }, [refreshProfileCount])
 
-  // Swipe navigation for mobile - back navigation via swipe right
-  const handleSwipeRight = useCallback(() => {
-    if (!isMobile) return
-    
-    // Handle back navigation based on current view
+  // Shared back-navigation mapping used by both the mobile swipe gesture and
+  // the Android hardware back button. Returns true if it navigated, false if
+  // there was nowhere to go back to (e.g. the main screen).
+  const navigateBack = useCallback((): boolean => {
     switch (viewState) {
       case 'form':
         handleBackToStart()
-        break
+        return true
       case 'results':
         handleReset()
-        break
+        return true
       case 'history-detail':
         setViewState('profile-catalogue')
-        break
+        return true
       case 'profile-catalogue':
         handleBackToStart()
-        break
+        return true
       case 'settings':
       case 'pour-over':
       case 'live-shot':
@@ -832,7 +895,7 @@ function App() {
       case 'dial-in':
       case 'machine-status':
         handleBackToStart()
-        break
+        return true
       case 'shot-history': {
         const prev = previousViewStateRef.current
         if (prev === 'shot-analysis' || prev === 'history-detail') {
@@ -840,19 +903,40 @@ function App() {
         } else {
           handleBackToStart()
         }
-        break
+        return true
       }
-      // Don't navigate on start, loading, or error views - but still block browser gesture
+      // start, loading, onboarding, error: nowhere to go back to.
       default:
-        break
+        return false
     }
-  }, [isMobile, viewState, handleBackToStart, handleReset, setViewState])
+  }, [viewState, handleBackToStart, handleReset, setViewState])
+
+  // Swipe navigation for mobile - back navigation via swipe right
+  const handleSwipeRight = useCallback(() => {
+    if (!isMobile) return
+    navigateBack()
+  }, [isMobile, navigateBack])
 
   useSwipeNavigation({
     onSwipeRight: handleSwipeRight,
     // Keep enabled on mobile to always block browser's native back gesture
     enabled: isMobile,
   })
+
+  // Android hardware back button. Priority: close an open modal/dialog/menu,
+  // otherwise confirm before discarding unsaved edits and navigate to the
+  // previous view. On the main screen there is nowhere to go back to, so the
+  // press is intentionally a no-op (the app is not exited).
+  const handleAndroidBack = useCallback(() => {
+    if (closeTopmostOverlay()) return
+    if (qrDialogOpen) { setQrDialogOpen(false); return }
+    if (showAddProfileDialog) { setShowAddProfileDialog(false); return }
+    if (pendingImportUrl) { setPendingImportUrl(null); return }
+    if (hasUnsavedChanges() && !window.confirm(t('profileEdit.unsavedChanges'))) return
+    navigateBack()
+  }, [qrDialogOpen, showAddProfileDialog, pendingImportUrl, navigateBack, t])
+
+  useAndroidBackButton(handleAndroidBack)
 
   const handleViewHistoryEntry = (entry: HistoryEntry, cachedImageUrl?: string) => {
     document.getElementById('root')?.scrollTo(0, 0)
@@ -1282,23 +1366,23 @@ function App() {
             <div className="flex items-center justify-center">
               {/* Dynamic Island — circle→pill CSS transition */}
               <div
-                  className={`inline-flex items-center select-none${!islandExpanded && smartGreeting ? ' cursor-pointer' : ''}`}
+                  className={`inline-flex items-center select-none${!islandExpanded && islandToggleable ? ' cursor-pointer' : ''}`}
                   data-sound="none"
-                  onClick={!islandExpanded && smartGreeting ? toggleIsland : undefined}
-                  role={!islandExpanded && smartGreeting ? 'button' : undefined}
-                  tabIndex={!islandExpanded && smartGreeting ? 0 : undefined}
-                  onKeyDown={!islandExpanded && smartGreeting ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
+                  onClick={!islandExpanded && islandToggleable ? toggleIsland : undefined}
+                  role={!islandExpanded && islandToggleable ? 'button' : undefined}
+                  tabIndex={!islandExpanded && islandToggleable ? 0 : undefined}
+                  onKeyDown={!islandExpanded && islandToggleable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleIsland() } } : undefined}
                   style={{
                     height: islandExpanded ? 48 : 40,
                     width: islandExpanded ? 'min(20rem, calc(100vw - 7rem))' : 40,
                     background: islandExpanded
-                      ? (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.75)')
+                      ? (islandTint ? islandTint.bg : (isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.75)'))
                       : 'transparent',
                     backdropFilter: islandExpanded ? (isDark ? 'none' : 'blur(16px) saturate(1.4)') : 'none',
                     WebkitBackdropFilter: islandExpanded ? (isDark ? 'none' : 'blur(16px) saturate(1.4)') : 'none',
                     borderRadius: 9999,
                     border: islandExpanded
-                      ? (isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.08)')
+                      ? (islandTint ? `1px solid ${islandTint.border}` : (isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(0,0,0,0.08)'))
                       : '1px solid transparent',
                     padding: islandExpanded ? '4px 4px 4px 4px' : '0',
                     overflow: 'hidden',
@@ -1311,14 +1395,14 @@ function App() {
                     type="button"
                     data-sound="none"
                     className="shrink-0 flex items-center justify-center bg-transparent border-none p-0"
-                    onClick={islandExpanded ? (e) => { e.stopPropagation(); toggleIsland() } : undefined}
-                    tabIndex={islandExpanded ? 0 : -1}
-                    aria-label={islandExpanded ? t('a11y.collapseGreeting', 'Collapse greeting') : t('a11y.appLogo', 'Metic logo')}
-                    aria-hidden={islandExpanded ? undefined : true}
+                    onClick={islandExpanded && islandToggleable ? (e) => { e.stopPropagation(); toggleIsland() } : undefined}
+                    tabIndex={islandExpanded && islandToggleable ? 0 : -1}
+                    aria-label={islandExpanded && islandToggleable ? t('a11y.collapseGreeting', 'Collapse greeting') : t('a11y.appLogo', 'Metic logo')}
+                    aria-hidden={islandExpanded && islandToggleable ? undefined : true}
                     style={{
                       width: 32,
                       height: 32,
-                      cursor: islandExpanded ? 'pointer' : 'default',
+                      cursor: islandExpanded && islandToggleable ? 'pointer' : 'default',
                       transition: 'transform 0.4s cubic-bezier(0.32, 0.72, 0, 1)',
                       transform: islandExpanded ? 'scale(0.85)' : 'scale(1)',
                     }}
@@ -1335,8 +1419,8 @@ function App() {
                     />
                   </button>
 
-                  {/* Greeting text — always in DOM for smooth animation, zero-width when collapsed */}
-                  {smartGreeting && (
+                  {/* Greeting / notification text — always in DOM for smooth animation, zero-width when collapsed */}
+                  {islandHasContent && (
                     <div
                       className="min-w-0 overflow-hidden"
                       style={{
@@ -1346,26 +1430,28 @@ function App() {
                         opacity: islandExpanded ? 1 : 0,
                         transition: 'flex 0.45s cubic-bezier(0.32, 0.72, 0, 1), width 0.45s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.35s ease 0.25s, margin-left 0.45s cubic-bezier(0.32, 0.72, 0, 1)',
                         pointerEvents: islandExpanded ? 'auto' : 'none',
-                        maskImage: islandExpanded && !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
-                        WebkitMaskImage: islandExpanded && !smartGreeting.action ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
+                        maskImage: islandExpanded && !islandAction ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
+                        WebkitMaskImage: islandExpanded && !islandAction ? 'linear-gradient(to right, black 0px, black calc(100% - 8px), transparent 100%)' : 'none',
                       }}
                     >
                       <div
                         ref={greetingTextRef as React.RefObject<HTMLDivElement>}
                         className={`text-xs island-greeting-text${isScrollActive ? ' island-scroll-active' : ''} ${isDark ? 'text-white/85' : 'text-foreground/80'}`}
+                        role={islandNote ? 'status' : undefined}
+                        aria-live={islandNote ? 'polite' : undefined}
                       >
-                        <span ref={greetingInnerRef as React.RefObject<HTMLSpanElement>} className="island-marquee-inner">{smartGreeting.message}</span>
+                        <span ref={greetingInnerRef as React.RefObject<HTMLSpanElement>} className="island-marquee-inner">{islandMessage}</span>
                       </div>
                     </div>
                   )}
 
                   {/* Action button — circular chevron on the right */}
-                  {smartGreeting?.action && islandExpanded && (
+                  {islandAction && islandExpanded && (
                     <button
                       type="button"
                       className={`shrink-0 flex items-center justify-center rounded-full transition-all ${isDark ? 'bg-white/10 hover:bg-white/20 text-white/80' : 'bg-black/5 hover:bg-black/10 text-foreground/60'}`}
-                      onClick={(e) => { e.stopPropagation(); handleGreetingAction(smartGreeting.action!.target, smartGreeting.action!.context) }}
-                      aria-label={smartGreeting.action.label}
+                      onClick={(e) => { e.stopPropagation(); handleGreetingAction(islandAction.target, islandAction.context) }}
+                      aria-label={islandAction.label}
                       style={{
                         width: 32,
                         height: 32,
@@ -1581,6 +1667,8 @@ function App() {
                   <LiveShotView
                     machineState={machineState}
                     onBack={handleBackToStart}
+                    profileData={liveProfileData}
+                    profileDescription={liveProfileDescription}
                     onAnalyzeShot={(profileName) => {
                       setShotHistoryProfileName(profileName)
                       setShotHistoryInitialDate(undefined)

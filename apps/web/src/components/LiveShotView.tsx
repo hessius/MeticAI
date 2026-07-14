@@ -21,9 +21,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  Play,
   Stop,
-  XCircle,
   ArrowLeft,
   Timer,
   Scales,
@@ -33,7 +31,6 @@ import {
   Coffee,
   Gauge,
   Lightning,
-  Fire,
 } from '@phosphor-icons/react'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
@@ -55,6 +52,9 @@ import {
 import { getServerUrl } from '@/lib/config'
 import { getActiveShotOverride } from '@/lib/activeShotOverride'
 import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
+import { HeatingDashboard } from './LiveShotView/HeatingDashboard'
+import { useHeatingSamples } from './LiveShotView/useHeatingSamples'
+import type { ProfileData } from '@/components/ProfileBreakdown'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -65,6 +65,10 @@ interface LiveShotViewProps {
   onBack: () => void
   /** Navigate to shot history for the given profile */
   onAnalyzeShot?: (profileName: string) => void
+  /** Full active-profile data (stages/variables) for the heating breakdown */
+  profileData?: ProfileData | null
+  /** Optional profile description for the heating-view collapsible disclosure */
+  profileDescription?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +113,7 @@ interface ProfileStageInfo {
  */
 export const TEMP_ON_TARGET_THRESHOLD = 2.3
 
-export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotViewProps) {
+export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData, profileDescription }: LiveShotViewProps) {
   const { t } = useTranslation()
   const chartDataRef = useRef<ChartDataPoint[]>([])
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
@@ -133,9 +137,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const { notification: hapticsNotification } = useHaptics()
   const { shotComplete: playShotComplete } = useSoundEffects()
   const { notifyBrewComplete } = useBrewNotifications()
-
-  // Brew Head target delta tile (#482): color-coded difference from target temp.
-  const tempDelta = getTempTileDisplay('delta', ms.brew_head_temperature, ms.target_temperature, t)
 
   // Prefer the temporary override weight target (when this shot was started
   // with variable overrides) so the live tile reflects what's actually brewing.
@@ -269,6 +270,37 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
   const { cmd } = useMachineActions(machineState)
   const machine = useMachineService()
 
+  // Heating-phase derivation (#494): before a shot starts and before any chart
+  // data has arrived, the live view becomes a heating dashboard.
+  const stateLC = (ms.state ?? '').toLowerCase()
+  const isHeatingPhase = !ms.brewing && chartData.length === 0
+  const isReadyState = stateLC === 'click to start'
+  const isActivelyHeating = stateLC === 'heating' || stateLC === 'preheating'
+  const headTempVal = ms.brew_head_temperature
+  const chamberTempVal = ms.boiler_temperature
+  const targetTempVal = ms.target_temperature
+  const lanceReadyCutoff =
+    targetTempVal != null ? targetTempVal - TEMP_ON_TARGET_THRESHOLD : 0
+  // "Lance's standard" easter egg: brew-head temp sits within the on-target
+  // threshold while the machine reports ready.
+  const isLancesStandard =
+    isReadyState &&
+    headTempVal != null &&
+    targetTempVal != null &&
+    Math.abs(headTempVal - targetTempVal) <= TEMP_ON_TARGET_THRESHOLD
+  // Accumulate a rolling temperature window throughout the heating *and* ready
+  // phases so the temperature chart stays populated once target is reached. The
+  // machine's preheat countdown (when present) drives sampling through plateaus
+  // where the head temp briefly stops changing near target.
+  const heatingSamples = useHeatingSamples({
+    temp: headTempVal ?? 0,
+    chamber: chamberTempVal ?? undefined,
+    active: isHeatingPhase,
+    // Treat a 0 countdown as absent so temperature changes still drive sampling
+    // near end-of-heat (0 would otherwise pin the hook's effect dependency).
+    tick: ms.preheat_countdown || undefined,
+  })
+
   // Compute stage ranges from data
   const stages = useMemo(
     () => extractStageRanges(chartData),
@@ -391,211 +423,26 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot }: LiveShotVi
       {/* ── ACTIVE SHOT / WAITING ─────────────────────────────── */}
       {!shotComplete && (
         <>
-          {/* Pre-shot empty state — gauges, deactivated chart, heating/ready prominence */}
-          {!ms.brewing && chartData.length === 0 && (() => {
-            const stateLC = (ms.state ?? '').toLowerCase()
-            const isHeating = stateLC === 'heating' || stateLC === 'preheating'
-            const isReady = stateLC === 'click to start'
-            const temp = ms.brew_head_temperature
-            const targetTemp = ms.target_temperature
-
-            return (
-              <>
-                {/* Prominent READY banner */}
-                {isReady && (() => {
-                  // "Lance's standard" easter egg: when temp is on-target, show enhanced display
-                  const isLancesStandard = temp != null && targetTemp != null && Math.abs(temp - targetTemp) <= TEMP_ON_TARGET_THRESHOLD
-                  return (
-                  <Card className={`p-4 ${isLancesStandard ? 'border-emerald-400 bg-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.4)] dark:shadow-[0_0_40px_rgba(16,185,129,0.5)]' : 'border-emerald-500/50 bg-emerald-500/10'}`}>
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`relative flex ${isLancesStandard ? 'h-4 w-4' : 'h-3 w-3'}`}>
-                          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isLancesStandard ? 'bg-emerald-300' : 'bg-emerald-400'} opacity-75`} />
-                          <span className={`relative inline-flex rounded-full ${isLancesStandard ? 'h-4 w-4' : 'h-3 w-3'} bg-emerald-500`} />
-                        </span>
-                        <span className={`font-bold ${isLancesStandard ? 'text-xl text-emerald-600 dark:text-emerald-300' : 'text-lg text-emerald-700 dark:text-emerald-400'}`}>
-                          {t('controlCenter.states.ready')}
-                        </span>
-                      </div>
-                      {temp != null && (
-                        <span className={`font-bold tabular-nums ${isLancesStandard ? 'text-4xl text-emerald-600 dark:text-emerald-300 animate-pulse' : 'text-3xl text-emerald-700 dark:text-emerald-400'}`}>
-                          {temp.toFixed(1)}°C
-                        </span>
-                      )}
-                      {/* Lance's standard subtitle */}
-                      {isLancesStandard && (
-                        <span className="text-xs font-medium text-emerald-600/80 dark:text-emerald-400/80 italic">
-                          {t('controlCenter.states.lancesStandard')}
-                        </span>
-                      )}
-                    </div>
-                  </Card>
-                  )
-                })()}
-
-                {/* Prominent HEATING display */}
-                {isHeating && (
-                  <Card className="p-4 border-orange-500/40 bg-orange-500/10">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="flex items-center gap-2">
-                        <Fire size={20} weight="fill" className="text-orange-500 animate-pulse" />
-                        <span className="text-sm font-semibold text-orange-700 dark:text-orange-400">
-                          {t('controlCenter.states.heating')}
-                        </span>
-                      </div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-bold tabular-nums text-foreground">
-                          {temp != null ? temp.toFixed(1) : '—'}
-                        </span>
-                        <span className="text-lg text-muted-foreground">°C</span>
-                        {targetTemp != null && (
-                          <span className="text-sm text-muted-foreground ml-1">
-                            / {targetTemp.toFixed(0)}°C
-                          </span>
-                        )}
-                      </div>
-                      {/* Progress bar toward target temp */}
-                      {temp != null && targetTemp != null && targetTemp > 0 && (
-                        <div className="w-full max-w-xs">
-                          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-orange-500 rounded-full transition-all duration-500"
-                              style={{ width: `${Math.min(100, (temp / targetTemp) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                      {/* Preheat countdown */}
-                      {ms.preheat_countdown != null && ms.preheat_countdown > 0 && (() => {
-                        const secs = Math.ceil(ms.preheat_countdown)
-                        const mm = Math.floor(secs / 60)
-                        const ss = String(secs % 60).padStart(2, '0')
-                        return (
-                          <span className="text-xl font-bold tabular-nums text-orange-700 dark:text-orange-400">
-                            {mm}:{ss}
-                          </span>
-                        )
-                      })()}
-                    </div>
-                  </Card>
-                )}
-
-                {/* Metric tiles (same layout as active shot) */}
-                <div className="space-y-2">
-                  {/* Full-width profile & stage card — hidden on desktop where the right column shows this */}
-                  <div className="bg-muted/50 rounded-lg px-3 py-2 flex items-center gap-3 lg:hidden">
-                    {profileImgUrl && (
-                      <img
-                        src={profileImgUrl}
-                        alt={ms.active_profile ?? ''}
-                        className="w-8 h-8 rounded-md object-cover shrink-0"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                      />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      {ms.active_profile && (
-                        <div className="text-xs font-semibold text-foreground truncate">{ms.active_profile}</div>
-                      )}
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        {ms.state || '—'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Row 1: Time, Pressure, Flow */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <MetricTile
-                      icon={<Timer size={14} />}
-                      value={ms.shot_timer?.toFixed(1) ?? '0.0'}
-                      unit="s"
-                      label={t('controlCenter.metrics.time')}
-                    />
-                    <MetricTile
-                      icon={<Gauge size={14} />}
-                      value={ms.pressure?.toFixed(1) ?? '0.0'}
-                      unit="bar"
-                      label={t('controlCenter.metrics.pressure')}
-                    />
-                    <MetricTile
-                      icon={<Drop size={14} />}
-                      value={ms.flow_rate?.toFixed(1) ?? '0.0'}
-                      unit="ml/s"
-                      label={t('controlCenter.metrics.flow')}
-                    />
-                  </div>
-                  {/* Row 2 (pre-shot): Brew Head, Brew Chamber, Target Δ — weight
-                      is omitted because the scale auto-tares when the shot starts */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <MetricTile
-                      icon={<Thermometer size={14} />}
-                      value={ms.brew_head_temperature?.toFixed(1) ?? '—'}
-                      unit="°C"
-                      label={t('controlCenter.metrics.brewTemp', 'Brew Head')}
-                    />
-                    <MetricTile
-                      icon={<Thermometer size={14} />}
-                      value={ms.boiler_temperature?.toFixed(1) ?? '—'}
-                      unit="°C"
-                      label={t('controlCenter.metrics.boilerTemp', 'Brew Chamber')}
-                    />
-                    <MetricTile
-                      icon={<Thermometer size={14} />}
-                      value={tempDelta.value}
-                      unit={tempDelta.unit}
-                      label={tempDelta.label}
-                      valueClassName={tempDelta.valueClassName}
-                    />
-                  </div>
-                </div>
-
-                {/* Deactivated chart placeholder */}
-                <Card className="p-4 opacity-40">
-                  <EspressoChart
-                    data={[]}
-                    stages={[]}
-                    heightClass="h-[25vh] lg:h-[30vh] max-h-[250px]"
-                    showWeight
-                    targetCurves={targetCurves}
-                    xMax={liveXMax}
-                  />
-                </Card>
-
-                {/* Action buttons */}
-                <div className="flex gap-3 justify-center flex-wrap">
-                  {ms.connected && (
-                    <>
-                      <Button
-                        variant="default"
-                        className="h-11 px-6"
-                        onClick={() => cmd(() => machine.continueShot(), 'startingShot')}
-                      >
-                        <Play size={18} weight="fill" className="mr-2" />
-                        {t('controlCenter.actions.start')}
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" className="h-11 px-6">
-                            <XCircle size={18} weight="fill" className="mr-2" />
-                            {t('controlCenter.actions.abort')}
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>{t('controlCenter.confirm.abortTitle')}</AlertDialogTitle>
-                            <AlertDialogDescription>{t('controlCenter.confirm.abortDesc')}</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => { cmd(() => machine.abortShot(), 'warmupCancelled'); onBack() }}>{t('common.confirm')}</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </>
-                  )}
-                </div>
-              </>
-            )
-          })()}
+          {/* Pre-shot heating dashboard (#494): temps, hero countdown, profile breakdown */}
+          {isHeatingPhase && (
+            <HeatingDashboard
+              isReady={isReadyState}
+              isHeating={isActivelyHeating}
+              lancesStandard={isLancesStandard}
+              profileName={ms.active_profile ?? ''}
+              profileImageUrl={profileImgUrl}
+              setTemp={targetTempVal ?? 0}
+              chamberTemp={chamberTempVal ?? 0}
+              headTemp={headTempVal ?? 0}
+              lanceReadyCutoff={lanceReadyCutoff}
+              samples={heatingSamples}
+              profile={profileData ?? null}
+              description={profileDescription}
+              startDisabled={!ms.connected}
+              onStart={() => cmd(() => machine.continueShot(), 'startingShot')}
+              onAbort={() => { cmd(() => machine.abortShot(), 'warmupCancelled'); onBack() }}
+            />
+          )}
 
           {/* ── Horizontal metrics — two rows ─────────────── */}
           {(ms.brewing || chartData.length > 0) && (

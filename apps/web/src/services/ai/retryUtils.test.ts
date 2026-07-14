@@ -45,6 +45,13 @@ describe('isRetryableError', () => {
     expect(isRetryableError('503 error')).toBe(true)
     expect(isRetryableError('auth failed')).toBe(false)
   })
+
+  it('treats wrapped transient AI service errors as retryable', async () => {
+    const { AIServiceError } = await import('./aiErrors')
+    expect(isRetryableError(new AIServiceError('SERVICE_UNAVAILABLE'))).toBe(true)
+    expect(isRetryableError(new AIServiceError('QUOTA_EXCEEDED'))).toBe(true)
+    expect(isRetryableError(new AIServiceError('API_KEY_INVALID'))).toBe(false)
+  })
 })
 
 describe('retryWithBackoff', () => {

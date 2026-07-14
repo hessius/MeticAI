@@ -1130,9 +1130,11 @@ async def get_changelog(request: Request):
                     "releases": [
                         {
                             "version": release.get("tag_name", ""),
-                            "date": release.get("published_at", "")[:10]
-                            if release.get("published_at")
-                            else "",
+                            "date": (
+                                release.get("published_at", "")[:10]
+                                if release.get("published_at")
+                                else ""
+                            ),
                             "body": strip_installation_section(
                                 release.get("body", "No release notes available.")
                             ),
@@ -1208,13 +1210,29 @@ async def get_settings(request: Request):
         stored_settings = load_settings()
         settings = dict(stored_settings)
 
+        # Active AI provider (#491). Defaults to gemini for backward compat.
+        from services.ai_providers import (
+            get_active_provider_id,
+            get_provider_api_key,
+            get_provider_model,
+            get_provider_descriptor,
+        )
+
+        active_provider = get_active_provider_id()
+        settings["aiProvider"] = active_provider
+        is_gemini_provider = active_provider == "gemini"
+
         # Read current values from environment
         env_api_key = os.environ.get("GEMINI_API_KEY", "")
         env_meticulous_ip = os.environ.get("METICULOUS_IP", "")
         env_server_ip = os.environ.get("PI_IP", "")
 
-        stored_api_key = str(stored_settings.get("geminiApiKey", "") or "").strip()
-        effective_api_key = env_api_key.strip() or stored_api_key
+        if is_gemini_provider:
+            stored_api_key = str(stored_settings.get("geminiApiKey", "") or "").strip()
+            effective_api_key = env_api_key.strip() or stored_api_key
+        else:
+            stored_api_key = str(stored_settings.get("aiApiKey", "") or "").strip()
+            effective_api_key = get_provider_api_key(active_provider) or stored_api_key
 
         # Always show API key as stars if set (never expose the actual key)
         if effective_api_key:
@@ -1225,6 +1243,10 @@ async def get_settings(request: Request):
             settings["geminiApiKey"] = ""
             settings["geminiApiKeyMasked"] = False
             settings["geminiApiKeyConfigured"] = False
+
+        # Never expose the raw BYO provider key (#491). The masked representation
+        # is already carried by geminiApiKey/geminiApiKeyMasked above.
+        settings.pop("aiApiKey", None)
 
         # Always show current IP values from environment (env takes precedence)
         if env_meticulous_ip:
@@ -1240,12 +1262,19 @@ async def get_settings(request: Request):
         elif "mqttEnabled" not in settings:
             settings["mqttEnabled"] = True
 
-        # Gemini model (env var takes precedence over stored setting)
-        gemini_model_env = os.environ.get("GEMINI_MODEL", "").strip()
-        if gemini_model_env:
-            settings["geminiModel"] = gemini_model_env
-        elif "geminiModel" not in settings:
-            settings["geminiModel"] = "gemini-2.5-flash"
+        # Model (env var takes precedence over stored setting). The web client
+        # reads `geminiModel` generically, so report the active provider's model.
+        if is_gemini_provider:
+            gemini_model_env = os.environ.get("GEMINI_MODEL", "").strip()
+            if gemini_model_env:
+                settings["geminiModel"] = gemini_model_env
+            elif "geminiModel" not in settings:
+                settings["geminiModel"] = "gemini-2.5-flash"
+        else:
+            settings["geminiModel"] = get_provider_model(active_provider)
+            settings["aiModelDefault"] = get_provider_descriptor(active_provider)[
+                "default_model"
+            ]
 
         return settings
 
@@ -1302,6 +1331,18 @@ async def save_settings_endpoint(request: Request):
         # Load current settings
         current_settings = load_settings()
 
+        # Active AI provider (#491). Defaults to gemini for backward compat.
+        from services.ai_providers import PROVIDERS, DEFAULT_PROVIDER
+
+        ai_provider = str(body.get("aiProvider", "") or "").strip().lower()
+        if ai_provider not in PROVIDERS:
+            stored_provider = str(current_settings.get("aiProvider", "") or "")
+            ai_provider = (
+                stored_provider if stored_provider in PROVIDERS else DEFAULT_PROVIDER
+            )
+        current_settings["aiProvider"] = ai_provider
+        is_gemini_provider = ai_provider == "gemini"
+
         # Update only provided fields
         if "authorName" in body:
             current_settings["authorName"] = body["authorName"].strip()
@@ -1311,12 +1352,13 @@ async def save_settings_endpoint(request: Request):
             if bool_key in body:
                 current_settings[bool_key] = bool(body[bool_key])
 
-        # Gemini model selection
+        # Model selection (stored per active provider).
         if "geminiModel" in body:
             model_value = str(body["geminiModel"]).strip()
-            current_settings["geminiModel"] = (
-                model_value if model_value else "gemini-2.5-flash"
-            )
+            if is_gemini_provider:
+                current_settings["geminiModel"] = model_value or "gemini-2.5-flash"
+            else:
+                current_settings["aiModel"] = model_value
 
         # For IP and API key changes, also update .env file
         env_updated = False
@@ -1327,22 +1369,35 @@ async def save_settings_endpoint(request: Request):
         if env_path.exists():
             env_content = env_path.read_text()
 
-        # Handle API key update
+        def _upsert_env(name: str, value: str) -> None:
+            """Insert or replace ``name=value`` in the in-memory .env content."""
+            nonlocal env_content
+            if f"{name}=" in env_content:
+                env_content = re.sub(
+                    rf"{re.escape(name)}=.*",
+                    lambda _m: f"{name}={value}",
+                    env_content,
+                )
+            else:
+                env_content += f"\n{name}={value}"
+
+        # Persist the active provider id to .env (only written when another
+        # change already triggers an .env write; s6 env + settings.json below
+        # guarantee persistence regardless).
+        _upsert_env("AI_PROVIDER", ai_provider)
+
+        # Handle API key update (routed to the active provider's env var).
         if body.get("geminiApiKey") and not body.get("geminiApiKeyMasked"):
             new_api_key = body["geminiApiKey"].strip()
             if (
                 new_api_key and "..." not in new_api_key and "*" not in new_api_key
             ):  # Not a masked value
-                current_settings["geminiApiKey"] = new_api_key
-                # Update .env file — use re.escape to handle special chars in keys
-                if "GEMINI_API_KEY=" in env_content:
-                    env_content = re.sub(
-                        r"GEMINI_API_KEY=.*",
-                        f"GEMINI_API_KEY={re.escape(new_api_key)}",
-                        env_content,
-                    )
+                key_env = "GEMINI_API_KEY" if is_gemini_provider else "AI_API_KEY"
+                if is_gemini_provider:
+                    current_settings["geminiApiKey"] = new_api_key
                 else:
-                    env_content += f"\nGEMINI_API_KEY={new_api_key}"
+                    current_settings["aiApiKey"] = new_api_key
+                _upsert_env(key_env, new_api_key)
                 env_updated = True
 
         # Handle Meticulous IP update
@@ -1444,11 +1499,17 @@ async def save_settings_endpoint(request: Request):
                     f"Could not restart bridge: {e}", extra={"request_id": request_id}
                 )
 
+        # Hot-reload the active provider into the process environment so the
+        # change takes effect without a container restart.
+        os.environ["AI_PROVIDER"] = ai_provider
+        _update_s6_env("AI_PROVIDER", ai_provider, request_id)
+
         if body.get("geminiApiKey") and not body.get("geminiApiKeyMasked"):
             new_api_key = body["geminiApiKey"].strip()
             if new_api_key and "..." not in new_api_key and "*" not in new_api_key:
-                os.environ["GEMINI_API_KEY"] = new_api_key
-                _update_s6_env("GEMINI_API_KEY", new_api_key, request_id)
+                key_env = "GEMINI_API_KEY" if is_gemini_provider else "AI_API_KEY"
+                os.environ[key_env] = new_api_key
+                _update_s6_env(key_env, new_api_key, request_id)
                 # Reset cached vision model so it re-configures with the new key
                 try:
                     from services.gemini_service import reset_vision_model
@@ -1460,9 +1521,10 @@ async def save_settings_endpoint(request: Request):
                         f"Failed to reset vision model: {e}",
                         extra={"request_id": request_id},
                     )
-                services_restarted.append("gemini_env")
+                services_restarted.append("ai_env")
                 logger.info(
-                    "Updated GEMINI_API_KEY in process environment",
+                    "Updated %s in process environment",
+                    key_env,
                     extra={"request_id": request_id},
                 )
 
@@ -1517,15 +1579,17 @@ async def save_settings_endpoint(request: Request):
                 "MQTT enabled=%s", mqtt_enabled, extra={"request_id": request_id}
             )
 
-        # Hot-reload Gemini model into process environment
+        # Hot-reload the model into the process environment (per active provider).
         if "geminiModel" in body:
             new_model = str(body["geminiModel"]).strip()
             if new_model:
-                os.environ["GEMINI_MODEL"] = new_model
-                _update_s6_env("GEMINI_MODEL", new_model, request_id)
-                services_restarted.append("gemini_model")
+                model_env = "GEMINI_MODEL" if is_gemini_provider else "AI_MODEL"
+                os.environ[model_env] = new_model
+                _update_s6_env(model_env, new_model, request_id)
+                services_restarted.append("ai_model")
                 logger.info(
-                    "Updated GEMINI_MODEL to %s",
+                    "Updated %s to %s",
+                    model_env,
                     new_model,
                     extra={"request_id": request_id},
                 )

@@ -28,7 +28,7 @@ import {
   XCircle,
   Fire,
   Scales,
-  House,
+  ArrowLineUp,
   Drop,
   ArrowRight,
   SpeakerHigh,
@@ -179,8 +179,8 @@ export function ControlCenterExpanded({ machineState }: ControlCenterExpandedPro
             onClick={() => { impact('light'); cmd(() => machine.tareScale(), 'tared') }}
           />
           <ActionButton
-            icon={<House size={14} weight="fill" />}
-            label={t('controlCenter.actions.home')}
+            icon={<ArrowLineUp size={14} weight="fill" />}
+            label={t('controlCenter.actions.raise')}
             disabled={(!isIdle && !isReady) || !isConnected}
             onClick={() => { impact('light'); cmd(() => machine.homePlunger(), 'homed') }}
           />

@@ -30,7 +30,7 @@ vi.mock('@/services/ai/BrowserAIService', () => ({
   })),
 }))
 
-import { installDirectModeInterceptor } from './DirectModeInterceptor'
+import { computeRichLocalAnalysis, installDirectModeInterceptor } from './DirectModeInterceptor'
 
 type FetchCall = {
   input: RequestInfo | URL
@@ -696,6 +696,86 @@ describe('DirectModeInterceptor regression harness', () => {
       })
     })
 
+    it('resolves an invented positional variable id to the real key by type and current value', async () => {
+      const profileIdent = nestedMachineProfiles()[0]
+      const editableProfile = {
+        ...profileIdent,
+        profile: {
+          ...profileIdent.profile,
+          variables: [
+            { key: 'pressure_Max Pressure', name: 'Max Pressure', type: 'pressure', value: 6, adjustable: true },
+            { key: 'pressure_PreBrew pressure', name: 'PreBrew pressure', type: 'pressure', value: 1.8, adjustable: true },
+          ],
+        },
+      }
+      let savedProfile: Record<string, unknown> | null = null
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': [editableProfile],
+        'POST /api/v1/profile/save': ({ init }: FetchCall) => {
+          savedProfile = JSON.parse(String(init?.body))
+          return jsonResponse({ ok: true })
+        },
+      }))
+      const form = new FormData()
+      // Model invented "pressure_2" instead of the real "pressure_Max Pressure".
+      form.append('recommendations', JSON.stringify([
+        { variable: 'pressure_2', current_value: 6, recommended_value: 5, stage: 'Pressure Ramp Up' },
+      ]))
+
+      const response = await window.fetch('/api/profile/Turbo%20Bloom/apply-recommendations', {
+        method: 'POST',
+        body: form,
+      })
+
+      expect(response.status).toBe(200)
+      await expect(readJson(response)).resolves.toMatchObject({
+        status: 'success',
+        applied: [
+          { variable: 'pressure_Max Pressure', value: 5, matched_from: 'pressure_2' },
+        ],
+      })
+      expect(savedProfile).toMatchObject({
+        variables: expect.arrayContaining([
+          expect.objectContaining({ key: 'pressure_Max Pressure', value: 5 }),
+          expect.objectContaining({ key: 'pressure_PreBrew pressure', value: 1.8 }),
+        ]),
+      })
+    })
+
+    it('reports no_changes (not success) when an invented variable cannot be resolved', async () => {
+      const profileIdent = nestedMachineProfiles()[0]
+      const editableProfile = {
+        ...profileIdent,
+        profile: {
+          ...profileIdent.profile,
+          variables: [
+            { key: 'flow_bloom', name: 'Bloom Flow', type: 'flow', value: 2.1, adjustable: true },
+          ],
+        },
+      }
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': [editableProfile],
+        'POST /api/v1/profile/save': () => jsonResponse({ ok: true }),
+      }))
+      const form = new FormData()
+      // No pressure variable exists, so this cannot be resolved.
+      form.append('recommendations', JSON.stringify([
+        { variable: 'pressure_2', current_value: 6, recommended_value: 5, stage: 'Ghost Stage' },
+      ]))
+
+      const response = await window.fetch('/api/profile/Turbo%20Bloom/apply-recommendations', {
+        method: 'POST',
+        body: form,
+      })
+
+      expect(response.status).toBe(200)
+      await expect(readJson(response)).resolves.toMatchObject({
+        status: 'no_changes',
+        applied: [],
+        skipped: [{ variable: 'pressure_2', reason: 'variable not found in profile' }],
+      })
+    })
+
     it('uploads and caches direct profile images on the machine profile', async () => {
       vi.useRealTimers()
       installInterceptor(createMachineFetch({
@@ -950,6 +1030,56 @@ describe('DirectModeInterceptor regression harness', () => {
       expect(body.profiles[0]).not.toHaveProperty('profile')
     })
 
+    it('surfaces cached AI sensory tags on /api/machine/profiles (#400)', async () => {
+      localStorage.setItem(
+        STORAGE_KEYS.AI_TAGS_CACHE,
+        JSON.stringify({ 'Turbo Bloom': ['Chocolate', 'Sweet'] }),
+      )
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': nestedMachineProfiles(),
+      }))
+
+      const response = await window.fetch('/api/machine/profiles')
+      const body = await readJson<{ profiles: Array<{ name: string; ai_tags?: string[] }> }>(response)
+      const turbo = body.profiles.find((p) => p.name === 'Turbo Bloom')
+      const choco = body.profiles.find((p) => p.name === 'Chocolate Cruise')
+      expect(turbo?.ai_tags).toEqual(['Chocolate', 'Sweet'])
+      expect(choco?.ai_tags).toEqual([])
+    })
+
+    it('paginates /api/shots/by-profile via the limit query param over full history', async () => {
+      // Three Turbo Bloom shots + one other, returned newest-first by the
+      // machine search endpoint. The short-listing GET is intentionally left
+      // unregistered so the test proves the POST search (with max_results) is
+      // what supplies the full history.
+      const fullHistory = [
+        { id: 's1', time: Date.parse('2026-01-01T10:00:00Z') / 1000, name: 'Turbo Bloom', file: 's1.json', profile: { id: 'profile-1', name: 'Turbo Bloom', final_weight: 36 }, data: null },
+        { id: 's2', time: Date.parse('2026-01-02T10:00:00Z') / 1000, name: 'Turbo Bloom', file: 's2.json', profile: { id: 'profile-1', name: 'Turbo Bloom', final_weight: 37 }, data: null },
+        { id: 's3', time: Date.parse('2026-01-03T10:00:00Z') / 1000, name: 'Turbo Bloom', file: 's3.json', profile: { id: 'profile-1', name: 'Turbo Bloom', final_weight: 38 }, data: null },
+        { id: 's4', time: Date.parse('2026-01-04T10:00:00Z') / 1000, name: 'Chocolate Cruise', file: 's4.json', profile: { id: 'profile-2', name: 'Chocolate Cruise', final_weight: 40 }, data: null },
+      ]
+      const historySearch = vi.fn(() => jsonResponse({ history: fullHistory }))
+      installInterceptor(createMachineFetch({
+        'POST /api/v1/history': historySearch,
+      }))
+      vi.useRealTimers()
+
+      // First page: limit=2 returns the two newest Turbo Bloom shots.
+      const page1 = await window.fetch(`/api/shots/by-profile/${encodeURIComponent('Turbo Bloom')}?limit=2`)
+      const body1 = await readJson<{ shots: Array<{ filename: string }>; count: number; limit: number }>(page1)
+      expect(historySearch).toHaveBeenCalled()
+      expect(body1.limit).toBe(2)
+      expect(body1.count).toBe(2)
+      expect(body1.shots.map((s) => s.filename)).toEqual(['s3.json', 's2.json'])
+
+      // "Load more": limit=20 returns all three Turbo Bloom shots (the other
+      // profile's shot is filtered out), newest-first.
+      const page2 = await window.fetch(`/api/shots/by-profile/${encodeURIComponent('Turbo Bloom')}?limit=20`)
+      const body2 = await readJson<{ shots: Array<{ filename: string }>; count: number }>(page2)
+      expect(body2.count).toBe(3)
+      expect(body2.shots.map((s) => s.filename)).toEqual(['s3.json', 's2.json', 's1.json'])
+    })
+
     it('applies variable overrides and runs the profile via ephemeral load', async () => {
       const profileData = nestedMachineProfiles()[0].profile
       installInterceptor(createMachineFetch({
@@ -1071,6 +1201,63 @@ describe('DirectModeInterceptor regression harness', () => {
       const second = await window.fetch('/api/machine/profiles')
       const secondBody = await readJson<{ profiles: Array<{ name: string }> }>(second)
       expect(secondBody.profiles.map((p) => p.name)).toEqual(['Turbo Bloom', 'Imported Joy'])
+    })
+
+    it('persists a new profile order via the machine settings endpoint', async () => {
+      let savedSettings: Record<string, unknown> | null = null
+      installInterceptor(createMachineFetch({
+        'POST /api/v1/settings': ({ init }: FetchCall) => {
+          savedSettings = JSON.parse(String(init?.body))
+          return jsonResponse({ ok: true })
+        },
+      }))
+
+      const response = await window.fetch('/api/machine/profiles/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: ['profile-2', 'profile-1'] }),
+      })
+
+      expect(response.status).toBe(200)
+      await expect(readJson(response)).resolves.toEqual({
+        status: 'success',
+        order: ['profile-2', 'profile-1'],
+      })
+      expect(savedSettings).toEqual({ profile_order: ['profile-2', 'profile-1'] })
+    })
+
+    it('invalidates the profile list cache after reordering', async () => {
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': () => jsonResponse(nestedMachineProfiles()),
+        'POST /api/v1/settings': () => jsonResponse({ ok: true }),
+      }))
+
+      await window.fetch('/api/machine/profiles')
+      expect(localStorage.getItem(STORAGE_KEYS.PROFILE_LIST_CACHE)).not.toBeNull()
+
+      await window.fetch('/api/machine/profiles/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: ['profile-2', 'profile-1'] }),
+      })
+
+      expect(localStorage.getItem(STORAGE_KEYS.PROFILE_LIST_CACHE)).toBeNull()
+    })
+
+    it('rejects an empty reorder request before contacting the machine', async () => {
+      const settingsRoute = vi.fn(() => jsonResponse({ ok: true }))
+      installInterceptor(createMachineFetch({
+        'POST /api/v1/settings': settingsRoute,
+      }))
+
+      const response = await window.fetch('/api/machine/profiles/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: [] }),
+      })
+
+      expect(response.status).toBe(400)
+      expect(settingsRoute).not.toHaveBeenCalled()
     })
 
     it('rejects empty direct machine profile rename requests before saving', async () => {
@@ -1243,6 +1430,65 @@ describe('DirectModeInterceptor regression harness', () => {
           expect.objectContaining({ stage_name: 'Bloom', target_flow: 2.1 }),
           expect.objectContaining({ stage_name: 'Ramp', target_pressure: 8 }),
         ]),
+      )
+    })
+
+    it('fetches full stages + variables by id when the profile list omits them', async () => {
+      // Real machines return profile/list entries without full stage data, so
+      // the pre-shot breakdown and auto-generated description must fall back to
+      // the get-by-id endpoint. The list here intentionally has empty stages.
+      const listWithoutStages = [
+        {
+          change_id: 'change-1',
+          profile: {
+            id: 'profile-1',
+            name: 'Turbo Bloom',
+            author: 'MeticAI',
+            author_id: 'author-1',
+            previous_authors: [],
+            display: { description: 'Bright fruit profile' },
+            temperature: 93,
+            final_weight: 36,
+            variables: [],
+            stages: [],
+          },
+        },
+      ] as unknown as ProfileIdent[]
+
+      const fullProfile = {
+        id: 'profile-1',
+        name: 'Turbo Bloom',
+        temperature: 93,
+        final_weight: 36,
+        variables: [{ name: 'dose', key: 'dose', value: 18 }],
+        stages: [
+          {
+            name: 'Bloom',
+            type: 'flow',
+            key: 'flow_bloom',
+            dynamics: { points: [[0, 2.1]], over: 'time', interpolation: 'linear' },
+            exit_triggers: [],
+            limits: [],
+          },
+        ],
+      }
+
+      installInterceptor(createMachineFetch({
+        'GET /api/v1/profile/list': listWithoutStages,
+        'GET /api/v1/profile/get/profile-1': fullProfile,
+      }))
+
+      const response = await window.fetch('/api/profile/Turbo%20Bloom?include_stages=true')
+      expect(response.status).toBe(200)
+      const body = await readJson<{
+        status: string
+        profile: { stages: Array<Record<string, unknown>>; variables: Array<Record<string, unknown>> }
+      }>(response)
+      expect(body.profile.stages).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: 'Bloom' })]),
+      )
+      expect(body.profile.variables).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: 'dose' })]),
       )
     })
 
@@ -1617,5 +1863,73 @@ describe('DirectModeInterceptor regression harness', () => {
       expect(lastShot.final_weight).toBe(35.9)
       expect(lastShot.total_time).toBe(33)
     })
+  })
+})
+
+describe('computeRichLocalAnalysis dynamics-format parity (#423 nested profiles)', () => {
+  // A "Slayer at Home"-style extraction: declared flow with an aggressive flow
+  // target (≥6 ml/s) governed by a pressure limit. Its effective control mode
+  // must resolve to 'pressure', and profile_max_target must resolve the $var —
+  // regardless of whether the profile stores dynamics in the flat
+  // (dynamics_points/dynamics_over) or canonical nested (dynamics.points) shape.
+  const variables = [
+    { key: 'flow_MaxFlowRate', name: 'flow_MaxFlowRate', type: 'flow', value: 10.8 },
+    { key: 'pressure_Max', name: 'Max Pressure', type: 'pressure', value: 6 },
+  ]
+  const exitTriggers = [{ type: 'weight', value: 36, comparison: '>=' }]
+  const limits = [{ type: 'pressure', value: '$pressure_Max' }]
+  const telemetry = [
+    { time: 0, profile_time: 0, status: 'Extraction', shot: { pressure: 0, flow: 0, weight: 0 } },
+    { time: 5000, profile_time: 5000, status: 'Extraction', shot: { pressure: 6, flow: 3.2, weight: 8 } },
+    { time: 30000, profile_time: 30000, status: 'Extraction', shot: { pressure: 6, flow: 2.1, weight: 36 } },
+  ]
+  const makeEntry = (stage: Record<string, unknown>): Parameters<typeof computeRichLocalAnalysis>[0] => ({
+    id: 'shot-slayer',
+    time: 0,
+    name: 'Slayer at Home',
+    profile: { name: 'Slayer at Home', final_weight: 36, temperature: 93, variables, stages: [stage as never] },
+    data: telemetry as never,
+  })
+
+  const flatStage = {
+    name: 'Extraction',
+    type: 'flow',
+    key: 'flow_extraction',
+    dynamics_points: [[0, '$flow_MaxFlowRate'], [30, '$flow_MaxFlowRate']],
+    dynamics_over: 'time',
+    exit_triggers: exitTriggers,
+    limits,
+  }
+  const nestedStage = {
+    name: 'Extraction',
+    type: 'flow',
+    key: 'flow_extraction',
+    dynamics: { points: [[0, '$flow_MaxFlowRate'], [30, '$flow_MaxFlowRate']], over: 'time', interpolation: 'linear' },
+    exit_triggers: exitTriggers,
+    limits,
+  }
+
+  it('resolves the flow target and effective pressure mode for a FLAT-format stage', () => {
+    const analysis = computeRichLocalAnalysis(makeEntry(flatStage), 'Slayer at Home') as unknown as {
+      stage_analyses: Array<{ profile_max_target: number | null; profile_target_value: number | null }>
+      shot_facts: { stages: Array<{ stage_name: string; control_mode?: string; mode_overridden?: boolean }> }
+    }
+    expect(analysis.stage_analyses[0].profile_max_target).toBe(10.8)
+    expect(analysis.stage_analyses[0].profile_target_value).toBe(10.8)
+    const fact = analysis.shot_facts.stages.find(s => s.stage_name === 'Extraction')
+    expect(fact?.control_mode).toBe('pressure')
+    expect(fact?.mode_overridden).toBe(true)
+  })
+
+  it('resolves the same for a NESTED-format stage (parity)', () => {
+    const analysis = computeRichLocalAnalysis(makeEntry(nestedStage), 'Slayer at Home') as unknown as {
+      stage_analyses: Array<{ profile_max_target: number | null; profile_target_value: number | null }>
+      shot_facts: { stages: Array<{ stage_name: string; control_mode?: string; mode_overridden?: boolean }> }
+    }
+    expect(analysis.stage_analyses[0].profile_max_target).toBe(10.8)
+    expect(analysis.stage_analyses[0].profile_target_value).toBe(10.8)
+    const fact = analysis.shot_facts.stages.find(s => s.stage_name === 'Extraction')
+    expect(fact?.control_mode).toBe('pressure')
+    expect(fact?.mode_overridden).toBe(true)
   })
 })
