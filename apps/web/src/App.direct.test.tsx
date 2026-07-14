@@ -6,7 +6,7 @@ import { isDemoMode, isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { STORAGE_KEYS } from '@/lib/constants'
 
 const secureStorageMock = vi.hoisted(() => ({
-  getItem: vi.fn(async (_key: string) => null as string | null),
+  getItem: vi.fn<(key: string) => Promise<string | null>>(async () => null),
   setItem: vi.fn(async () => {}),
   removeItem: vi.fn(async () => {}),
 }))
