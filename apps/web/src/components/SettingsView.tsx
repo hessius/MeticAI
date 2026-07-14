@@ -511,6 +511,14 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             } catch { /* localStorage unavailable — non-critical */ }
             // Persist to the Keychain in the background; must not block the UI gate.
             void Promise.resolve(secureSetItem(keyStorageKey, apiKey)).catch(() => {})
+            // Mirror onboarding: saving a hosted key must move AI into a
+            // hosted-inclusive mode. Without this, a stored 'none'/degraded mode
+            // leaves the freshly entered key inert until the user re-onboards.
+            const rawMode = localStorage.getItem(STORAGE_KEYS.AI_MODE)
+            if (rawMode !== 'hosted' && rawMode !== 'both') {
+              setAIMode('hosted')
+              setAiModeState('hosted')
+            }
             window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { apiKeyChanged: true } }))
           }
           if (nextSettings.authorName) {

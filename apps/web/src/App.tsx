@@ -45,6 +45,7 @@ import { useBackgroundBlobs } from '@/hooks/useBackgroundBlobs'
 import { useThemePreference } from '@/hooks/useThemePreference'
 import { Sun, Moon, Gear, ArrowRight } from '@phosphor-icons/react'
 import { AI_PREFS_CHANGED_EVENT, getAiEnabled, getHideAiWhenUnavailable, getAutoSync, getAutoSyncAiDescription, syncAutoSyncFromServer } from '@/lib/aiPreferences'
+import { isAIConfigured, apiKeyStorageKey, getActiveProviderId } from '@/services/ai/providers'
 
 // Phase 3 — Control Center & live telemetry
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
@@ -197,20 +198,24 @@ function App() {
       // In direct or demo mode, no MeticAI backend — use sensible defaults
       if (isDemoMode() || isDirectMode()) {
         setMqttEnabled(true) // DemoAdapter / Socket.IO provides telemetry
-        // On native, the API key may be in SecureStorage (Keychain) but not in localStorage.
-        // Mirror it so synchronous checks (BrowserAIService, feature flags) find it.
-        if (isNativePlatform() && !localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()) {
+        // On native, the active hosted provider's key may be in SecureStorage
+        // (Keychain) but not in localStorage. Mirror the ACTIVE provider's slot
+        // (not just Gemini) so synchronous checks (BrowserAIService, feature
+        // flags, the AI gate) find it and the key takes effect without
+        // re-onboarding.
+        const activeKeySlot = apiKeyStorageKey(getActiveProviderId())
+        if (isNativePlatform() && !localStorage.getItem(activeKeySlot)?.trim()) {
           try {
             const { SecureStorage } = await import('@aparajita/capacitor-secure-storage')
-            const secureKey = await SecureStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)
+            const secureKey = await SecureStorage.getItem(activeKeySlot)
             if (secureKey?.trim()) {
-              localStorage.setItem(STORAGE_KEYS.GEMINI_API_KEY, secureKey)
+              localStorage.setItem(activeKeySlot, secureKey)
             }
           } catch {
             // SecureStorage unavailable — skip migration
           }
         }
-        setIsAiConfigured(Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()))
+        setIsAiConfigured(isAIConfigured())
         return
       }
       try {
@@ -260,7 +265,7 @@ function App() {
       setHideAiWhenUnavailable(getHideAiWhenUnavailable())
       // Re-check API key availability (may have been added/removed in Settings)
       if (isDemoMode() || isDirectMode()) {
-        setIsAiConfigured(Boolean(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)?.trim()))
+        setIsAiConfigured(isAIConfigured())
       } else {
         // Proxy/server mode: re-fetch from the backend so the AI gate refreshes
         // immediately when a key is added in Settings, without waiting to leave
