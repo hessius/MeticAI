@@ -107,7 +107,7 @@
     "octokit": "^5.0.5",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.7",
-    "react-day-picker": "^9.14.0",
+    "react-day-picker": "^10.0.1",
     "react-dom": "^19.2.7",
     "react-easy-crop": "^6.0.2",
     "react-error-boundary": "^6.1.2",
