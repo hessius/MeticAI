@@ -115,7 +115,7 @@
     "react-i18next": "17.0.6",
     "react-is": "^19.2.7",
     "react-resizable-panels": "^4.11.2",
-    "recharts": "^3.9.0",
+    "recharts": "^3.9.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "3.6.0",
     "three": "^0.184.0",
