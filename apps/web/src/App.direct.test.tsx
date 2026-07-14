@@ -3,6 +3,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode, HTMLAttributes } from 'react'
 import { hasFeature, type FeatureFlags } from '@/lib/featureFlags'
 import { isDemoMode, isDirectMode, isNativePlatform } from '@/lib/machineMode'
+import { STORAGE_KEYS } from '@/lib/constants'
+
+const secureStorageMock = vi.hoisted(() => ({
+  getItem: vi.fn(async (_key: string) => null as string | null),
+  setItem: vi.fn(async () => {}),
+  removeItem: vi.fn(async () => {}),
+}))
+
+vi.mock('@aparajita/capacitor-secure-storage', () => ({
+  SecureStorage: secureStorageMock,
+}))
 
 vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
@@ -91,6 +102,10 @@ vi.mock('@/hooks/useMachineTelemetry', () => ({
 
 vi.mock('@/hooks/useSmartGreeting', () => ({
   useSmartGreeting: () => null,
+}))
+
+vi.mock('@/hooks/useBrewNotifications', () => ({
+  useBrewNotifications: () => ({ notifyPreheatComplete: vi.fn() }),
 }))
 
 vi.mock('@/hooks/useLastShot', () => ({
@@ -221,3 +236,42 @@ describe('App cloud sync guard', () => {
     expect(localStorage.getItem('meticai-auto-sync-ai-description')).toBe('true')
   })
 })
+
+describe('App AI gate — provider-aware Keychain mirror', () => {
+  beforeEach(() => {
+    mockedIsDemoMode.mockReturnValue(false)
+    mockedIsDirectMode.mockReturnValue(true)
+    mockedIsNativePlatform.mockReturnValue(true)
+    mockedHasFeature.mockImplementation((feature: keyof FeatureFlags) => feature !== 'cloudSync')
+    localStorage.clear()
+    secureStorageMock.getItem.mockReset()
+    secureStorageMock.getItem.mockImplementation(async () => null)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('mirrors the active hosted provider key slot from the Keychain, not just the Gemini slot', async () => {
+    // A hosted user configured a non-Gemini provider (OpenAI). Its key lives in
+    // the Keychain under the provider-specific slot, not the Gemini slot.
+    localStorage.setItem(STORAGE_KEYS.AI_PROVIDER, 'openai')
+    localStorage.setItem(STORAGE_KEYS.AI_MODE, 'hosted')
+    localStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETE, 'true')
+    const openaiSlot = `${STORAGE_KEYS.AI_KEY_PREFIX}openai`
+    secureStorageMock.getItem.mockImplementation(async (key: string) =>
+      key === openaiSlot ? 'sk-openaikey' : null)
+
+    render(<App />)
+
+    // The gate must consult the active provider's slot so the key takes effect
+    // without re-onboarding; hardcoding the Gemini slot leaves it inert.
+    await waitFor(() => {
+      expect(localStorage.getItem(openaiSlot)).toBe('sk-openaikey')
+    })
+    expect(secureStorageMock.getItem).toHaveBeenCalledWith(openaiSlot)
+  })
+})
+

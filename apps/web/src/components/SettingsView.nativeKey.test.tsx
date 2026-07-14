@@ -147,6 +147,29 @@ describe('SettingsView native-mode API key save', () => {
     })
   })
 
+  it('promotes AI_MODE to hosted when a hosted key is saved while the mode is not hosted-inclusive', async () => {
+    secureStorageMock.setItem.mockImplementation(async () => {})
+    // A stored non-hosted mode ('none') leaves a freshly entered hosted key inert
+    // (isAIConfigured stays false) until the user re-onboards. Saving the key in
+    // Settings must promote the mode to hosted, mirroring the onboarding path.
+    storageBacking.set(STORAGE_KEYS.AI_MODE, 'none')
+
+    await act(async () => {
+      render(<SettingsView onBack={() => {}} />)
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+
+    const aiSection = await screen.findByText('settings.aiSettings')
+    fireEvent.click(aiSection)
+    const input = await screen.findByLabelText('settings.providerApiKey')
+
+    fireEvent.change(input, { target: { value: 'AIzaNATIVEKEY' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 850)) })
+
+    expect(localStorage.getItem(STORAGE_KEYS.GEMINI_API_KEY)).toBe('AIzaNATIVEKEY')
+    expect(localStorage.getItem(STORAGE_KEYS.AI_MODE)).toBe('hosted')
+  })
+
   it('removes the stored key from localStorage and the Keychain when the field is cleared', async () => {
     secureStorageMock.setItem.mockImplementation(async () => {})
     await act(async () => {
