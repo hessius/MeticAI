@@ -23,7 +23,6 @@ import {
   Globe,
   WifiHigh,
   WifiSlash,
-  House,
   Key,
   Link as LinkIcon,
   Copy,
@@ -83,7 +82,6 @@ interface Settings {
   meticulousIp: string
   authorName: string
   geminiModel?: string
-  mqttEnabled?: boolean
   geminiApiKeyMasked?: boolean
   geminiApiKeyConfigured?: boolean
 }
@@ -124,8 +122,6 @@ interface TailscaleStatus {
 // Maximum expected update duration (3 minutes)
 const MAX_UPDATE_DURATION = 180000
 const PROGRESS_UPDATE_INTERVAL = 500
-const METICULOUS_ADDON_INSTALL_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && python3 -m pip install -r requirements.txt && python3 -m pip install ."'
-const METICULOUS_ADDON_UPDATE_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && git pull --ff-only && python3 -m pip install ."'
 
 function normalizeMachineUrl(value: string): string | null {
   const trimmed = value.trim()
@@ -158,8 +154,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     geminiApiKey: '',
     meticulousIp: '',
     authorName: '',
-    geminiModel: 'gemini-2.5-flash',
-    mqttEnabled: true
+    geminiModel: 'gemini-2.5-flash'
   })
   const [aiProvider, setAiProviderState] = useState<ProviderId>(getActiveHostedProviderId())
   const [aiMode, setAiModeState] = useState<AIMode>(getAIMode())
@@ -294,7 +289,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             meticulousIp: new URL(getDefaultMachineUrl()).hostname,
             authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
             geminiModel: localStorage.getItem(modelKey) || defaultModel,
-            mqttEnabled: true,
             geminiApiKeyMasked: false,
             geminiApiKeyConfigured: Boolean(storedKey.trim()),
           })
@@ -307,7 +301,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             meticulousIp: new URL(getDefaultMachineUrl()).hostname,
             authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
             geminiModel: localStorage.getItem(modelKey) || defaultModel,
-            mqttEnabled: true,
             geminiApiKeyMasked: false,
             geminiApiKeyConfigured: Boolean(fallbackKey.trim()),
           })
@@ -326,7 +319,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             meticulousIp: data.meticulousIp || '',
             authorName: data.authorName || '',
             geminiModel: data.geminiModel || 'gemini-2.5-flash',
-            mqttEnabled: data.mqttEnabled !== false,
             geminiApiKeyMasked: data.geminiApiKeyMasked || false,
             geminiApiKeyConfigured: data.geminiApiKeyConfigured || false
           })
@@ -519,6 +511,14 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             } catch { /* localStorage unavailable — non-critical */ }
             // Persist to the Keychain in the background; must not block the UI gate.
             void Promise.resolve(secureSetItem(keyStorageKey, apiKey)).catch(() => {})
+            // Mirror onboarding: saving a hosted key must move AI into a
+            // hosted-inclusive mode. Without this, a stored 'none'/degraded mode
+            // leaves the freshly entered key inert until the user re-onboards.
+            const rawMode = localStorage.getItem(STORAGE_KEYS.AI_MODE)
+            if (rawMode !== 'hosted' && rawMode !== 'both') {
+              setAIMode('hosted')
+              setAiModeState('hosted')
+            }
             window.dispatchEvent(new CustomEvent(AI_PREFS_CHANGED_EVENT, { detail: { apiKeyChanged: true } }))
           }
           if (nextSettings.authorName) {
@@ -532,7 +532,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           const payload: Record<string, string | boolean | undefined> = {
             authorName: nextSettings.authorName,
             meticulousIp: nextSettings.meticulousIp,
-            mqttEnabled: nextSettings.mqttEnabled,
             geminiModel: nextSettings.geminiModel,
             aiProvider,
           }
@@ -703,14 +702,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
       })
     } finally {
       setIsDetecting(false)
-    }
-  }
-
-  const handleCopyText = async (value: string) => {
-    try {
-      await navigator.clipboard.writeText(value)
-    } catch (err) {
-      console.error('Failed to copy snippet:', err)
     }
   }
 
@@ -1432,104 +1423,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                 />
               </div>
             </CollapsibleSection>
-
-            {/* MQTT Bridge */}
-            {hasFeature('bridgeStatus') && <CollapsibleSection
-              title={t('settings.mqttBridge')}
-              trailing={
-                <a
-                  href="https://github.com/hessius/MeticAI/blob/main/HOME_ASSISTANT.md"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-primary transition-colors"
-                  title={t('settings.homeAssistantGuide')}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Question size={14} weight="bold" />
-                </a>
-              }
-            >
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="mqtt-toggle" className="text-sm font-medium">
-                    {t('settings.mqttEnabled')}
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {t('settings.mqttEnabledDescription')}
-                  </p>
-                </div>
-                <Switch
-                  id="mqtt-toggle"
-                  checked={settings.mqttEnabled}
-                  onCheckedChange={(checked) => {
-                    setSettings(prev => {
-                      const next = { ...prev, mqttEnabled: checked as boolean }
-                      debouncedSave(next)
-                      return next
-                    })
-                    if (checked) playToggleOn(); else playToggleOff()
-                  }}
-                />
-              </div>
-              {settings.mqttEnabled && (
-                <div className="space-y-2 pt-1">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => window.open('https://my.home-assistant.io/redirect/config_flow_start?domain=mqtt', '_blank')}
-                  >
-                    <House size={18} className="mr-2" weight="bold" />
-                    {t('settings.addToHomeAssistant')}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    {t('settings.homeAssistantDescription')}
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-2 pt-1 border-t border-border/50">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium">Meticulous Add-on</h4>
-                  <a
-                    href="https://github.com/nickwilsonr/meticulous-addon"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline"
-                  >
-                    GitHub
-                  </a>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Copy these snippets to install or update the addon manually in the running container.
-                </p>
-                <div className="rounded-md border border-border/60 bg-muted/30 p-2 flex items-start gap-2">
-                  <Code size={14} className="mt-0.5 text-muted-foreground shrink-0" weight="bold" />
-                  <code className="text-[11px] leading-relaxed text-foreground break-all flex-1">{METICULOUS_ADDON_INSTALL_SNIPPET}</code>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0"
-                    onClick={() => handleCopyText(METICULOUS_ADDON_INSTALL_SNIPPET)}
-                    title="Copy install command"
-                  >
-                    <Copy size={13} />
-                  </Button>
-                </div>
-                <div className="rounded-md border border-border/60 bg-muted/30 p-2 flex items-start gap-2">
-                  <Code size={14} className="mt-0.5 text-muted-foreground shrink-0" weight="bold" />
-                  <code className="text-[11px] leading-relaxed text-foreground break-all flex-1">{METICULOUS_ADDON_UPDATE_SNIPPET}</code>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0"
-                    onClick={() => handleCopyText(METICULOUS_ADDON_UPDATE_SNIPPET)}
-                    title="Copy update command"
-                  >
-                    <Copy size={13} />
-                  </Button>
-                </div>
-              </div>
-            </CollapsibleSection>}
 
             {/* Appearance */}
             {(onToggleBlobs !== undefined || onToggleTheme !== undefined) && (

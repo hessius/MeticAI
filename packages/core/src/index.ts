@@ -1,4 +1,4 @@
-export { handle } from "./handler";
+export { handle, tryHandle } from "./handler";
 export {
   jsonResponse,
   errorResponse,
@@ -14,4 +14,5 @@ export type {
   Scheduler,
   Logger,
   AIConfig,
+  GenerationProgressEvent,
 } from "./platform";

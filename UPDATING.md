@@ -1,5 +1,9 @@
 # 🔄 Updating Metic
 
+> **3.0.0 note:** the in-app self-updater has been removed (the `/api/trigger-update`
+> endpoint now returns 503). Updating is handled by pulling the image, or
+> automatically via the optional Watchtower sidecar.
+
 ## Quick Update (v2.x)
 
 ```bash

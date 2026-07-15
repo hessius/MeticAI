@@ -8,6 +8,8 @@
  */
 
 import { createServer } from "./server.ts";
+import { rollbackSqliteMigration } from "./platform/sqliteMigration.ts";
+import { join } from "node:path";
 
 async function healthcheck(): Promise<number> {
   const port = Number(process.env.PORT ?? 3550);
@@ -39,8 +41,23 @@ async function main(): Promise<void> {
       process.exit(await healthcheck());
       break;
     }
+    case "storage-rollback": {
+      // Reverse a SQLite boot migration: drop metic.db and restore the
+      // flat-JSON *.bak originals (issue #531). Idempotent.
+      const dataDir = process.env.DATA_DIR ?? join(process.cwd(), "data");
+      const did = rollbackSqliteMigration(dataDir, (m) => console.log(m));
+      console.log(
+        did
+          ? "storage rollback complete"
+          : "no SQLite migration to roll back (no stamp found)",
+      );
+      process.exit(0);
+      break;
+    }
     default: {
-      console.error(`Unknown command: ${command}\nUsage: metic-server [serve|healthcheck]`);
+      console.error(
+        `Unknown command: ${command}\nUsage: metic-server [serve|healthcheck|storage-rollback]`,
+      );
       process.exit(2);
     }
   }

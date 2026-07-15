@@ -25,6 +25,7 @@ import { computeRichLocalAnalysis, type HistEntry } from "../logic/shotAnalysis"
 import { buildShotFacts } from "../logic/shotFacts";
 import { buildTasteContext } from "../ai/prompts";
 import { buildAnalyzeLlmPrompt } from "./analyzeLlmPrompt";
+import { needsCompactPrompt } from "../ai/contextWindow";
 import {
   lintShotAnalysis,
   validateAgainstFacts,
@@ -188,6 +189,7 @@ export async function handleShotAnalysisRoutes(
         cleanStages,
         facts,
         tasteContext,
+        compact: needsCompactPrompt(platform.ai),
       });
 
       const generate = async (): Promise<string> => {

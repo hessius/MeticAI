@@ -412,6 +412,27 @@ describe("profiles-crud: sync + orphaned + profile json", () => {
     expect(body).toEqual({ status: "success", new: [], updated: [], orphaned: [] });
   });
 
+  test("sync/accept/{id} returns a benign success (no notFound leak)", async () => {
+    const p = makeMockPlatform({ machine: scriptedMachine({}) });
+    const res = await handle(jsonReq("/api/profiles/sync/accept/prof-1", "POST"), p);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({
+      status: "success",
+      profile_name: "prof-1",
+      content_hash: "",
+      ai_description_generated: false,
+    });
+  });
+
+  test("sync/accept decodes an encoded profile id", async () => {
+    const p = makeMockPlatform({ machine: scriptedMachine({}) });
+    const body = await (
+      await handle(jsonReq("/api/profiles/sync/accept/My%20Profile", "POST"), p)
+    ).json();
+    expect(body.profile_name).toBe("My Profile");
+  });
+
   test("orphaned returns an empty list", async () => {
     const p = makeMockPlatform({ machine: scriptedMachine({}) });
     const body = await (await handle(get("/api/machine/profiles/orphaned"), p)).json();

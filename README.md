@@ -44,8 +44,7 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 
 ### For Power Users
 - 🔌 **REST API** - Integrate with any automation system
-- 🏠 **Home Assistant** - MQTT bridge for HA automations and entities
-- 🐳 **Single Docker Container** - Simple deployment and updates
+- 🐳 **Single Docker Container** - Simple, distroless single-binary deployment
 - 🔓 **Open Source** - Customize and extend as you like
 - 🔄 **Auto Updates** - Optional Watchtower integration
 
@@ -156,29 +155,22 @@ server is required.
 
 ## 🎛️ Control Center
 
-Metic includes a real-time Control Center powered by the [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) MQTT bridge:
+Metic includes a real-time Control Center with live machine telemetry streamed
+straight from your Meticulous over the built-in `/api/ws/live` WebSocket:
 
 - **Live telemetry** — Real-time pressure, flow, weight, and temperature gauges
 - **Machine control** — Preheat, tare, purge, abort, brightness, sounds, and more
 - **Live Shot View** — Watch your extraction in real-time with live charts
 - **Auto-detection** — Automatically detects when a shot starts and prompts you to watch
 - **Last Shot Banner** — After a shot, offers one-tap analysis with AI coaching
-- **Home Assistant** — MQTT bridge enables auto-discovery of 24 sensors + 11 commands in HA
 
-The Control Center appears as a side panel on desktop and a full page on mobile. Enable it in Settings → Control Center → MQTT Bridge.
+The Control Center appears as a side panel on desktop and a full page on mobile,
+and works out of the box with no extra services.
 
-### Home Assistant Integration
-
-When the MQTT bridge is enabled, your Meticulous machine is automatically discoverable in Home Assistant.
-
-1. Start Metic with the Home Assistant overlay:
-   ```bash
-   docker compose -f docker-compose.yml -f docker-compose.homeassistant.yml up -d
-   ```
-2. In HA, add the **MQTT** integration and point it to your Metic server's IP on port 1883
-3. This enables automations like "notify me when my shot is done" or "preheat at 7am on weekdays"
-
-[→ Full Home Assistant integration guide](HOME_ASSISTANT.md)
+> **Removed in 3.0.0:** the Home Assistant MQTT bridge (mosquitto broker +
+> meticulous-addon) has been removed along with the Python backend. Live
+> telemetry and machine control are unaffected; only HA MQTT auto-discovery is
+> gone. See [HOME_ASSISTANT.md](HOME_ASSISTANT.md) for details.
 
 ## 🔄 Updating Metic
 
@@ -192,7 +184,8 @@ With Watchtower enabled, updates happen automatically every 6 hours.
 
 ### Manage Addons After Install
 
-You can enable or disable optional addons at any time (Watchtower, Tailscale, Home Assistant MQTT) without re-running the full installer.
+You can enable or disable optional addons at any time (Watchtower, Tailscale)
+without re-running the full installer.
 
 Linux/macOS:
 

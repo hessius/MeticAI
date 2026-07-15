@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { buildFullProfilePrompt, validateAndRetryProfile } from "../../src/ai/profilePromptFull";
+import { buildFullProfilePrompt, buildCompactProfilePrompt, validateAndRetryProfile } from "../../src/ai/profilePromptFull";
 
 const validProfile = {
   name: "Valid Bloom",
@@ -53,6 +53,50 @@ describe("buildFullProfilePrompt", () => {
     const prompt = buildFullProfilePrompt("Ada", "18g dose", [], false);
     expect(prompt).not.toContain("Analyze the coffee bag image.");
     expect(prompt).toContain("TASK: Create a sophisticated espresso profile while strictly adhering to the user's requirements above.");
+  });
+});
+
+describe("buildFullProfilePrompt (compact / on-device)", () => {
+  const args: [string, string, string[], boolean] = ["Metic", "light roast, 1:3 ratio", ["turbo"], false];
+
+  test("is materially smaller than the full prompt", () => {
+    const full = buildFullProfilePrompt(...args);
+    const compact = buildFullProfilePrompt(...args, true);
+    expect(compact.length).toBeLessThan(full.length * 0.6);
+  });
+
+  test("delegates to the compact builder when compact=true", () => {
+    const viaFlag = buildFullProfilePrompt(...args, true);
+    const direct = buildCompactProfilePrompt(...args);
+    expect(viaFlag).toBe(direct);
+  });
+
+  test("preserves the output contract the extractor needs", () => {
+    const p = buildFullProfilePrompt(...args, true);
+    expect(p).toContain("**Profile Created:**");
+    expect(p).toContain("```json");
+    expect(p).toContain("author");
+  });
+
+  test("keeps the rejection-critical validation rules", () => {
+    const p = buildFullProfilePrompt(...args, true);
+    expect(p).toMatch(/flow stage must NOT have a flow exit trigger/i);
+    expect(p).toMatch(/time exit trigger/i);
+    expect(p).toMatch(/pressure stages need a flow limit/i);
+    expect(p).toMatch(/relative/i);
+  });
+
+  test("honours mandatory user preferences", () => {
+    const p = buildFullProfilePrompt("Metic", "20g dose", [], false, true);
+    expect(p).toContain("20g dose");
+    expect(p).toMatch(/MANDATORY/i);
+  });
+
+  test("adapts the task line for image input", () => {
+    const withImage = buildFullProfilePrompt("Metic", "", [], true, true);
+    const noImage = buildFullProfilePrompt("Metic", "", [], false, true);
+    expect(withImage).toMatch(/coffee bag image/i);
+    expect(noImage).not.toMatch(/coffee bag image/i);
   });
 });
 

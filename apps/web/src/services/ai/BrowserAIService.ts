@@ -33,7 +33,7 @@ import { STORAGE_KEYS } from '@/lib/constants'
 import { lintShotAnalysis, repairShotAnalysis, checkStructure } from '@/lib/analysisLint'
 import { safeRandomUUID } from '@/lib/uuid'
 import { AIServiceError, type AIErrorCode as AIErrorCodeBase } from './aiErrors'
-import { getProviderForMethod, isAIConfigured } from './providers'
+import { getProviderForMethod, isAIConfigured, needsCompactPrompt } from './providers'
 
 /**
  * Typed AI service error codes — UI layer translates these via i18n.
@@ -84,6 +84,7 @@ export function createBrowserAIService(): AIService {
         request.preferences,
         request.tags,
         !!request.image,
+        needsCompactPrompt(provider),
       )
       parts.push({ text: systemPrompt })
 

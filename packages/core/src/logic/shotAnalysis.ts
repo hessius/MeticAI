@@ -260,6 +260,7 @@ export function computeRichLocalAnalysis(entry: HistEntry, profileName: string):
     startWeight: number; endWeight: number
     startPressure: number; endPressure: number; avgPressure: number; maxPressure: number; minPressure: number
     startFlow: number; endFlow: number; avgFlow: number; maxFlow: number
+    boundaryPressure?: number; boundaryFlow?: number; boundaryWeight?: number; boundaryTime?: number
   }
   const shotStages = new Map<string, StageStats>()
   {
@@ -292,6 +293,25 @@ export function computeRichLocalAnalysis(entry: HistEntry, profileName: string):
       stagePts.push(pt)
     }
     flush()
+  }
+
+  // Attach boundary (transition) values. The machine flips a sample's status to
+  // the next stage on the control tick where the current stage's exit condition
+  // becomes true, so the sample that satisfies a rising pressure/flow trigger is
+  // labeled as the FIRST sample of the next stage. Expose it (the next stage's
+  // start_* values) so exit evaluation credits the stage for the value that
+  // ended it; otherwise a stage that exits exactly when its target is reached is
+  // falsely assessed as "failed".
+  {
+    const ordered = [...shotStages.entries()]
+    for (let i = 0; i < ordered.length - 1; i++) {
+      const cur = ordered[i][1]
+      const nxt = ordered[i + 1][1]
+      cur.boundaryPressure = nxt.startPressure
+      cur.boundaryFlow = nxt.startFlow
+      cur.boundaryWeight = nxt.startWeight
+      cur.boundaryTime = nxt.startTime
+    }
   }
 
   let maxPressure = 0, maxFlow = 0
@@ -443,16 +463,37 @@ export function computeRichLocalAnalysis(entry: HistEntry, profileName: string):
         const tVal = _resolveVar(tr.value, vars)
         const comp = tr.comparison ?? '>='
         let actual = 0
-        if (tType === 'time') actual = sd.duration
-        else if (tType === 'weight') actual = sd.endWeight
-        else if (tType === 'pressure') actual = comp === '>=' || comp === '>' ? sd.maxPressure : sd.endPressure
-        else if (tType === 'flow') actual = comp === '>=' || comp === '>' ? sd.maxFlow : sd.endFlow
+        let boundaryActual: number | undefined
+        if (tType === 'time') {
+          actual = sd.duration
+          if (sd.boundaryTime !== undefined) boundaryActual = sd.boundaryTime - sd.startTime
+        } else if (tType === 'weight') {
+          actual = sd.endWeight
+          boundaryActual = sd.boundaryWeight
+        } else if (tType === 'pressure') {
+          actual = comp === '>=' || comp === '>' ? sd.maxPressure : sd.endPressure
+          boundaryActual = sd.boundaryPressure
+        } else if (tType === 'flow') {
+          actual = comp === '>=' || comp === '>' ? sd.maxFlow : sd.endFlow
+          boundaryActual = sd.boundaryFlow
+        }
         const tol = (tType === 'time' || tType === 'weight') ? 0.5 : 0.2
-        let hit = false
-        if (comp === '>=') hit = actual >= tVal - tol
-        else if (comp === '>') hit = actual > tVal
-        else if (comp === '<=') hit = actual <= tVal + tol
-        else if (comp === '<') hit = actual < tVal
+        const evalHit = (a: number) => {
+          if (comp === '>=') return a >= tVal - tol
+          if (comp === '>') return a > tVal
+          if (comp === '<=') return a <= tVal + tol
+          if (comp === '<') return a < tVal
+          return false
+        }
+        let hit = evalHit(actual)
+        // The machine advances stages on the tick where the exit condition
+        // fires, so the satisfying sample is labeled as the next stage. If the
+        // in-stage value falls short, rescue the trigger with that transition
+        // (boundary) value rather than falsely reporting the stage as failed.
+        if (!hit && boundaryActual !== undefined && evalHit(boundaryActual)) {
+          actual = boundaryActual
+          hit = true
+        }
         const u = unitMap[tType] ?? ''
         const info = { type: tType, target: tVal, actual: _round1(actual), description: `${tType} >= ${tVal}${u}` }
         if (hit && !triggered) triggered = info

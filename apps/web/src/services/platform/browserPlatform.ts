@@ -4,7 +4,7 @@
  * This is the direct-mode counterpart to the Bun server's Node platform
  * (`apps/bun-server/src/platform/node.ts`): it lets the SAME `@metic/core`
  * `handle(request, platform)` run entirely client-side, replacing the bespoke
- * per-route logic in `DirectModeInterceptor`.
+ * per-route logic of the retired direct-mode fetch interceptor.
  *
  * Storage is IndexedDB-backed. To match the Node platform's verbatim JSON
  * semantics EXACTLY (its repos read/write documents unchanged), the keyed-map
@@ -35,11 +35,16 @@ import type {
   AIConfig,
   BlobStore,
   Cache,
+  GenerationProgressEvent,
   Logger,
   Platform,
   PlatformAI,
   Repo,
 } from "@metic/core/platform";
+
+// Kept in sync with `DIRECT_MODE_PROGRESS_EVENT` in @/hooks/useGenerationProgress.
+// Duplicated (not imported) so the platform layer doesn't pull in a React hook.
+const GENERATION_PROGRESS_EVENT = "meticai:generation-progress";
 
 /** Namespace prefix for core-owned documents in the IndexedDB settings store. */
 const CORE_KEY_PREFIX = "core:";
@@ -192,6 +197,9 @@ function providerAI(getProvider: () => AIProvider, configured: () => boolean): P
     currentModel() {
       return getProviderModel(getActiveHostedProviderId());
     },
+    contextWindowTokens() {
+      return getProvider().capabilities.contextWindowTokens;
+    },
   };
 }
 
@@ -268,5 +276,38 @@ export function createBrowserPlatform(deps: BrowserPlatformDeps = {}): Platform 
       deps.appVersion ??
       ((globalThis as Record<string, unknown>).__APP_VERSION__ as string | undefined) ??
       "unknown",
+    reportProgress: browserReportProgress(clock),
+  };
+}
+
+/**
+ * Drive the segmented profile-generation progress bar. Core emits phase events
+ * during `analyze_and_profile`; here we translate them into the
+ * `meticai:generation-progress` CustomEvent that `useGenerationProgress`
+ * listens for in direct mode. `elapsed` is measured from the first `analyzing`
+ * event of each run. Never throws into the caller.
+ */
+function browserReportProgress(clock: () => number): (event: GenerationProgressEvent) => void {
+  let startTime = 0;
+  return (event) => {
+    try {
+      if (typeof window === "undefined") return;
+      if (event.phase === "analyzing" && startTime === 0) startTime = clock();
+      const elapsed = startTime === 0 ? 0 : (clock() - startTime) / 1000;
+      if (event.phase === "complete" || event.phase === "failed") startTime = 0;
+      window.dispatchEvent(
+        new CustomEvent(GENERATION_PROGRESS_EVENT, {
+          detail: {
+            phase: event.phase,
+            message: event.message,
+            attempt: event.attempt ?? 1,
+            max_attempts: event.maxAttempts ?? 3,
+            elapsed,
+          },
+        }),
+      );
+    } catch {
+      /* progress reporting is best-effort */
+    }
   };
 }

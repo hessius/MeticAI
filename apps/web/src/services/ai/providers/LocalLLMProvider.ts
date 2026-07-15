@@ -64,6 +64,10 @@ export class LocalLLMProvider implements AIProvider {
     vision: false,
     imageGen: false,
     jsonMode: false,
+    // Apple Intelligence and Gemma 4 E2B both run in a ~4096-token window
+    // (shared input + output). The full analysis/profile prompts overflow it,
+    // so call sites request a compacted prompt for this provider.
+    contextWindowTokens: 4096,
   }
 
   isConfigured(): boolean {

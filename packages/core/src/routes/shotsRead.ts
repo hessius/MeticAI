@@ -73,6 +73,11 @@ export async function handleShotsReadRoutes(
   const url = new URL(req.url);
   const { pathname } = url;
 
+  // GET /api/shots/llm-analysis-cache -> no server/direct-mode LLM cache lookup.
+  if (pathname === "/api/shots/llm-analysis-cache") {
+    return jsonResponse({ cached: false });
+  }
+
   // GET /api/last-shot -> most-recent normalized shot.
   if (pathname === "/api/last-shot") {
     try {

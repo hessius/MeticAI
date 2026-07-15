@@ -59,7 +59,7 @@ const EXPECTED_MODE_CAPABILITIES: Record<keyof FeatureFlags, ModeValues> = {
   scheduledShots: { proxy: true, directPwa: false, capacitor: false },
   systemManagement: { proxy: true, directPwa: false, capacitor: false },
   tailscaleConfig: { proxy: true, directPwa: false, capacitor: false },
-  mcpServer: { proxy: true, directPwa: false, capacitor: false },
+  mcpServer: { proxy: false, directPwa: false, capacitor: false },
   cloudSync: { proxy: true, directPwa: false, capacitor: false },
   aiFeatures: { proxy: true, directPwa: true, capacitor: true },
   liveTelemetry: { proxy: true, directPwa: true, capacitor: true },
@@ -69,7 +69,7 @@ const EXPECTED_MODE_CAPABILITIES: Record<keyof FeatureFlags, ModeValues> = {
   dialIn: { proxy: true, directPwa: true, capacitor: true },
   recommendations: { proxy: true, directPwa: true, capacitor: true },
   pwaInstall: { proxy: false, directPwa: true, capacitor: false },
-  bridgeStatus: { proxy: true, directPwa: false, capacitor: false },
+  bridgeStatus: { proxy: false, directPwa: false, capacitor: false },
   watchtowerUpdate: { proxy: true, directPwa: false, capacitor: false },
 }
 
@@ -194,16 +194,8 @@ describe('feature parity between proxy, direct PWA, and Capacitor modes', () => 
         reason: 'Tailscale CLI is a server-side tool, not accessible from browser',
       },
       {
-        flag: 'mcpServer',
-        reason: 'MCP server integration runs as a backend process',
-      },
-      {
         flag: 'cloudSync',
         reason: 'Machine/profile sync controls depend on the backend profile database',
-      },
-      {
-        flag: 'bridgeStatus',
-        reason: 'Backend health/bridge monitoring — no backend exists in direct mode',
       },
       {
         flag: 'watchtowerUpdate',
@@ -261,21 +253,36 @@ describe('feature parity between proxy, direct PWA, and Capacitor modes', () => 
     ]
     const BACKEND_ONLY: (keyof FeatureFlags)[] = [
       'scheduledShots', 'systemManagement',
-      'tailscaleConfig', 'mcpServer', 'cloudSync', 'bridgeStatus', 'watchtowerUpdate',
+      'tailscaleConfig', 'cloudSync', 'watchtowerUpdate',
+    ]
+    // Removed in 3.0.0 (MCP server + MQTT bridge deleted); off in every mode.
+    const DISABLED_EVERYWHERE: (keyof FeatureFlags)[] = [
+      'mcpServer', 'bridgeStatus',
     ]
     const PROXY_AND_CAPACITOR: (keyof FeatureFlags)[] = ['machineDiscovery']
     const DIRECT_PWA_ONLY: (keyof FeatureFlags)[] = [
       'pwaInstall',
     ]
 
+    it('removed features are disabled in every mode', () => {
+      const proxy = getProxyFlags()
+      const direct = getDirectFlags()
+      const capacitor = getCapacitorFlags()
+      for (const flag of DISABLED_EVERYWHERE) {
+        expect(proxy[flag]).toBe(false)
+        expect(direct[flag]).toBe(false)
+        expect(capacitor[flag]).toBe(false)
+      }
+    })
+
     it('every feature flag is classified by its three-mode availability pattern', () => {
-      const allClassified = [...SHARED, ...BACKEND_ONLY, ...PROXY_AND_CAPACITOR, ...DIRECT_PWA_ONLY].sort()
+      const allClassified = [...SHARED, ...BACKEND_ONLY, ...DISABLED_EVERYWHERE, ...PROXY_AND_CAPACITOR, ...DIRECT_PWA_ONLY].sort()
       const allFlags = Object.keys(getProxyFlags()).sort()
       expect(allClassified).toEqual(allFlags)
     })
 
     it('no flag appears in multiple categories', () => {
-      const all = [...SHARED, ...BACKEND_ONLY, ...PROXY_AND_CAPACITOR, ...DIRECT_PWA_ONLY]
+      const all = [...SHARED, ...BACKEND_ONLY, ...DISABLED_EVERYWHERE, ...PROXY_AND_CAPACITOR, ...DIRECT_PWA_ONLY]
       const unique = new Set(all)
       expect(unique.size).toBe(all.length)
     })

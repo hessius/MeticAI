@@ -512,8 +512,6 @@
     "geminiModelDescriptionDynamic": "Modeller hämtade från Google AI. Välj vilken modell som ska användas.",
     "modelsLoading": "Läser in modeller…",
     "modelDefault": "Standardmodell",
-    "mqttEnabled": "MQTT-brygga",
-    "mqttEnabledDescription": "Realtidstelemetri från maskinen via MQTT. Driver den direkta kontrollpanelen.",
     "settingsSaved": "Inställningar sparade framgångsrikt!",
     "settingsSaveFailed": "Misslyckades spara inställningar",
     "changelog": "Ändringslogg",
@@ -614,9 +612,6 @@
     },
     "version": "Version",
     "footer": "Metic • Byggd med ❤️ för kaffeälskare",
-    "addToHomeAssistant": "Add to Home Assistant",
-    "homeAssistantDescription": "Connect Home Assistant to Metic's MQTT broker to auto-discover your Meticulous machine (24 sensors + 11 commands). Point HA to this server's IP on port 1883.",
-    "homeAssistantGuide": "Home Assistant-guide",
     "poweredBy": "Powered by",
     "credits": {
       "pyMeticulous": "Official Python client for the Meticulous API",
@@ -636,7 +631,6 @@
     "geminiModel31FlashLite": "Gemini 3.1 Flash Lite",
     "aiSettings": "AI-inställningar",
     "versionAndChangelog": "Version och ändringslogg",
-    "mqttBridge": "MQTT-brygga",
     "disclaimer": "Metic är ett oberoende open source-projekt och är inte anslutet till, godkänt av eller kopplat till Meticulous Home, tillverkaren av Meticulous espressomaskinen.",
     "localModelDownloadKeepOpen": "Håll appen öppen och stanna på den här skärmen tills nedladdningen är klar."
   },

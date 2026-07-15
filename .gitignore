@@ -93,3 +93,6 @@ testflight.md
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Bun compile temp artifacts
+*.bun-build

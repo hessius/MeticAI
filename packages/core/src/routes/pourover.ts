@@ -21,6 +21,8 @@
 
 import type { Platform, Repo } from "../platform";
 import { jsonResponse } from "../http";
+import { adaptPourOverProfile, adaptRecipeToProfile } from "../logic/pourOverAdapter";
+import { POUR_OVER_RECIPES } from "../data/recipes";
 
 export interface ModePreferences {
   autoStart: boolean;
@@ -171,33 +173,103 @@ export async function savePreferences(platform: Platform, value: unknown): Promi
  */
 export async function handlePourOverRoutes(req: Request, platform: Platform): Promise<Response | null> {
   const { pathname } = new URL(req.url);
-  if (pathname !== "/api/pour-over/preferences") return null;
 
-  if (req.method === "GET") {
+  if (pathname === "/api/pour-over/preferences") {
+    if (req.method === "GET") {
+      try {
+        return jsonResponse(await getPreferences(platform));
+      } catch (err) {
+        const message = err instanceof PourOverValidationError ? err.message : "Failed to load pour-over preferences";
+        return jsonResponse({ detail: message }, 500);
+      }
+    }
+
+    if (req.method === "PUT") {
+      let body: unknown;
+      try {
+        body = await req.json();
+      } catch {
+        return jsonResponse({ detail: "Invalid preferences" }, 400);
+      }
+      try {
+        return jsonResponse(await savePreferences(platform, body));
+      } catch (err) {
+        if (err instanceof PourOverValidationError) {
+          return jsonResponse({ detail: "Invalid preferences" }, 400);
+        }
+        return jsonResponse({ detail: "Failed to save preferences" }, 500);
+      }
+    }
+
+    return null;
+  }
+
+  // POST /api/pour-over/prepare -> build an adapted ratio/bloom profile and load it on the machine.
+  if (pathname === "/api/pour-over/prepare" && req.method === "POST") {
     try {
-      return jsonResponse(await getPreferences(platform));
-    } catch (err) {
-      const message = err instanceof PourOverValidationError ? err.message : "Failed to load pour-over preferences";
-      return jsonResponse({ detail: message }, 500);
+      const body = (await req.json().catch(() => ({}))) as {
+        target_weight?: number;
+        bloom_enabled?: boolean;
+        bloom_seconds?: number;
+        dose_grams?: number | null;
+        brew_ratio?: number | null;
+      };
+      const profile = adaptPourOverProfile({
+        targetWeight: body.target_weight ?? 300,
+        bloomEnabled: body.bloom_enabled ?? true,
+        bloomSeconds: body.bloom_seconds ?? 30,
+        doseGrams: body.dose_grams ?? null,
+        brewRatio: body.brew_ratio ?? null,
+      });
+      return await loadPourOverProfile(platform, profile, "Failed to load pour-over profile");
+    } catch (e) {
+      return jsonResponse({ status: "error", detail: (e as Error).message }, 500);
     }
   }
 
-  if (req.method === "PUT") {
-    let body: unknown;
+  // POST /api/pour-over/prepare-recipe -> convert an OPOS recipe to a profile and load it on the machine.
+  if (pathname === "/api/pour-over/prepare-recipe" && req.method === "POST") {
     try {
-      body = await req.json();
-    } catch {
-      return jsonResponse({ detail: "Invalid preferences" }, 400);
-    }
-    try {
-      return jsonResponse(await savePreferences(platform, body));
-    } catch (err) {
-      if (err instanceof PourOverValidationError) {
-        return jsonResponse({ detail: "Invalid preferences" }, 400);
+      const body = (await req.json().catch(() => ({}))) as { recipe_slug?: string };
+      const recipe = POUR_OVER_RECIPES.find((r) => r.slug === body.recipe_slug);
+      if (!recipe) {
+        return jsonResponse({ status: "error", detail: `Recipe '${body.recipe_slug}' not found` }, 404);
       }
-      return jsonResponse({ detail: "Failed to save preferences" }, 500);
+      const profile = adaptRecipeToProfile(recipe);
+      return await loadPourOverProfile(platform, profile, "Failed to load recipe profile");
+    } catch (e) {
+      return jsonResponse({ status: "error", detail: (e as Error).message }, 500);
     }
+  }
+
+  // POST /api/pour-over/cleanup, force-cleanup -> server-side no-op success.
+  // (The browser runtime additionally restores the previously-active profile
+  //  from session state before this handler runs; see the browser native shim.)
+  if ((pathname === "/api/pour-over/cleanup" || pathname === "/api/pour-over/force-cleanup") && req.method === "POST") {
+    return jsonResponse({ status: "ok" });
+  }
+
+  // GET /api/pour-over/active -> no active-session tracking in direct/server mode.
+  if (pathname === "/api/pour-over/active" && req.method === "GET") {
+    return jsonResponse({ active: false });
   }
 
   return null;
+}
+
+/** Load an adapted pour-over profile onto the machine and return the standard response. */
+async function loadPourOverProfile(
+  platform: Platform,
+  profile: Record<string, unknown>,
+  failureDetail: string,
+): Promise<Response> {
+  const loadResponse = await platform.machine.fetch("/api/v1/profile/load", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(profile),
+  });
+  if (!loadResponse.ok) {
+    return jsonResponse({ status: "error", detail: failureDetail }, 502);
+  }
+  return jsonResponse({ profile_id: profile.id, profile_name: profile.name });
 }
