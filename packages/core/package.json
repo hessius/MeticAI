@@ -15,6 +15,7 @@
     "./logic/analysisLint": "./src/logic/analysisLint.ts",
     "./logic/uuid": "./src/logic/uuid.ts",
     "./logic/decentConverter": "./src/logic/decentConverter.ts",
+    "./logic/profileSource": "./src/logic/profileSource.ts",
     "./logic/tags": "./src/logic/tags.ts",
     "./logic/profileAnalysis": "./src/logic/profileAnalysis.ts",
     "./logic/profileDescription": "./src/logic/profileDescription.ts",

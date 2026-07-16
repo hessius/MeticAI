@@ -396,6 +396,56 @@ describe("profiles-crud: import-from-url", () => {
     const body = await res.json();
     expect(body.status).toBe("success");
     expect(body.profile_name).toBe("Remote Profile");
+    expect(body.source_kind).toBe("url");
+  });
+
+  test("resolves a metprofiles link via the download endpoint", async () => {
+    const p = makeMockPlatform({
+      machine: scriptedMachine({
+        "/api/profiles/cd10c990-2185-4633-b883-f3fa4ed7dbfd/download": {
+          name: "Slay-ish",
+          stages: [],
+        },
+        "/api/v1/profile/save": {},
+      }),
+    });
+    const res = await handle(
+      jsonReq("/api/import-from-url", "POST", {
+        url: "https://metprofiles.link/profile/cd10c990-2185-4633-b883-f3fa4ed7dbfd",
+      }),
+      p,
+    );
+    const body = await res.json();
+    expect(body.status).toBe("success");
+    expect(body.profile_name).toBe("Slay-ish");
+    expect(body.source_kind).toBe("metprofiles");
+  });
+
+  test("imports raw JSON text pasted into the source field", async () => {
+    const p = makeMockPlatform({
+      machine: scriptedMachine({ "/api/v1/profile/save": {} }),
+    });
+    const res = await handle(
+      jsonReq("/api/import-from-url", "POST", {
+        url: JSON.stringify({ name: "Pasted", stages: [] }),
+      }),
+      p,
+    );
+    const body = await res.json();
+    expect(body.status).toBe("success");
+    expect(body.profile_name).toBe("Pasted");
+    expect(body.source_kind).toBe("json");
+  });
+
+  test("400 with an error code when the input is neither link nor JSON", async () => {
+    const p = makeMockPlatform({ machine: scriptedMachine({}) });
+    const res = await handle(
+      jsonReq("/api/import-from-url", "POST", { url: "just some words" }),
+      p,
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("invalid_input");
   });
 });
 

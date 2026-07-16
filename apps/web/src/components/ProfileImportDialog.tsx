@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +25,7 @@ import {
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { detectDecentFormat, convertDecentToMeticulous, type ConversionResult } from '@/services/decentConverter'
+import { classifyProfileSource } from '@/services/profileSource'
 
 interface MachineProfile {
   id: string
@@ -156,12 +156,26 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
     const urlToImport = urlOverride || importUrl.trim()
     if (!urlToImport) return
 
-    try {
-      new URL(urlToImport)
-    } catch {
-      setError(t('profileImport.invalidUrl'))
-      setStep('error')
-      return
+    // The source may be a metprofiles link, a direct profile URL, or raw JSON
+    // pasted/shared as text. Classify with the shared @metic/core resolver so
+    // the client gives instant feedback and the server does the real work.
+    const kind = classifyProfileSource(urlToImport)
+    if (kind === 'json') {
+      try {
+        JSON.parse(urlToImport)
+      } catch {
+        setError(t('profileImport.invalidSource'))
+        setStep('error')
+        return
+      }
+    } else {
+      try {
+        new URL(urlToImport)
+      } catch {
+        setError(t('profileImport.invalidSource'))
+        setStep('error')
+        return
+      }
     }
 
     setStep('importing')
@@ -526,8 +540,8 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
                     className="h-24 flex-col gap-2 border-border/50 hover:border-primary/50 hover:bg-primary/5"
                   >
                     <LinkSimple size={28} weight="duotone" className="text-primary" />
-                    <span className="text-sm font-medium">{t('profileImport.fromUrl')}</span>
-                    <span className="text-[10px] text-muted-foreground">{t('profileImport.jsonOrMet')}</span>
+                    <span className="text-sm font-medium">{t('profileImport.fromLink')}</span>
+                    <span className="text-[10px] text-muted-foreground">{t('profileImport.linkOrJson')}</span>
                   </Button>
 
                   <Button
@@ -671,12 +685,19 @@ export function ProfileImportDialog({ isOpen, aiConfigured = true, hideAiWhenUna
             )}
 
 
-            {/* Step: Import from URL */}
+            {/* Step: Import from link or JSON */}
             {step === 'url' && (
               <motion.div key="url" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-3">
-                <Label className="text-sm font-medium">{t('profileImport.importFromUrl')}</Label>
-                <Input type="url" placeholder={t('profileImport.urlPlaceholder')} value={importUrl} onChange={(e) => setImportUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && importUrl.trim()) handleUrlImport() }} autoFocus />
-                <p className="text-[10px] text-muted-foreground">{t('profileImport.urlHint')}</p>
+                <Label className="text-sm font-medium">{t('profileImport.importFromLink')}</Label>
+                <textarea
+                  className="w-full h-28 rounded-lg border border-border/50 bg-secondary/30 p-3 text-xs font-mono resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  placeholder={t('profileImport.sourcePlaceholder')}
+                  value={importUrl}
+                  onChange={(e) => setImportUrl(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && importUrl.trim()) handleUrlImport() }}
+                  autoFocus
+                />
+                <p className="text-[10px] text-muted-foreground">{t('profileImport.sourceHint')}</p>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => { setImportUrl(''); setStep('choose') }} className="flex-1">{t('profileImport.back')}</Button>
                   <Button onClick={() => handleUrlImport()} disabled={!importUrl.trim()} className="flex-1">

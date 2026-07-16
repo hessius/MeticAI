@@ -34,6 +34,7 @@
 import type { Platform } from "../platform";
 import { jsonResponse } from "../http";
 import { detectDecentFormat, convertDecentToMeticulous } from "../logic/decentConverter";
+import { resolveProfileFromSource, ProfileSourceError } from "../logic/profileSource";
 import { buildStaticProfileDescription } from "../logic/profileDescription";
 import { generateEstimatedTargetCurves } from "../logic/targetCurves";
 import {
@@ -372,32 +373,35 @@ export async function handleProfilesCrudRoutes(
   }
 
   // POST /api/import-from-url
+  //
+  // Accepts any share input in `url` (also aliased as `source`/`json`): a
+  // metprofiles.link URL, a direct link to a JSON profile, or raw profile JSON
+  // text. Decent profiles are auto-detected and converted. Resolution is shared
+  // with the native runtime via @metic/core's resolveProfileFromSource.
   if (pathname === "/api/import-from-url" && method === "POST") {
     try {
-      const body = (await req.json().catch(() => ({}))) as { url?: string };
-      const profileUrl = body.url?.trim();
-      if (!profileUrl) return jsonResponse({ status: "error", detail: "No URL provided" }, 400);
-      let profileResp: Response;
+      const body = (await req.json().catch(() => ({}))) as {
+        url?: string;
+        source?: string;
+        json?: string;
+      };
+      const input = (body.url ?? body.source ?? body.json ?? "").trim();
+      if (!input) return jsonResponse({ status: "error", detail: "No URL provided" }, 400);
+
+      let resolved;
       try {
-        profileResp = await platform.machine.fetch(profileUrl);
-      } catch {
-        return jsonResponse({ status: "error", detail: "Failed to fetch URL" }, 502);
+        resolved = await resolveProfileFromSource(input, (u, init) =>
+          platform.machine.fetch(u, init),
+        );
+      } catch (err) {
+        if (err instanceof ProfileSourceError) {
+          const status = err.code === "fetch_failed" ? 502 : 400;
+          return jsonResponse({ status: "error", detail: err.message, code: err.code }, status);
+        }
+        return jsonResponse({ status: "error", detail: "Import from URL failed" }, 500);
       }
-      let profileJson: Record<string, unknown>;
-      try {
-        profileJson = (await profileResp.json()) as Record<string, unknown>;
-      } catch {
-        return jsonResponse({ status: "error", detail: "URL did not return valid JSON" }, 400);
-      }
-      let convertedFromDecent = false;
-      if (detectDecentFormat(profileJson)) {
-        const result = convertDecentToMeticulous(profileJson);
-        profileJson = result.profile as unknown as Record<string, unknown>;
-        convertedFromDecent = true;
-      }
-      if (typeof profileJson.name !== "string" || !profileJson.name) {
-        return jsonResponse({ status: "error", detail: "Profile is missing a 'name' field" }, 400);
-      }
+
+      const profileJson = resolved.profile;
       const saveOk = await machineOk(platform, "/api/v1/profile/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -412,7 +416,8 @@ export async function handleProfilesCrudRoutes(
         profile_name: profileJson.name,
         has_description: false,
         uploaded_to_machine: true,
-        converted_from_decent: convertedFromDecent,
+        converted_from_decent: resolved.convertedFromDecent,
+        source_kind: resolved.sourceKind,
       });
     } catch {
       return jsonResponse({ status: "error", detail: "Import from URL failed" }, 500);
