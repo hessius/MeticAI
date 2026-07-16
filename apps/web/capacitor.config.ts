@@ -31,6 +31,11 @@ const config: CapacitorConfig = {
     Preferences: {
       // Uses UserDefaults on iOS — no configuration needed
     },
+    CapacitorShareTarget: {
+      // App Group shared between the main app and the iOS Share Extension.
+      // Must match the App Group capability on both targets in Xcode.
+      appGroupId: 'group.com.metic.app',
+    },
   },
 }
 

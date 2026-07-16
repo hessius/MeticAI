@@ -71,6 +71,7 @@ const OnboardingWizard = lazy(() => import('./components/OnboardingWizard').then
 
 // Storage migration — initialises IndexedDB in direct/PWA mode
 import { useStorageMigration } from '@/services/storage'
+import { registerShareTargetListener } from '@/services/shareImport'
 
 // Capacitor plugin hooks
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
@@ -534,6 +535,22 @@ function App() {
       const url = new URL(window.location.href)
       url.searchParams.delete('import')
       window.history.replaceState({}, '', url.toString())
+    }
+  }, [])
+
+  // Native share sheet: a profile shared *to* Metic (link, JSON file, or raw
+  // text) flows through the same import path as the web `?import=` parameter.
+  useEffect(() => {
+    let cleanup: (() => void) | undefined
+    void registerShareTargetListener((source) => {
+      setPendingImportUrl(source)
+      setShowAddProfileDialog(true)
+      setViewState('profile-catalogue')
+    }).then((fn) => {
+      cleanup = fn
+    })
+    return () => {
+      cleanup?.()
     }
   }, [])
 
