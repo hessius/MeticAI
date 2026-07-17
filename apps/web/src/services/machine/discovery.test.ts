@@ -167,8 +167,9 @@ describe('discovery', () => {
         vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('timeout'))
 
         const promise = discoverMachines()
-        // The synchronous setup registers the single watch callback before the
-        // function suspends on its discovery timeout.
+        // The lazy plugin import resolves on the next microtask, after which the
+        // single watch callback is registered before the discovery timeout.
+        await vi.advanceTimersByTimeAsync(0)
         expect(callbacks.length).toBe(1)
         for (const cb of callbacks) {
           expect(() => cb(undefined)).not.toThrow()
@@ -201,6 +202,7 @@ describe('discovery', () => {
         vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('timeout'))
 
         const promise = discoverMachines()
+        await vi.advanceTimersByTimeAsync(0)
         expect(watchedTypes).toEqual(['_meticulous._tcp'])
         await vi.advanceTimersByTimeAsync(10000)
         await promise

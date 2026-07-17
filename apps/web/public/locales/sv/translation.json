@@ -775,7 +775,18 @@
     "importFromLink": "Importera från länk eller JSON",
     "sourcePlaceholder": "Klistra in en metprofiles-länk, en profil-URL eller profil-JSON...",
     "sourceHint": "Stöder metprofiles.link, direkta .json/.met-länkar och inklistrad profil-JSON",
-    "invalidSource": "Ange en giltig länk eller profil-JSON"
+    "invalidSource": "Ange en giltig länk eller profil-JSON",
+    "shareResult": {
+      "importingTitle": "Importerar profil",
+      "importingBody": "Lägger till den delade profilen i ditt bibliotek...",
+      "successTitle": "Profil importerad",
+      "successBody": "\"{{name}}\" importerades.",
+      "existsTitle": "Redan importerad",
+      "existsBody": "\"{{name}}\" finns redan i ditt bibliotek.",
+      "errorTitle": "Importen misslyckades",
+      "errorBody": "Profilen kunde inte importeras.",
+      "errorBodyWithReason": "Profilen kunde inte importeras: {{reason}}"
+    }
   },
   "imageCrop": {
     "title": "Beskär profilbild",

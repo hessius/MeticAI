@@ -770,7 +770,18 @@
     "importFromLink": "Aus Link oder JSON importieren",
     "sourcePlaceholder": "Füge einen metprofiles-Link, eine Profil-URL oder Profil-JSON ein...",
     "sourceHint": "Unterstützt metprofiles.link, direkte .json/.met-Links und eingefügtes Profil-JSON",
-    "invalidSource": "Gib einen gültigen Link oder Profil-JSON ein"
+    "invalidSource": "Gib einen gültigen Link oder Profil-JSON ein",
+    "shareResult": {
+      "importingTitle": "Profil wird importiert",
+      "importingBody": "Das geteilte Profil wird zu deiner Bibliothek hinzugefügt...",
+      "successTitle": "Profil importiert",
+      "successBody": "\"{{name}}\" wurde erfolgreich importiert.",
+      "existsTitle": "Bereits importiert",
+      "existsBody": "\"{{name}}\" ist bereits in deiner Bibliothek.",
+      "errorTitle": "Import fehlgeschlagen",
+      "errorBody": "Das Profil konnte nicht importiert werden.",
+      "errorBodyWithReason": "Das Profil konnte nicht importiert werden: {{reason}}"
+    }
   },
   "imageCrop": {
     "title": "Profilbild zuschneiden",

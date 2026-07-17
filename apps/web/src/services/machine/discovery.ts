@@ -15,7 +15,6 @@
  */
 
 import { CapacitorHttp } from '@capacitor/core'
-import { ZeroConf } from 'capacitor-zeroconf'
 import { isNativePlatform } from '@/lib/machineMode'
 
 export interface DiscoveredMachine {
@@ -127,6 +126,11 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
   // Step 1: Try Zeroconf mDNS service browsing (native only)
   if (isNativePlatform()) {
     dlog('STEP 1: isNativePlatform=true, attempting Zeroconf')
+
+    // The capacitor-zeroconf web stub creates a module-level rejected promise
+    // on import, so it is loaded lazily here (native branch only) to keep that
+    // floating rejection out of the web bundle and test environment.
+    const { ZeroConf } = await import('capacitor-zeroconf')
 
     // Step 2: Smoke-test plugin with getHostname()
     try {

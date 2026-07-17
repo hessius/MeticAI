@@ -775,7 +775,18 @@
     "importFromLink": "Import from link or JSON",
     "sourcePlaceholder": "Paste a metprofiles link, a profile URL, or profile JSON...",
     "sourceHint": "Supports metprofiles.link, direct .json/.met links, and pasted profile JSON",
-    "invalidSource": "Enter a valid link or profile JSON"
+    "invalidSource": "Enter a valid link or profile JSON",
+    "shareResult": {
+      "importingTitle": "Importing profile",
+      "importingBody": "Adding the shared profile to your library...",
+      "successTitle": "Profile imported",
+      "successBody": "\"{{name}}\" was imported successfully.",
+      "existsTitle": "Already imported",
+      "existsBody": "\"{{name}}\" is already in your library.",
+      "errorTitle": "Import failed",
+      "errorBody": "The profile could not be imported.",
+      "errorBodyWithReason": "The profile could not be imported: {{reason}}"
+    }
   },
   "imageCrop": {
     "title": "Crop Profile Image",

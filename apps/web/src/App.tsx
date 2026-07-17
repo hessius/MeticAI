@@ -58,6 +58,7 @@ import { BetaBanner } from '@/components/BetaBanner'
 import { DemoModeBanner } from '@/components/DemoModeBanner'
 import { FeatureErrorBoundary } from '@/components/FeatureErrorBoundary'
 import { ProfileImportDialog } from '@/components/ProfileImportDialog'
+import { ShareImportResultDialog, type ShareImportState } from '@/components/ShareImportResultDialog'
 import type { ProfileData } from '@/components/ProfileBreakdown'
 
 const LiveShotView = lazy(() => import('./components/LiveShotView').then(m => ({ default: m.LiveShotView })))
@@ -72,6 +73,7 @@ const OnboardingWizard = lazy(() => import('./components/OnboardingWizard').then
 // Storage migration — initialises IndexedDB in direct/PWA mode
 import { useStorageMigration } from '@/services/storage'
 import { registerShareTargetListener } from '@/services/shareImport'
+import { importProfileFromSource } from '@/services/importProfile'
 
 // Capacitor plugin hooks
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
@@ -119,7 +121,7 @@ function App() {
   const [shotHistoryProfileName, setShotHistoryProfileName] = useState<string | undefined>(undefined)
   const [shotHistoryInitialDate, setShotHistoryInitialDate] = useState<string | undefined>(undefined)
   const [shotHistoryInitialFilename, setShotHistoryInitialFilename] = useState<string | undefined>(undefined)
-  const [pendingImportUrl, setPendingImportUrl] = useState<string | null>(null)
+  const [shareImportState, setShareImportState] = useState<ShareImportState | null>(null)
   const [showAddProfileDialog, setShowAddProfileDialog] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const resultsCardRef = useRef<HTMLDivElement>(null)
@@ -522,38 +524,6 @@ function App() {
     checkProfiles()
   }, [])
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const importParam = params.get('import')
-    if (importParam) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time URL param init on mount
-      setPendingImportUrl(importParam)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setShowAddProfileDialog(true)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setViewState('profile-catalogue')
-      const url = new URL(window.location.href)
-      url.searchParams.delete('import')
-      window.history.replaceState({}, '', url.toString())
-    }
-  }, [])
-
-  // Native share sheet: a profile shared *to* Metic (link, JSON file, or raw
-  // text) flows through the same import path as the web `?import=` parameter.
-  useEffect(() => {
-    let cleanup: (() => void) | undefined
-    void registerShareTargetListener((source) => {
-      setPendingImportUrl(source)
-      setShowAddProfileDialog(true)
-      setViewState('profile-catalogue')
-    }).then((fn) => {
-      cleanup = fn
-    })
-    return () => {
-      cleanup?.()
-    }
-  }, [])
-
   // Update profile count when returning from history view
   const refreshProfileCount = useCallback(async () => {
     if (isDemoMode() || isDirectMode()) return
@@ -568,6 +538,49 @@ function App() {
       console.error('Failed to refresh profile count:', err)
     }
   }, [])
+
+  // Automatic profile import used by the share sheet and the `?import=` deep
+  // link. The profile is added without any dialog interaction; a central
+  // popover then reports success (with the profile name) or failure (with a
+  // reason when the server provides one).
+  const runAutoImport = useCallback(async (source: string) => {
+    const trimmed = source.trim()
+    if (!trimmed) return
+    setShareImportState({ status: 'importing' })
+    const result = await importProfileFromSource(trimmed)
+    setShareImportState(result)
+    if (result.status === 'success' || result.status === 'exists') {
+      refreshProfileCount()
+      setViewState('profile-catalogue')
+    }
+  }, [refreshProfileCount])
+
+  // The share sheet and the `?import=` deep link both import automatically and
+  // then surface the central result popover. Both run once on mount because
+  // runAutoImport is stable.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const importParam = params.get('import')
+    if (importParam) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('import')
+      window.history.replaceState({}, '', url.toString())
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time deep-link import on mount
+      runAutoImport(importParam)
+    }
+  }, [runAutoImport])
+
+  useEffect(() => {
+    let cleanup: (() => void) | undefined
+    void registerShareTargetListener((source) => {
+      runAutoImport(source)
+    }).then((fn) => {
+      cleanup = fn
+    })
+    return () => {
+      cleanup?.()
+    }
+  }, [runAutoImport])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -948,10 +961,10 @@ function App() {
     if (closeTopmostOverlay()) return
     if (qrDialogOpen) { setQrDialogOpen(false); return }
     if (showAddProfileDialog) { setShowAddProfileDialog(false); return }
-    if (pendingImportUrl) { setPendingImportUrl(null); return }
+    if (shareImportState && shareImportState.status !== 'importing') { setShareImportState(null); return }
     if (hasUnsavedChanges() && !window.confirm(t('profileEdit.unsavedChanges'))) return
     navigateBack()
-  }, [qrDialogOpen, showAddProfileDialog, pendingImportUrl, navigateBack, t])
+  }, [qrDialogOpen, showAddProfileDialog, shareImportState, navigateBack, t])
 
   useAndroidBackButton(handleAndroidBack)
 
@@ -1870,21 +1883,21 @@ function App() {
           isOpen={showAddProfileDialog}
           aiConfigured={aiAvailable}
           hideAiWhenUnavailable={hideAiWhenUnavailable}
-          initialUrl={pendingImportUrl ?? undefined}
           onClose={() => {
             setShowAddProfileDialog(false)
-            setPendingImportUrl(null)
           }}
           onImported={() => {
             setShowAddProfileDialog(false)
-            setPendingImportUrl(null)
             setViewState('profile-catalogue')
           }}
           onGenerateNew={() => {
             setShowAddProfileDialog(false)
-            setPendingImportUrl(null)
             setViewState('form')
           }}
+        />
+        <ShareImportResultDialog
+          state={shareImportState}
+          onClose={() => setShareImportState(null)}
         />
       </div>
     </div>
