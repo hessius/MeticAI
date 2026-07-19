@@ -83,8 +83,18 @@ class ShareViewController: UIViewController {
         group.notify(queue: .main) { [weak self] in
             guard let self = self else { return }
             self.persist(texts: texts, files: files)
-            self.openHostApp()
-            self.finish()
+            if self.openHostApp() {
+                // Give the app-switch a beat to dispatch before we tear the
+                // extension down — completing too early can cancel it.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                    self?.finish()
+                }
+            } else {
+                // Couldn't foreground the app automatically. The share is
+                // already persisted to the App Group, so tell the user how to
+                // finish and offer a button to try opening the app themselves.
+                self.presentManualOpenUI()
+            }
         }
     }
 
@@ -125,19 +135,86 @@ class ShareViewController: UIViewController {
         defaults.synchronize()
     }
 
-    /// Foreground the host app. Share extensions can't touch
-    /// `UIApplication.shared`, so walk the responder chain for `openURL:`.
-    private func openHostApp() {
-        guard let url = URL(string: urlScheme) else { return }
+    /// Foreground the host app by opening `metic://share`. Share extensions
+    /// can't touch `UIApplication.shared`, so walk the responder chain to the
+    /// `UIApplication` instance and call its (deprecated) `openURL:`. Returns
+    /// whether the app was asked to open.
+    @discardableResult
+    private func openHostApp() -> Bool {
+        guard let url = URL(string: urlScheme) else { return false }
         let selector = sel_registerName("openURL:")
         var responder: UIResponder? = self
         while let current = responder {
-            if current.responds(to: selector), current !== self {
-                _ = current.perform(selector, with: url)
-                return
+            if let application = current as? UIApplication, application.responds(to: selector) {
+                _ = application.perform(selector, with: url)
+                return true
             }
             responder = current.next
         }
+        return false
+    }
+
+    /// Fallback shown when the extension can't foreground the host app on its
+    /// own. The share is already persisted, so the app will pick it up on next
+    /// launch; this just makes that obvious and offers a one-tap open.
+    private func presentManualOpenUI() {
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.4)
+
+        let card = UIView()
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.backgroundColor = .systemBackground
+        card.layer.cornerRadius = 16
+        card.clipsToBounds = true
+        view.addSubview(card)
+
+        let title = UILabel()
+        title.text = "Almost there"
+        title.font = .preferredFont(forTextStyle: .headline)
+        title.textAlignment = .center
+        title.numberOfLines = 0
+
+        let body = UILabel()
+        body.text = "Open Metic to finish importing this profile."
+        body.font = .preferredFont(forTextStyle: .subheadline)
+        body.textColor = .secondaryLabel
+        body.textAlignment = .center
+        body.numberOfLines = 0
+
+        let openButton = UIButton(type: .system)
+        openButton.setTitle("Open Metic", for: .normal)
+        openButton.titleLabel?.font = .preferredFont(forTextStyle: .headline)
+        openButton.addTarget(self, action: #selector(handleOpenTapped), for: .touchUpInside)
+
+        let dismissButton = UIButton(type: .system)
+        dismissButton.setTitle("Done", for: .normal)
+        dismissButton.addTarget(self, action: #selector(handleDismissTapped), for: .touchUpInside)
+
+        let stack = UIStackView(arrangedSubviews: [title, body, openButton, dismissButton])
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.axis = .vertical
+        stack.spacing = 12
+        stack.isLayoutMarginsRelativeArrangement = true
+        stack.layoutMargins = UIEdgeInsets(top: 24, left: 20, bottom: 20, right: 20)
+        card.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            card.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            card.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
+            card.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
+            stack.topAnchor.constraint(equalTo: card.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+        ])
+    }
+
+    @objc private func handleOpenTapped() {
+        openHostApp()
+        finish()
+    }
+
+    @objc private func handleDismissTapped() {
+        finish()
     }
 
     private func finish() {
