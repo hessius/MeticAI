@@ -167,10 +167,28 @@ straight from your Meticulous over the built-in `/api/ws/live` WebSocket:
 The Control Center appears as a side panel on desktop and a full page on mobile,
 and works out of the box with no extra services.
 
-> **Removed in 3.0.0:** the Home Assistant MQTT bridge (mosquitto broker +
-> meticulous-addon) has been removed along with the Python backend. Live
-> telemetry and machine control are unaffected; only HA MQTT auto-discovery is
-> gone. See [HOME_ASSISTANT.md](HOME_ASSISTANT.md) for details.
+> **Changed in 3.0.0:** Home Assistant MQTT auto-discovery was removed, but live
+> telemetry and machine control are unaffected (served over the built-in
+> `/api/ws/live` WebSocket). See [Removed in 3.0.0](#-removed-in-300-server-version)
+> below for the full list.
+
+## 🗑️ Removed in 3.0.0 (server version)
+
+Metic 3.0.0 replaces the Python backend with a single unified image. As part of
+that cutover, a few **server-side** features were removed. On-device / native app
+functionality is unaffected.
+
+- **Home Assistant MQTT bridge**: the Mosquitto broker and
+  [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) MQTT
+  auto-discovery are gone, along with the in-app MQTT Bridge settings. Live
+  telemetry and machine control still work over the built-in `/api/ws/live`
+  WebSocket. See [HOME_ASSISTANT.md](HOME_ASSISTANT.md) for details.
+- **MCP server**: the bundled
+  [meticulous-mcp](https://github.com/twchad/meticulous-mcp) server and its
+  in-app settings were removed.
+- **In-app self-updater**: the in-UI update action (`/api/trigger-update`) was
+  removed. Update by pulling the new image (see below) or enable the optional
+  Watchtower addon for automatic updates.
 
 ## 🔄 Updating Metic
 
@@ -236,34 +254,34 @@ docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
 
 ## 🏗️ Architecture
 
-Metic v2.0 runs as a single unified container with five internal services managed by s6-overlay:
+Metic 3.0.0 runs as a single unified container: one distroless Bun process that
+serves the web UI, the API, the machine proxy, and live telemetry. (Earlier 2.x
+releases ran five internal services under s6-overlay: nginx, a FastAPI server, an
+MCP server, a Mosquitto broker, and an MQTT bridge; these were removed in 3.0.0.
+See [Removed in 3.0.0](#-removed-in-300-server-version).)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                      Metic Container                       │
+│                       Metic Container                        │
 │  ┌────────────────────────────────────────────────────────┐  │
-│  │                    nginx (:3550)                       │  │
-│  │             Web UI + API Reverse Proxy                 │  │
+│  │            Bun server, single binary (:3550)            │  │
+│  │                                                         │  │
+│  │   • Web UI (static SPA)                                 │  │
+│  │   • REST API (/api) → @metic/core                       │  │
+│  │       (AI, profiles, analysis, recommendations,         │  │
+│  │        dial-in) with a Gemini AI provider seam          │  │
+│  │   • Machine proxy (/api/v1/* → Meticulous)              │  │
+│  │   • Live telemetry (/api/ws/live WebSocket)             │  │
 │  └────────────────────────────────────────────────────────┘  │
 │                           │                                  │
-│       ┌───────────────────┼───────────────┐                  │
-│       ▼                   ▼               ▼                  │
-│  ┌──────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │  Server  │  │ MCP Server  │  │ Gemini CLI  │             │
-│  │ (FastAPI) │  │(Meticulous) │  │    (AI)     │             │
-│  │  :8000   │  │   :8080     │  │             │             │
-│  └──────────┘  └─────────────┘  └─────────────┘             │
-│       │                                                      │
-│       │ MQTT                                                 │
-│       ▼                                                      │
-│  ┌──────────┐  ┌─────────────────┐                           │
-│  │Mosquitto │◄─│Meticulous Bridge│◄── Machine (Socket.IO)    │
-│  │  :1883   │  │  (MQTT Bridge)  │                           │
-│  └──────────┘  └─────────────────┘                           │
+│                           ▼                                  │
+│                Machine (Socket.IO / HTTP)                     │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Real-time telemetry**: The [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) bridge connects to your machine via Socket.IO and publishes live sensor data (pressure, flow, weight, temperature) to the internal MQTT broker. The FastAPI server subscribes and pushes updates to the web UI via WebSocket.
+**Real-time telemetry**: The Bun server connects to your machine and pushes live
+sensor data (pressure, flow, weight, temperature) to the web UI over the built-in
+`/api/ws/live` WebSocket. No separate MQTT broker or bridge is required.
 
 **Optional sidecars:**
 - **Tailscale** - Secure remote access
@@ -333,7 +351,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-Runs on [pyMeticulous](https://github.com/MeticulousHome/pyMeticulous), [meticulous-mcp](https://github.com/twchad/meticulous-mcp), [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon), and caffeine ☕
+Runs on [Bun](https://bun.sh), TypeScript, [Google Gemini](https://ai.google.dev/), and caffeine ☕
 
 Made with ❤️ by <a href="https://github.com/hessius">@hessius</a>
 
