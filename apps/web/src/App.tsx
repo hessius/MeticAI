@@ -497,8 +497,19 @@ function App() {
     }
   }, [islandNote])
 
-  // Check for existing profiles on mount
+  // Check for existing profiles on mount.
+  //
+  // In proxy/server mode the `/api/history` endpoint is backed by the espresso
+  // machine's shot log, which can take 10s+ to respond (and much longer under
+  // concurrent load). Init must never hard-block on it, otherwise the whole app
+  // is stuck on the loading screen until the machine replies. Clear the
+  // initializing gate immediately and let the profile count populate in the
+  // background, guarded by a timeout so a slow or hanging machine never leaves
+  // the request pending indefinitely.
   useEffect(() => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
+
     const checkProfiles = async () => {
       // In direct or demo mode, skip proxy API — default to form view
       if (isDemoMode() || isDirectMode()) {
@@ -506,22 +517,35 @@ function App() {
         setIsInitializing(false)
         return
       }
+
+      // Never block the UI on the (potentially slow) machine-backed history call.
+      setIsInitializing(false)
+
       try {
         const serverUrl = await getServerUrl()
-        const response = await fetch(`${serverUrl}/api/history?limit=1&offset=0`)
+        const response = await fetch(`${serverUrl}/api/history?limit=1&offset=0`, {
+          signal: controller.signal,
+        })
         if (response.ok) {
           const data = await response.json()
           setProfileCount(data.total || 0)
         }
       } catch (err) {
-        console.error('Failed to check profiles:', err)
-        // On error, default to form view
-        setProfileCount(0)
+        // Ignore aborts (timeout/unmount); default to form view otherwise
+        if (!(err instanceof DOMException && err.name === 'AbortError')) {
+          console.error('Failed to check profiles:', err)
+          setProfileCount(0)
+        }
       } finally {
-        setIsInitializing(false)
+        clearTimeout(timeout)
       }
     }
     checkProfiles()
+
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
   }, [])
 
   // Update profile count when returning from history view
