@@ -28,7 +28,7 @@
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",
     "@aparajita/capacitor-secure-storage": "^8.0.0",
-    "@babel/plugin-transform-modules-systemjs": "^7.29.7",
+    "@babel/plugin-transform-modules-systemjs": "^7.29.8",
     "@capacitor-community/keep-awake": "^8.0.1",
     "@capacitor/action-sheet": "^8.1.1",
     "@capacitor/android": "^8.4.1",
