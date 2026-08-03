@@ -89,7 +89,7 @@ jobs:
 
       - name: Upload to GitHub Code Scanning
         if: always() && hashFiles('ai-guard-results.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4.37.4
         with:
           sarif_file: ai-guard-results.sarif
           category: ai-guard
