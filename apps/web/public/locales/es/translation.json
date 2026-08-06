@@ -632,7 +632,14 @@
     "aiSettings": "Ajustes de IA",
     "versionAndChangelog": "Versión y registro de cambios",
     "disclaimer": "Metic es un proyecto independiente de código abierto y no está afiliado, respaldado ni conectado con Meticulous Home, el fabricante de la máquina de espresso Meticulous.",
-    "localModelDownloadKeepOpen": "Mantén la app abierta y permanece en esta pantalla hasta que finalice la descarga."
+    "localModelDownloadKeepOpen": "Mantén la app abierta y permanece en esta pantalla hasta que finalice la descarga.",
+    "diagnostics": {
+      "title": "Diagnóstico",
+      "description": "Si la aplicación se congela o se comporta de forma inesperada, genera un informe de diagnóstico y envíanoslo. Registra bloqueos y errores en tu dispositivo y no contiene datos personales.",
+      "generate": "Generar informe",
+      "copy": "Copiar",
+      "clear": "Borrar"
+    }
   },
   "profileBreakdown": {
     "title": "Detalles del perfil",

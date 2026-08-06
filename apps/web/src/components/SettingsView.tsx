@@ -31,10 +31,12 @@ import {
   Info,
   Rocket,
   Heart,
-  HardDrives
+  HardDrives,
+  Bug
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isDemoMode, isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
+import { getDiagnosticsReport, clearDiagnostics } from '@/lib/diagnostics'
 import { STORAGE_KEYS } from '@/lib/constants'
 import {
   PROVIDERS,
@@ -146,6 +148,10 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   const { authenticate: biometricAuth } = useBiometrics()
   const { copyToClipboard } = useClipboard()
   const { toggleOn: playToggleOn, toggleOff: playToggleOff, confirmSoundToggle } = useSoundEffects()
+
+  // Diagnostics panel — passive on-device capture of freezes/errors, surfaced
+  // so users can copy and send a report when we cannot attach a debugger.
+  const [diagReport, setDiagReport] = useState('')
 
   // Direct and demo modes both use local storage for settings (no backend server)
   const isLocalMode = () => isDirectMode() || isDemoMode()
@@ -2108,6 +2114,48 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           </p>
         </Card>
       )}
+
+      {/* Diagnostics — passive freeze/error capture for field debugging */}
+      <CollapsibleSection title={t('settings.diagnostics.title')} defaultOpen={false}>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            {t('settings.diagnostics.description')}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setDiagReport(getDiagnosticsReport())}
+            >
+              <Bug size={18} className="mr-2" weight="bold" />
+              {t('settings.diagnostics.generate')}
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              disabled={!diagReport}
+              onClick={() => copyToClipboard(diagReport)}
+            >
+              <Copy size={18} className="mr-2" weight="bold" />
+              {t('settings.diagnostics.copy')}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                clearDiagnostics()
+                setDiagReport(getDiagnosticsReport())
+              }}
+            >
+              {t('settings.diagnostics.clear')}
+            </Button>
+          </div>
+          {diagReport && (
+            <pre className="text-[10px] text-muted-foreground bg-muted/50 p-3 rounded border overflow-auto max-h-64 whitespace-pre-wrap">
+              {diagReport}
+            </pre>
+          )}
+        </div>
+      </CollapsibleSection>
 
       {/* Footer */}
       <div className="text-center text-xs text-muted-foreground/50 pb-4 space-y-1">

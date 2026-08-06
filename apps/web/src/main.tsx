@@ -10,6 +10,7 @@ import { ShotDataServiceProvider } from '@/services/shots'
 import { CatalogueServiceProvider } from '@/services/catalogue'
 import { isDirectMode, isDemoMode } from '@/lib/machineMode'
 import { installCoreInterceptor } from '@/services/interceptor/coreInterceptor'
+import { startDiagnostics } from '@/lib/diagnostics'
 
 // Initialize i18n
 import './i18n/config'
@@ -17,6 +18,12 @@ import './i18n/config'
 import "./main.css"
 import "./styles/theme.css"
 import "./index.css"
+
+// Start passive on-device diagnostics as early as possible so we capture
+// main-thread stalls (ANR/freeze) and errors from the very first frame. This
+// is our only window into field freezes on devices we cannot attach a debugger
+// to. See src/lib/diagnostics.ts.
+startDiagnostics()
 
 // In direct mode (native/PWA on the machine), route MeticAI proxy API calls
 // through the shared @metic/core handler (the same handler the Bun server uses

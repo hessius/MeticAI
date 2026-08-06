@@ -3,6 +3,8 @@ import { Button } from "./components/ui/button";
 
 import { AlertTriangleIcon, RefreshCwIcon } from "lucide-react";
 
+import { recordDiagnostic } from "@/lib/diagnostics";
+
 interface ErrorFallbackProps {
   error: unknown;
   resetErrorBoundary: (...args: unknown[]) => void;
@@ -13,6 +15,9 @@ export const ErrorFallback = ({ error, resetErrorBoundary }: ErrorFallbackProps)
   // Log error details to console for debugging
   console.error('ErrorFallback caught error:', err);
   console.error('Error stack:', err.stack);
+  // Record into on-device diagnostics — React render errors are swallowed by
+  // the error boundary and never reach window.onerror.
+  recordDiagnostic('error', `React boundary: ${err.message || String(err)}`)
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
