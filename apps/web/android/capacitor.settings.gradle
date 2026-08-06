@@ -47,5 +47,8 @@ project(':capacitor-share').projectDir = new File('../node_modules/@capacitor/sh
 include ':capgo-capacitor-llm'
 project(':capgo-capacitor-llm').projectDir = new File('../node_modules/@capgo/capacitor-llm/android')
 
+include ':capgo-capacitor-share-target'
+project(':capgo-capacitor-share-target').projectDir = new File('../node_modules/@capgo/capacitor-share-target/android')
+
 include ':capacitor-zeroconf'
 project(':capacitor-zeroconf').projectDir = new File('../node_modules/capacitor-zeroconf/android')

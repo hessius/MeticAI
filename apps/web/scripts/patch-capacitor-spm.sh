@@ -396,6 +396,10 @@ else:
         with open(path, 'w') as f:
             f.write(content)
         print("  Patched: @capgo/capacitor-llm (LiteRT-LM CPU-first)")
+    elif "configs = [try makeConfig(.cpu()), try makeConfig(.gpu)]" in content:
+        # Upstream >= 8.1.3 already defaults to CPU-first (CPU then GPU fallback),
+        # which is exactly what this patch enforced. Nothing to do.
+        print("  OK: @capgo/capacitor-llm already CPU-first upstream (>= 8.1.3)")
     else:
         print("  WARNING: @capgo/capacitor-llm config block not found; upstream may have changed")
 PYEOF
