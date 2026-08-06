@@ -638,7 +638,16 @@
       "description": "Om appen fryser eller beter sig oväntat kan du skapa en diagnostikrapport och skicka den till oss. Den registrerar frysningar och fel på din enhet och innehåller inga personuppgifter.",
       "generate": "Skapa rapport",
       "copy": "Kopiera",
-      "clear": "Rensa"
+      "clear": "Rensa",
+      "overlay": {
+        "title": "Metic-diagnostik",
+        "intro": "Metic upptäckte en frysning. Kopiera eller dela rapporten och skicka den till utvecklarna så att de kan åtgärda felet.",
+        "copy": "Kopiera rapport",
+        "share": "Dela",
+        "copied": "Kopierad",
+        "copyFailed": "Kopiering misslyckades",
+        "dismiss": "Stäng"
+      }
     }
   },
   "profileBreakdown": {

@@ -638,7 +638,16 @@
       "description": "Wenn die App einfriert oder sich unerwartet verhält, erstelle einen Diagnosebericht und sende ihn an uns. Er erfasst Abstürze und Fehler auf deinem Gerät und enthält keine personenbezogenen Daten.",
       "generate": "Bericht erstellen",
       "copy": "Kopieren",
-      "clear": "Löschen"
+      "clear": "Löschen",
+      "overlay": {
+        "title": "Metic-Diagnose",
+        "intro": "Metic hat ein Einfrieren erkannt. Kopiere oder teile diesen Bericht und sende ihn an die Entwickler, damit sie das Problem beheben können.",
+        "copy": "Bericht kopieren",
+        "share": "Teilen",
+        "copied": "Kopiert",
+        "copyFailed": "Kopieren fehlgeschlagen",
+        "dismiss": "Schließen"
+      }
     }
   },
   "profileBreakdown": {

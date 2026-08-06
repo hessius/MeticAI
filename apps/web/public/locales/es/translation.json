@@ -638,7 +638,16 @@
       "description": "Si la aplicación se congela o se comporta de forma inesperada, genera un informe de diagnóstico y envíanoslo. Registra bloqueos y errores en tu dispositivo y no contiene datos personales.",
       "generate": "Generar informe",
       "copy": "Copiar",
-      "clear": "Borrar"
+      "clear": "Borrar",
+      "overlay": {
+        "title": "Diagnóstico de Metic",
+        "intro": "Metic detectó un bloqueo. Copia o comparte este informe y envíalo a los desarrolladores para que puedan solucionarlo.",
+        "copy": "Copiar informe",
+        "share": "Compartir",
+        "copied": "Copiado",
+        "copyFailed": "Error al copiar",
+        "dismiss": "Cerrar"
+      }
     }
   },
   "profileBreakdown": {

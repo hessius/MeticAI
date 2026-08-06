@@ -638,7 +638,16 @@
       "description": "If the app freezes or behaves unexpectedly, generate a diagnostics report and send it to us. It records app freezes and errors on your device and contains no personal data.",
       "generate": "Generate Report",
       "copy": "Copy",
-      "clear": "Clear"
+      "clear": "Clear",
+      "overlay": {
+        "title": "Metic diagnostics",
+        "intro": "Metic detected a freeze. Copy or share this report and send it to the developers so they can fix it.",
+        "copy": "Copy report",
+        "share": "Share",
+        "copied": "Copied",
+        "copyFailed": "Copy failed",
+        "dismiss": "Dismiss"
+      }
     }
   },
   "profileBreakdown": {

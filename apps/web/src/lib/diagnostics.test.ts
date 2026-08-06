@@ -7,14 +7,19 @@ import {
   clearDiagnostics,
   startDiagnostics,
   stopDiagnostics,
+  lastUnacknowledgedFreeze,
+  showBootDiagnosticsIfNeeded,
 } from './diagnostics'
 
 const STORAGE_KEY = 'metic.diagnostics.v1'
+const ACK_KEY = 'metic.diagnostics.ack'
 
 describe('diagnostics', () => {
   beforeEach(() => {
     clearDiagnostics()
     localStorage.clear()
+    document.getElementById('metic-diag-overlay')?.remove()
+    delete (window as unknown as Record<string, unknown>).Capacitor
   })
 
   describe('recordDiagnostic / getDiagnosticEvents', () => {
@@ -113,6 +118,92 @@ describe('diagnostics', () => {
       const stalls = getDiagnosticEvents().filter(e => e.kind === 'stall')
       expect(stalls.length).toBeGreaterThanOrEqual(1)
       expect(stalls[0].ms).toBeGreaterThanOrEqual(2500)
+    })
+  })
+
+  describe('lastUnacknowledgedFreeze', () => {
+    const seed = (evts: unknown[]) => localStorage.setItem(STORAGE_KEY, JSON.stringify(evts))
+
+    it('returns 0 when there are no stalls', () => {
+      seed([{ t: 10, kind: 'info', detail: 'x' }])
+      showBootDiagnosticsIfNeeded() // loads persisted
+      expect(lastUnacknowledgedFreeze()).toBe(0)
+    })
+
+    it('returns the latest stall timestamp when unacknowledged', () => {
+      seed([
+        { t: 100, kind: 'stall', detail: 'a', ms: 3000 },
+        { t: 500, kind: 'stall', detail: 'b', ms: 4000 },
+        { t: 300, kind: 'info', detail: 'c' },
+      ])
+      showBootDiagnosticsIfNeeded({ force: true })
+      expect(lastUnacknowledgedFreeze()).toBe(500)
+    })
+
+    it('returns 0 once the freeze has been acknowledged', () => {
+      seed([{ t: 500, kind: 'stall', detail: 'b', ms: 4000 }])
+      localStorage.setItem(ACK_KEY, '500')
+      showBootDiagnosticsIfNeeded()
+      expect(lastUnacknowledgedFreeze()).toBe(0)
+    })
+  })
+
+  describe('showBootDiagnosticsIfNeeded', () => {
+    const seed = (evts: unknown[]) => localStorage.setItem(STORAGE_KEY, JSON.stringify(evts))
+
+    afterEach(() => {
+      document.getElementById('metic-diag-overlay')?.remove()
+      delete (window as unknown as Record<string, unknown>).Capacitor
+    })
+
+    it('does not show when there is no freeze and it is not forced', () => {
+      seed([{ t: 1, kind: 'info', detail: 'x' }])
+      expect(showBootDiagnosticsIfNeeded()).toBe(false)
+      expect(document.getElementById('metic-diag-overlay')).toBeNull()
+    })
+
+    it('shows when explicitly forced, regardless of platform', () => {
+      seed([])
+      expect(showBootDiagnosticsIfNeeded({ force: true })).toBe(true)
+      const overlay = document.getElementById('metic-diag-overlay')
+      expect(overlay).not.toBeNull()
+      expect(overlay!.textContent).toContain('Metic diagnostics')
+    })
+
+    it('auto-shows on native platforms when there is an unacknowledged freeze', () => {
+      ;(window as unknown as Record<string, unknown>).Capacitor = {
+        isNativePlatform: () => true,
+      }
+      seed([{ t: Date.now(), kind: 'stall', detail: 'blocked', ms: 3000 }])
+      expect(showBootDiagnosticsIfNeeded()).toBe(true)
+      expect(document.getElementById('metic-diag-overlay')).not.toBeNull()
+    })
+
+    it('does not auto-show on web even with a freeze (only native or forced)', () => {
+      seed([{ t: Date.now(), kind: 'stall', detail: 'blocked', ms: 3000 }])
+      expect(showBootDiagnosticsIfNeeded()).toBe(false)
+      expect(document.getElementById('metic-diag-overlay')).toBeNull()
+    })
+
+    it('dismiss acknowledges the freeze so it does not reappear', () => {
+      ;(window as unknown as Record<string, unknown>).Capacitor = {
+        isNativePlatform: () => true,
+      }
+      const freezeAt = Date.now()
+      seed([{ t: freezeAt, kind: 'stall', detail: 'blocked', ms: 3000 }])
+      expect(showBootDiagnosticsIfNeeded()).toBe(true)
+
+      const overlay = document.getElementById('metic-diag-overlay')!
+      const dismiss = Array.from(overlay.querySelectorAll('button')).find(
+        b => b.textContent === 'Dismiss',
+      )
+      expect(dismiss).toBeTruthy()
+      dismiss!.click()
+
+      expect(document.getElementById('metic-diag-overlay')).toBeNull()
+      expect(Number(localStorage.getItem(ACK_KEY))).toBe(freezeAt)
+      // A second boot with the same persisted freeze must not re-show.
+      expect(showBootDiagnosticsIfNeeded()).toBe(false)
     })
   })
 })

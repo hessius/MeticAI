@@ -10,7 +10,7 @@ import { ShotDataServiceProvider } from '@/services/shots'
 import { CatalogueServiceProvider } from '@/services/catalogue'
 import { isDirectMode, isDemoMode } from '@/lib/machineMode'
 import { installCoreInterceptor } from '@/services/interceptor/coreInterceptor'
-import { startDiagnostics } from '@/lib/diagnostics'
+import { startDiagnostics, showBootDiagnosticsIfNeeded } from '@/lib/diagnostics'
 
 // Initialize i18n
 import './i18n/config'
@@ -24,6 +24,13 @@ import "./index.css"
 // is our only window into field freezes on devices we cannot attach a debugger
 // to. See src/lib/diagnostics.ts.
 startDiagnostics()
+
+// Escape hatch for the "app freezes before I can ever reach Settings" case:
+// if the previous session recorded a freeze, surface a plain-DOM report overlay
+// now, before React mounts and before any native plugin work — so it stays
+// interactive even if this session deadlocks again. Also openable anywhere via
+// a `#diagnostics` URL. See src/lib/diagnostics.ts.
+showBootDiagnosticsIfNeeded()
 
 // In direct mode (native/PWA on the machine), route MeticAI proxy API calls
 // through the shared @metic/core handler (the same handler the Bun server uses

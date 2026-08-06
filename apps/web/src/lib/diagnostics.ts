@@ -32,6 +32,12 @@ export interface DiagnosticEvent {
 }
 
 const STORAGE_KEY = 'metic.diagnostics.v1'
+/**
+ * Timestamp (epoch ms) of the freeze the user has already been shown. The boot
+ * overlay only auto-appears when there is a stall newer than this, so it does
+ * not nag on every launch after the user has seen / sent a report.
+ */
+const ACK_KEY = 'metic.diagnostics.ack'
 const MAX_EVENTS = 200
 /** Heartbeat cadence. */
 const HEARTBEAT_MS = 1000
@@ -246,6 +252,208 @@ export function startDiagnostics(): void {
   startLongTaskObserver()
   startErrorHandlers()
 }
+
+function ackTimestamp(): number {
+  if (!hasWindow()) return 0
+  try {
+    const raw = window.localStorage.getItem(ACK_KEY)
+    return raw ? Number(raw) || 0 : 0
+  } catch {
+    return 0
+  }
+}
+
+function setAck(t: number): void {
+  if (!hasWindow()) return
+  try {
+    window.localStorage.setItem(ACK_KEY, String(t))
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Timestamp of the most recent stall the user has not yet acknowledged, or 0 if
+ * none. A stall is the fingerprint of a freeze/ANR, so this answers "did the app
+ * freeze since we last showed the user a report?".
+ */
+export function lastUnacknowledgedFreeze(): number {
+  const ack = ackTimestamp()
+  let latest = 0
+  for (const e of events) {
+    if (e.kind === 'stall' && e.t > latest) latest = e.t
+  }
+  return latest > ack ? latest : 0
+}
+
+/** True when the current URL explicitly requests the diagnostics overlay. */
+function overlayForcedByUrl(): boolean {
+  if (!hasWindow() || typeof window.location === 'undefined') return false
+  const { hash, search } = window.location
+  return /(?:^|[#?&])diagnostics?(?:$|[=&])/i.test(hash || '') || /[?&]diagnostics?(?:=|&|$)/i.test(search || '')
+}
+
+function isNativePlatform(): boolean {
+  if (!hasWindow()) return false
+  const cap = (window as unknown as Record<string, unknown>).Capacitor as
+    | { isNativePlatform?: () => boolean }
+    | undefined
+  return cap?.isNativePlatform?.() ?? false
+}
+
+async function copyReportToClipboard(text: string): Promise<boolean> {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // fall through to legacy path
+  }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.focus()
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
+
+async function shareReport(text: string, title: string): Promise<boolean> {
+  try {
+    const mod = await import('@capacitor/share')
+    await mod.Share.share({ title, text, dialogTitle: title })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Emergency escape hatch for the "app is frozen and I can never reach Settings"
+ * case. Rendered as plain DOM (not React) as early as possible during boot, so
+ * it is interactive even if the React tree / native plugins later deadlock, and
+ * it surfaces the PREVIOUS session's captured freeze data (which was persisted
+ * before the freeze).
+ *
+ * It appears automatically on native platforms when there is an unacknowledged
+ * freeze, and on any platform when the URL contains `#diagnostics` (so we can
+ * always talk a user through reaching it). Copying or sharing the report, or
+ * dismissing it, acknowledges the freeze so it does not reappear until the next
+ * one.
+ *
+ * @returns true when the overlay was shown.
+ */
+export function showBootDiagnosticsIfNeeded(options?: { force?: boolean }): boolean {
+  if (!hasWindow() || typeof document === 'undefined' || !document.body) return false
+  if (document.getElementById('metic-diag-overlay')) return true
+
+  loadPersisted()
+  const freezeAt = lastUnacknowledgedFreeze()
+  const forced = options?.force === true || overlayForcedByUrl()
+  const autoShow = freezeAt > 0 && isNativePlatform()
+  if (!forced && !autoShow) return false
+
+  const t = (key: string, fallback: string): string => {
+    try {
+      // i18next is exposed on globalThis by src/i18n/config.ts. Translations may
+      // not be loaded this early (HTTP backend), so always pass an English
+      // default to keep the overlay readable.
+      const i18n = (globalThis as Record<string, unknown>).i18next as
+        | { t?: (k: string, o?: Record<string, unknown>) => string }
+        | undefined
+      const translated = i18n?.t?.(key, { defaultValue: fallback })
+      return typeof translated === 'string' && translated.length > 0 ? translated : fallback
+    } catch {
+      return fallback
+    }
+  }
+
+  const report = getDiagnosticsReport()
+  const title = t('settings.diagnostics.overlay.title', 'Metic diagnostics')
+  const intro = t(
+    'settings.diagnostics.overlay.intro',
+    'Metic detected a freeze. Copy or share this report and send it to the developers so they can fix it.',
+  )
+
+  const overlay = document.createElement('div')
+  overlay.id = 'metic-diag-overlay'
+  overlay.setAttribute('role', 'dialog')
+  overlay.setAttribute('aria-modal', 'true')
+  overlay.style.cssText =
+    'position:fixed;inset:0;z-index:2147483647;background:#030202;color:#f5f5f5;' +
+    'font:14px/1.4 -apple-system,system-ui,sans-serif;display:flex;flex-direction:column;' +
+    'padding:16px;box-sizing:border-box;-webkit-user-select:text;user-select:text;'
+
+  const h = document.createElement('div')
+  h.textContent = title
+  h.style.cssText = 'font-size:18px;font-weight:700;margin-bottom:8px;'
+
+  const p = document.createElement('div')
+  p.textContent = intro
+  p.style.cssText = 'margin-bottom:12px;opacity:0.85;'
+
+  const pre = document.createElement('pre')
+  pre.textContent = report
+  pre.style.cssText =
+    'flex:1;overflow:auto;background:#141010;border-radius:8px;padding:12px;margin:0 0 12px;' +
+    'white-space:pre-wrap;word-break:break-word;font-size:12px;'
+
+  const row = document.createElement('div')
+  row.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;'
+
+  const acknowledge = () => setAck(freezeAt > 0 ? freezeAt : Date.now())
+
+  const makeButton = (label: string, primary: boolean, onClick: () => void): HTMLButtonElement => {
+    const b = document.createElement('button')
+    b.textContent = label
+    b.style.cssText =
+      'flex:1;min-width:96px;padding:12px;border-radius:10px;border:0;font-size:15px;font-weight:600;' +
+      (primary ? 'background:#c9773a;color:#fff;' : 'background:#2a2222;color:#f5f5f5;') +
+      'cursor:pointer;-webkit-tap-highlight-color:transparent;'
+    b.addEventListener('click', onClick)
+    return b
+  }
+
+  const copyBtn = makeButton(t('settings.diagnostics.overlay.copy', 'Copy report'), true, async () => {
+    const ok = await copyReportToClipboard(report)
+    copyBtn.textContent = ok
+      ? t('settings.diagnostics.overlay.copied', 'Copied')
+      : t('settings.diagnostics.overlay.copyFailed', 'Copy failed')
+    acknowledge()
+  })
+
+  const shareBtn = makeButton(t('settings.diagnostics.overlay.share', 'Share'), false, async () => {
+    const ok = await shareReport(report, title)
+    if (!ok) {
+      const copied = await copyReportToClipboard(report)
+      shareBtn.textContent = copied
+        ? t('settings.diagnostics.overlay.copied', 'Copied')
+        : t('settings.diagnostics.overlay.share', 'Share')
+    }
+    acknowledge()
+  })
+
+  const closeBtn = makeButton(t('settings.diagnostics.overlay.dismiss', 'Dismiss'), false, () => {
+    acknowledge()
+    overlay.remove()
+  })
+
+  row.append(copyBtn, shareBtn, closeBtn)
+  overlay.append(h, p, pre, row)
+  document.body.appendChild(overlay)
+  return true
+}
+
+/**
+ * Stop the heartbeat and flush pending persistence. Primarily useful for tests
 
 /**
  * Stop the heartbeat and flush pending persistence. Primarily useful for tests

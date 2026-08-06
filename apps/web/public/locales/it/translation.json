@@ -638,7 +638,16 @@
       "description": "Se l'app si blocca o si comporta in modo imprevisto, genera un rapporto diagnostico e inviacelo. Registra blocchi ed errori sul tuo dispositivo e non contiene dati personali.",
       "generate": "Genera rapporto",
       "copy": "Copia",
-      "clear": "Cancella"
+      "clear": "Cancella",
+      "overlay": {
+        "title": "Diagnostica Metic",
+        "intro": "Metic ha rilevato un blocco. Copia o condividi questo rapporto e invialo agli sviluppatori affinché possano risolverlo.",
+        "copy": "Copia rapporto",
+        "share": "Condividi",
+        "copied": "Copiato",
+        "copyFailed": "Copia non riuscita",
+        "dismiss": "Chiudi"
+      }
     }
   },
   "profileBreakdown": {
