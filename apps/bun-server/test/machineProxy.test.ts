@@ -34,47 +34,39 @@ describe("proxyToMachine", () => {
     expect(await res.json()).toEqual({ error: "Machine address not configured" });
   });
 
-  test("forwards method, path, query and body upstream and mirrors the response", async () => {
-    const captured: { url?: string; method?: string; body?: string } = {};
-    const original = globalThis.fetch;
-    globalThis.fetch = (async (input: Request | string | URL, init?: RequestInit) => {
-      captured.url = String(input);
+  test("forwards method, path, query and body through machine.fetch and mirrors the response", async () => {
+    const captured: { path?: string; method?: string; body?: string } = {};
+    const platform = fakePlatform("http://machine:8080");
+    platform.machine.fetch = (async (path: string, init?: RequestInit) => {
+      captured.path = path;
       captured.method = init?.method;
       captured.body = init?.body ? String(init.body) : undefined;
       return new Response(JSON.stringify({ ok: true }), {
         status: 201,
         headers: { "content-type": "application/json", "x-custom": "1" },
       });
-    }) as unknown as typeof fetch;
+    }) as Platform["machine"]["fetch"];
 
-    try {
-      const res = await proxyToMachine(
-        new Request("http://localhost/api/v1/action/start?force=1", { method: "POST" }),
-        fakePlatform("http://machine:8080"),
-      );
-      expect(captured.url).toBe("http://machine:8080/api/v1/action/start?force=1");
-      expect(captured.method).toBe("POST");
-      expect(res.status).toBe(201);
-      expect(res.headers.get("x-custom")).toBe("1");
-      expect(await res.json()).toEqual({ ok: true });
-    } finally {
-      globalThis.fetch = original;
-    }
+    const res = await proxyToMachine(
+      new Request("http://localhost/api/v1/action/start?force=1", { method: "POST" }),
+      platform,
+    );
+    expect(captured.path).toBe("/api/v1/action/start?force=1");
+    expect(captured.method).toBe("POST");
+    expect(res.status).toBe(201);
+    expect(res.headers.get("x-custom")).toBe("1");
+    expect(await res.json()).toEqual({ ok: true });
   });
 
   test("returns 502 when the machine is unreachable", async () => {
-    const original = globalThis.fetch;
-    globalThis.fetch = (async () => {
+    const platform = fakePlatform("http://machine:8080");
+    platform.machine.fetch = (async () => {
       throw new Error("ECONNREFUSED");
-    }) as unknown as typeof fetch;
-    try {
-      const res = await proxyToMachine(
-        new Request("http://localhost/api/v1/machine"),
-        fakePlatform("http://machine:8080"),
-      );
-      expect(res.status).toBe(502);
-    } finally {
-      globalThis.fetch = original;
-    }
+    }) as Platform["machine"]["fetch"];
+    const res = await proxyToMachine(
+      new Request("http://localhost/api/v1/machine"),
+      platform,
+    );
+    expect(res.status).toBe(502);
   });
 });

@@ -2,7 +2,7 @@ import { describe, test, expect, afterEach } from "bun:test";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createNodePlatform } from "../src/platform/node.ts";
+import { createNodePlatform, machineCandidateBases } from "../src/platform/node.ts";
 
 const dirs: string[] = [];
 
@@ -132,6 +132,52 @@ describe("createNodePlatform machine url", () => {
   test("fetch rejects when the machine URL is not configured", async () => {
     const p = createNodePlatform({ machineBaseUrl: undefined, dataDir: "/tmp/x" });
     await expect(p.machine.fetch("/api/v1/history")).rejects.toThrow();
+  });
+});
+
+describe("machineCandidateBases", () => {
+  test("adds a port-80 fallback for an explicit non-default http port", () => {
+    expect(machineCandidateBases("http://host:8080")).toEqual([
+      "http://host:8080",
+      "http://host",
+    ]);
+  });
+
+  test("no fallback for a bare host (already port 80)", () => {
+    expect(machineCandidateBases("http://host")).toEqual(["http://host"]);
+  });
+
+  test("no fallback for an explicit port 80", () => {
+    expect(machineCandidateBases("http://host:80")).toEqual(["http://host:80"]);
+  });
+
+  test("no fallback for https", () => {
+    expect(machineCandidateBases("https://host:8443")).toEqual(["https://host:8443"]);
+  });
+});
+
+describe("createNodePlatform machine port-80 fallback", () => {
+  test("resolves to port 80 when the configured :8080 base is unreachable", async () => {
+    const p = createNodePlatform({ machineBaseUrl: "http://machine:8080", dataDir: "/tmp/x" });
+    const prev = globalThis.fetch;
+    const seen: string[] = [];
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      const u = String(url);
+      seen.push(u);
+      if (u.includes(":8080")) throw new Error("ECONNREFUSED");
+      return new Response("{}");
+    }) as typeof fetch;
+    try {
+      const res = await p.machine.fetch("/api/v1/history");
+      expect(res.status).toBe(200);
+      // The probe hit :8080 (failed) then :80 (ok), and the real request used :80.
+      expect(seen).toContain("http://machine:8080/api/v1/settings");
+      expect(seen).toContain("http://machine/api/v1/settings");
+      expect(seen).toContain("http://machine/api/v1/history");
+      expect(p.machine.getBaseUrl()).toBe("http://machine");
+    } finally {
+      globalThis.fetch = prev;
+    }
   });
 });
 

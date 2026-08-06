@@ -673,16 +673,16 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     try {
       if (isLocalMode()) {
         // In direct/demo mode, use client-side discovery instead of server endpoint
-        const { discoverMachines, testMachineConnection } = await import('@/services/machine/discovery')
+        const { discoverMachines, resolveReachableMachineUrl } = await import('@/services/machine/discovery')
         const machines = await discoverMachines()
         if (machines.length > 0) {
           const machine = machines[0]
-          const verified = await testMachineConnection(machine.url)
-          if (verified) {
+          const resolved = await resolveReachableMachineUrl(machine.url)
+          if (resolved) {
             setDetectResult({ found: true, ip: machine.host, hostname: machine.name })
-            await persistMachineUrl(machine.url)
+            await persistMachineUrl(resolved)
             setMachineUrlError('')
-            setSettings(prev => ({ ...prev, meticulousIp: machine.url }))
+            setSettings(prev => ({ ...prev, meticulousIp: resolved }))
             if (isDemoMode()) window.location.reload()
           } else {
             setDetectResult({ found: false, guidance_key: 'notFound' })

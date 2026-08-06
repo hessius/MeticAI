@@ -61,50 +61,93 @@ function dlog(msg: string) {
 // HTTP probe helpers
 // ---------------------------------------------------------------------------
 
+/** A 2xx (or legacy 404) response means the machine API answered. */
+function isReachableStatus(status: number): boolean {
+  return (status >= 200 && status < 300) || status === 404
+}
+
+/**
+ * GET a URL and return its HTTP status, or null on a network/timeout error.
+ * Uses CapacitorHttp on native to bypass CORS, regular fetch on web.
+ */
+async function fetchStatus(probeUrl: string, timeoutMs: number): Promise<number | null> {
+  try {
+    if (isNativePlatform()) {
+      const resp = await CapacitorHttp.get({
+        url: probeUrl,
+        connectTimeout: timeoutMs,
+        readTimeout: timeoutMs,
+      })
+      return resp.status
+    }
+    const resp = await fetch(probeUrl, { signal: AbortSignal.timeout(timeoutMs) })
+    return resp.status
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Build the ordered list of base URLs to try for a machine, most-likely first.
+ *
+ * Firmware quirk: current firmware exposes the machine API on port 8080 (and
+ * also proxies it on port 80 via nginx), so we default to 8080. Older /
+ * downgraded firmware serves the API ONLY on the default HTTP port (80). When a
+ * URL assumes an explicit non-default HTTP port, we therefore add a port-80
+ * (no explicit port) fallback so those machines remain reachable.
+ */
+export function machineUrlCandidates(rawUrl: string): string[] {
+  const candidates: string[] = []
+  const push = (u: string) => {
+    const trimmed = u.replace(/\/+$/, '')
+    if (trimmed && !candidates.includes(trimmed)) candidates.push(trimmed)
+  }
+  push(rawUrl)
+  try {
+    const url = new URL(rawUrl)
+    if (url.protocol === 'http:' && url.port && url.port !== '80') {
+      url.port = ''
+      push(url.toString())
+    }
+  } catch {
+    // Not a parseable URL — only the raw value is a candidate.
+  }
+  return candidates
+}
+
+/**
+ * Resolve the first reachable base URL for a machine, trying the given port and
+ * then a port-80 fallback (see {@link machineUrlCandidates}). Returns the base
+ * URL that actually answered so callers persist the WORKING url (with the
+ * correct port), or null if none responded. Demo mode always resolves to 'demo'.
+ */
+export async function resolveReachableMachineUrl(url: string): Promise<string | null> {
+  if (url.toLowerCase() === 'demo') return 'demo'
+  for (const candidate of machineUrlCandidates(url)) {
+    const status = await fetchStatus(`${candidate}/api/v1/settings`, 5000)
+    if (status !== null) {
+      console.info(`[Discovery] Probe ${candidate}/api/v1/settings → status ${status}`)
+      if (isReachableStatus(status)) return candidate
+    }
+  }
+  return null
+}
+
 /**
  * Probe a single address to check if a Meticulous machine lives there.
  * Uses CapacitorHttp on native to bypass CORS, regular fetch on web.
  * Verifies via /api/v1/settings — the machine's liveness endpoint.
  */
 async function probeMachine(baseUrl: string): Promise<DiscoveredMachine | null> {
-  const probeUrl = `${baseUrl}/api/v1/settings`
-
-  try {
-    let status: number
-
-    console.info(`[Discovery] Probing machine at ${probeUrl}`)
-
-    if (isNativePlatform()) {
-      const resp = await CapacitorHttp.get({
-        url: probeUrl,
-        connectTimeout: 4000,
-        readTimeout: 4000,
-      })
-      status = resp.status
-    } else {
-      const resp = await fetch(probeUrl, {
-        signal: AbortSignal.timeout(4000),
-      })
-      status = resp.status
-    }
-
-    console.info(`[Discovery] Probe ${probeUrl} → status ${status}`)
-
-    // Any 2xx means the machine is responding; 404 also accepted for
-    // backward compatibility (old probe endpoint returned 404 when no data)
-    if ((status >= 200 && status < 300) || status === 404) {
-      const url = new URL(baseUrl)
-      return {
-        name: url.hostname,
-        host: url.hostname,
-        port: parseInt(url.port, 10) || 8080,
-        url: baseUrl,
-      }
-    }
-  } catch (e) {
-    console.warn(`[Discovery] Probe failed for ${probeUrl}:`, e)
+  const reachable = await resolveReachableMachineUrl(baseUrl)
+  if (!reachable || reachable === 'demo') return null
+  const url = new URL(reachable)
+  return {
+    name: url.hostname,
+    host: url.hostname,
+    port: url.port ? parseInt(url.port, 10) : 80,
+    url: reachable,
   }
-  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -316,36 +359,14 @@ export function parseMachineInput(input: string): DiscoveredMachine | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Test if a machine is reachable at the given URL. Uses CapacitorHttp on
- * native to bypass CORS. Same verification as backend's verify_machine().
- * Demo mode always succeeds.
+ * Test if a machine is reachable at the given URL. Tries the given port and a
+ * port-80 fallback (older firmware serves the API on port 80 only). Uses
+ * CapacitorHttp on native to bypass CORS. Same verification as the server's
+ * machine proxy. Demo mode always succeeds.
+ *
+ * Prefer {@link resolveReachableMachineUrl} when you need the working URL to
+ * persist; this boolean wrapper is kept for callers that only need liveness.
  */
 export async function testMachineConnection(url: string): Promise<boolean> {
-  if (url.toLowerCase() === 'demo') return true
-  const probeUrl = `${url}/api/v1/settings`
-  console.error(`[Discovery] Testing connection to ${probeUrl}`)
-  try {
-    let status: number
-
-    if (isNativePlatform()) {
-      const resp = await CapacitorHttp.get({
-        url: probeUrl,
-        connectTimeout: 5000,
-        readTimeout: 5000,
-      })
-      status = resp.status
-    } else {
-      const resp = await fetch(probeUrl, {
-        signal: AbortSignal.timeout(5000),
-      })
-      status = resp.status
-    }
-
-    const ok = (status >= 200 && status < 300) || status === 404
-    console.error(`[Discovery] Connection test ${probeUrl} → status ${status}, ok=${ok}`)
-    return ok
-  } catch (e) {
-    console.error(`[Discovery] Connection test failed for ${probeUrl}:`, e)
-    return false
-  }
+  return (await resolveReachableMachineUrl(url)) !== null
 }

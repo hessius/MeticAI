@@ -296,6 +296,33 @@ function resolveMachineBaseUrl(override?: string): string {
   return ip.includes(":") ? `http://${ip}` : `http://${ip}:${MACHINE_PORT}`;
 }
 
+/**
+ * Ordered base URLs to try for the machine, most-likely first.
+ *
+ * Current firmware serves the API on port 8080 (and proxies it on port 80 via
+ * nginx); older / downgraded firmware serves it ONLY on the default HTTP port
+ * (80). When the configured base assumes an explicit non-default HTTP port, add
+ * a port-80 (no explicit port) fallback so those machines stay reachable.
+ */
+export function machineCandidateBases(baseUrl: string): string[] {
+  const out: string[] = [];
+  const push = (u: string) => {
+    const trimmed = u.replace(/\/+$/, "");
+    if (trimmed && !out.includes(trimmed)) out.push(trimmed);
+  };
+  push(baseUrl);
+  try {
+    const url = new URL(baseUrl);
+    if (url.protocol === "http:" && url.port && url.port !== "80") {
+      url.port = "";
+      push(url.toString());
+    }
+  } catch {
+    /* not a URL — only the raw value is a candidate */
+  }
+  return out;
+}
+
 /** App version for GET /api/version: $APP_VERSION, else the repo VERSION file, else "unknown". */
 function resolveAppVersion(): string {
   const env = process.env.APP_VERSION?.trim();
@@ -353,6 +380,40 @@ export function createNodePlatform(options: NodePlatformOptions = {}): Platform 
   const clock = () => Date.now();
   const logger = consoleLogger();
   const machineBaseUrl = resolveMachineBaseUrl(options.machineBaseUrl);
+  const machineCandidates = machineCandidateBases(machineBaseUrl);
+  // The base URL that most recently answered. Starts at the configured default
+  // (port 8080) and self-heals to a port-80 fallback for older firmware.
+  let effectiveMachineBase = machineBaseUrl;
+
+  /**
+   * Probe candidate bases once and switch `effectiveMachineBase` to the first
+   * that answers /api/v1/settings. Memoized; safe to call repeatedly. No-op when
+   * unconfigured or when there is no alternative to try.
+   */
+  let machineResolution: Promise<void> | null = null;
+  function resolveEffectiveMachineBase(): Promise<void> {
+    if (!machineBaseUrl || machineCandidates.length <= 1) return Promise.resolve();
+    if (machineResolution) return machineResolution;
+    machineResolution = (async () => {
+      for (const base of machineCandidates) {
+        try {
+          const resp = await fetch(`${base}/api/v1/settings`, {
+            signal: AbortSignal.timeout(4000),
+          });
+          if (resp.ok || resp.status === 404) {
+            if (base !== effectiveMachineBase) {
+              logger.info(`[machine] using ${base} (configured ${machineBaseUrl} unreachable on that port)`);
+            }
+            effectiveMachineBase = base;
+            return;
+          }
+        } catch {
+          /* try the next candidate */
+        }
+      }
+    })();
+    return machineResolution;
+  }
 
   const backend =
     options.storageBackend ??
@@ -380,15 +441,32 @@ export function createNodePlatform(options: NodePlatformOptions = {}): Platform 
       getAIConfig,
     },
     machine: {
-      getBaseUrl: () => machineBaseUrl,
-      fetch: (path: string, init?: RequestInit) => {
+      getBaseUrl: () => effectiveMachineBase,
+      fetch: async (path: string, init?: RequestInit) => {
         if (!machineBaseUrl) {
           return Promise.reject(new Error("Machine base URL is not configured"));
         }
-        const url = path.startsWith("http")
-          ? path
-          : `${machineBaseUrl}${path.startsWith("/") ? path : `/${path}`}`;
-        return fetch(url, init);
+        if (path.startsWith("http")) return fetch(path, init);
+        await resolveEffectiveMachineBase();
+        const rel = path.startsWith("/") ? path : `/${path}`;
+        try {
+          return await fetch(`${effectiveMachineBase}${rel}`, init);
+        } catch (err) {
+          // Connection-level failure: try the remaining candidate ports (older
+          // firmware serves the API on port 80 only) and switch on success.
+          for (const base of machineCandidates) {
+            if (base === effectiveMachineBase) continue;
+            try {
+              const resp = await fetch(`${base}${rel}`, init);
+              effectiveMachineBase = base;
+              logger.info(`[machine] switched base URL to ${base} after a connection failure`);
+              return resp;
+            } catch {
+              /* try the next candidate */
+            }
+          }
+          throw err;
+        }
       },
     },
     ai: geminiAI(getAIConfig),

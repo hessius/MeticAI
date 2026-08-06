@@ -27,6 +27,8 @@ import {
   discoverMachines,
   scanMachineQR,
   testMachineConnection,
+  machineUrlCandidates,
+  resolveReachableMachineUrl,
 } from './discovery'
 
 const mockedIsNative = vi.mocked(isNativePlatform)
@@ -264,6 +266,78 @@ describe('discovery', () => {
     it('should return true for demo mode without fetching', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch')
       expect(await testMachineConnection('demo')).toBe(true)
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  // -------------------------------------------------------------------
+  // machineUrlCandidates
+  // -------------------------------------------------------------------
+  describe('machineUrlCandidates', () => {
+    it('adds a port-80 fallback for an explicit non-default http port', () => {
+      expect(machineUrlCandidates('http://192.168.1.42:8080')).toEqual([
+        'http://192.168.1.42:8080',
+        'http://192.168.1.42',
+      ])
+    })
+
+    it('does not add a fallback for a bare host (already port 80)', () => {
+      expect(machineUrlCandidates('http://192.168.1.42')).toEqual([
+        'http://192.168.1.42',
+      ])
+    })
+
+    it('does not add a fallback for an explicit port 80', () => {
+      expect(machineUrlCandidates('http://192.168.1.42:80')).toEqual([
+        'http://192.168.1.42:80',
+      ])
+    })
+
+    it('does not add a fallback for https', () => {
+      expect(machineUrlCandidates('https://machine.local:8443')).toEqual([
+        'https://machine.local:8443',
+      ])
+    })
+  })
+
+  // -------------------------------------------------------------------
+  // resolveReachableMachineUrl
+  // -------------------------------------------------------------------
+  describe('resolveReachableMachineUrl', () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('returns the given url when the configured port answers', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response('{}', { status: 200 }),
+      )
+      expect(await resolveReachableMachineUrl('http://192.168.1.42:8080')).toBe(
+        'http://192.168.1.42:8080',
+      )
+    })
+
+    it('falls back to port 80 when :8080 is unreachable (older firmware)', async () => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(
+        (async (input: RequestInfo | URL) => {
+          const u = String(input)
+          if (u.includes(':8080')) throw new Error('unreachable')
+          return new Response('{}', { status: 200 })
+        }) as typeof fetch,
+      )
+      expect(await resolveReachableMachineUrl('http://192.168.1.42:8080')).toBe(
+        'http://192.168.1.42',
+      )
+    })
+
+    it('returns null when no candidate responds', async () => {
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('timeout'))
+      expect(await resolveReachableMachineUrl('http://192.168.1.42:8080')).toBeNull()
+    })
+
+    it('resolves demo without fetching', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      expect(await resolveReachableMachineUrl('demo')).toBe('demo')
       expect(fetchSpy).not.toHaveBeenCalled()
     })
   })

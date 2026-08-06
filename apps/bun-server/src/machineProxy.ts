@@ -49,7 +49,7 @@ export async function proxyToMachine(
   }
 
   const incoming = new URL(request.url);
-  const target = `${baseUrl}${incoming.pathname}${incoming.search}`;
+  const target = `${incoming.pathname}${incoming.search}`;
 
   const init: RequestInit = {
     method: request.method,
@@ -64,7 +64,10 @@ export async function proxyToMachine(
 
   let upstream: Response;
   try {
-    upstream = await fetch(target, init);
+    // Route through the platform's machine.fetch so the request inherits the
+    // effective base URL resolution (older firmware serves the API on port 80
+    // only, so the configured :8080 base transparently falls back to :80).
+    upstream = await platform.machine.fetch(target, init);
   } catch (err) {
     platform.logger.error("machine proxy request failed", {
       target,

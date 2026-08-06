@@ -43,7 +43,7 @@ import {
 } from '@/services/ai/providers'
 import { isDemoMode, isNativePlatform, setMachineUrl } from '@/lib/machineMode'
 import { persistMachineUrl } from '@/services/machine/machineUrl'
-import { parseMachineInput, testMachineConnection, discoverMachines, type DiscoveredMachine } from '@/services/machine/discovery'
+import { parseMachineInput, resolveReachableMachineUrl, discoverMachines, type DiscoveredMachine } from '@/services/machine/discovery'
 import { supportedLanguages, languageNames, type SupportedLanguage } from '@/i18n/config'
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference'
 import { useScreenReaderAnnouncement } from '@/hooks/a11y/useScreenReader'
@@ -213,10 +213,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       setMachineName(machine.name)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setConnectionStatus('testing')
-      testMachineConnection(machine.url).then((ok) => {
+      resolveReachableMachineUrl(machine.url).then((resolved) => {
         if (!mountedRef.current || autoConnectingUrlRef.current !== machine.url) return
-        if (ok) {
-          saveMachineUrl(machine.url)
+        if (resolved) {
+          saveMachineUrl(resolved)
           setConnectionStatus('success')
           toast.success(t('onboarding.machine.autoDiscovered'))
         } else {
@@ -262,11 +262,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }
     setConnectionStatus('testing')
     try {
-      const ok = await testMachineConnection(parsed.url)
-      if (ok) {
+      const resolved = await resolveReachableMachineUrl(parsed.url)
+      if (resolved) {
         setConnectionStatus('success')
         setMachineName(parsed.name)
-        saveMachineUrl(parsed.url)
+        saveMachineUrl(resolved)
         toast.success(t('onboarding.machine.connected'))
       } else {
         setConnectionStatus('error')
@@ -391,10 +391,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     setMachineName(m.name)
                     setConnectionStatus('testing')
                     try {
-                      const ok = await testMachineConnection(m.url)
-                      if (ok) {
+                      const resolved = await resolveReachableMachineUrl(m.url)
+                      if (resolved) {
                         setConnectionStatus('success')
-                        saveMachineUrl(m.url)
+                        saveMachineUrl(resolved)
                         toast.success(t('onboarding.machine.connected'))
                       } else {
                         setConnectionStatus('error')
