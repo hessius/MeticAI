@@ -32,9 +32,10 @@ struct ControlProvider: TimelineProvider {
             let openApp = store.openAppOnStart()
 
             // Only fetch a live snapshot if one was explicitly requested recently
-            // (via the "Now" button), so system-driven reloads stay silent.
+            // (via the "Now" button), so system-driven reloads stay silent. The
+            // window is generous because WidgetKit may defer the reload.
             let requestedAt = AppGroup.defaults?.double(forKey: "snapshotRequestedAt") ?? 0
-            let isFresh = Date().timeIntervalSince1970 - requestedAt < 3
+            let isFresh = Date().timeIntervalSince1970 - requestedAt < 8
 
             guard isFresh, let base = store.machineURL() else {
                 completion(Timeline(entries: [
@@ -69,24 +70,17 @@ struct ControlProvider: TimelineProvider {
 
 // MARK: - Views
 
-private struct ControlButton: View {
-    let title: String
-    let systemImage: String
-    let intent: any AppIntent
-
-    var body: some View {
-        Button(intent: intent) {
-            VStack(spacing: 3) {
-                Image(systemName: systemImage).font(.title3)
-                Text(title).font(.caption2)
-            }
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .padding(.vertical, 4)
-            .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-        .buttonStyle(.plain)
+private func controlLabel(_ title: String, _ systemImage: String) -> some View {
+    VStack(spacing: 3) {
+        Image(systemName: systemImage).font(.title3)
+        Text(title).font(.caption2)
     }
+    .frame(maxWidth: .infinity, minHeight: 44)
+    .padding(.vertical, 4)
+    .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 }
+
+private enum ControlKind: CaseIterable { case start, preheat, tare, now }
 
 struct ControlCenterWidgetView: View {
     @Environment(\.widgetFamily) private var family
@@ -123,39 +117,44 @@ struct ControlCenterWidgetView: View {
         }
     }
 
-    // Start becomes Stop when a snapshot reports brewing.
-    private var isBrewing: Bool { entry.snapshot?.state.isBrewing ?? false }
-
-    private var startOrStop: (title: String, image: String, intent: any AppIntent) {
-        isBrewing
-            ? ("Stop", "stop.fill", StopIntent())
-            : ("Start", "play.fill", StartFirstFavouriteIntentProxy(favourites: entry.favourites,
-                                                                     openAppOnStart: entry.openAppOnStart))
-    }
-
-    private var controls: [(String, String, any AppIntent)] {
-        [
-            (startOrStop.title, startOrStop.image, startOrStop.intent),
-            ("Preheat", "thermometer.medium", PreheatIntent()),
-            ("Tare", "scalemass", TareIntent()),
-            ("Now", "waveform.path.ecg", SnapshotIntent()),
-        ]
+    /// Start honours "Open app on start" (foreground via metic:// Link) exactly
+    /// like the favourite tiles; otherwise it starts the top favourite in the
+    /// background. Stop is not on the face — it lives in the snapshot overlay,
+    /// which is the only moment the widget knows the machine is brewing.
+    @ViewBuilder private func controlView(_ kind: ControlKind) -> some View {
+        switch kind {
+        case .start:
+            let id = entry.favourites.first?.id
+            if entry.openAppOnStart, let id, let url = URL(string: "metic://start?profileId=\(id)") {
+                Link(destination: url) { controlLabel("Start", "play.fill") }
+            } else {
+                Button(intent: StartProfileIntent(profileId: id ?? "")) {
+                    controlLabel("Start", "play.fill")
+                }
+                .buttonStyle(.plain)
+            }
+        case .preheat:
+            Button(intent: PreheatIntent()) { controlLabel("Preheat", "thermometer.medium") }
+                .buttonStyle(.plain)
+        case .tare:
+            Button(intent: TareIntent()) { controlLabel("Tare", "scalemass") }
+                .buttonStyle(.plain)
+        case .now:
+            Button(intent: SnapshotIntent()) { controlLabel("Now", "waveform.path.ecg") }
+                .buttonStyle(.plain)
+        }
     }
 
     private func controlGrid(columns: Int) -> some View {
         let cols = Array(repeating: GridItem(.flexible(), spacing: 6), count: columns)
         return LazyVGrid(columns: cols, spacing: 6) {
-            ForEach(Array(controls.enumerated()), id: \.offset) { _, c in
-                ControlButton(title: c.0, systemImage: c.1, intent: c.2)
-            }
+            ForEach(ControlKind.allCases, id: \.self) { controlView($0) }
         }
     }
 
     private var controlRow: some View {
         HStack(spacing: 6) {
-            ForEach(Array(controls.enumerated()), id: \.offset) { _, c in
-                ControlButton(title: c.0, systemImage: c.1, intent: c.2)
-            }
+            ForEach(ControlKind.allCases, id: \.self) { controlView($0) }
         }
     }
 
@@ -167,27 +166,6 @@ struct ControlCenterWidgetView: View {
                               imageSize: 30, compact: true)
             }
         }
-    }
-}
-
-/// Wraps StartProfileIntent for the first favourite; the Control Center "Start"
-/// button starts the top favourite (or opens the app when configured).
-struct StartFirstFavouriteIntentProxy: AppIntent {
-    static var title: LocalizedStringResource = "Start First Favourite"
-
-    @Parameter(title: "Profile ID") var profileId: String
-    @Parameter(title: "Open App") var openApp: Bool
-
-    init() {}
-    init(favourites: [Favourite], openAppOnStart: Bool) {
-        self.profileId = favourites.first?.id ?? ""
-        self.openApp = openAppOnStart
-    }
-
-    func perform() async throws -> some IntentResult {
-        guard !profileId.isEmpty, let base = AppGroupStore().machineURL() else { return .result() }
-        try? await MachineClient(baseURL: base).startProfile(id: profileId)
-        return .result()
     }
 }
 
@@ -222,6 +200,16 @@ struct SnapshotOverlay: View {
             metricRow(icon: "scalemass",
                       current: snapshot.currentWeightG, target: snapshot.targetWeightG, unit: "g")
             Spacer(minLength: 0)
+            if snapshot.state.isBrewing {
+                Button(intent: StopIntent()) {
+                    Label("Stop", systemImage: "stop.fill")
+                        .font(.caption).bold()
+                        .frame(maxWidth: .infinity, minHeight: 36)
+                        .background(.red.opacity(0.9), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

@@ -9,7 +9,7 @@ private func machineClient() -> MachineClient? {
 struct PreheatIntent: AppIntent {
     static var title: LocalizedStringResource = "Preheat"
     func perform() async throws -> some IntentResult {
-        try? await machineClient()?.perform(.preheat)
+        _ = try? await machineClient()?.perform(.preheat)
         return .result()
     }
 }
@@ -17,7 +17,7 @@ struct PreheatIntent: AppIntent {
 struct TareIntent: AppIntent {
     static var title: LocalizedStringResource = "Tare"
     func perform() async throws -> some IntentResult {
-        try? await machineClient()?.perform(.tare)
+        _ = try? await machineClient()?.perform(.tare)
         return .result()
     }
 }
@@ -25,7 +25,7 @@ struct TareIntent: AppIntent {
 struct StopIntent: AppIntent {
     static var title: LocalizedStringResource = "Stop"
     func perform() async throws -> some IntentResult {
-        try? await machineClient()?.perform(.stop)
+        _ = try? await machineClient()?.perform(.stop)
         return .result()
     }
 }
