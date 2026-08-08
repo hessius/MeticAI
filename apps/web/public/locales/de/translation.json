@@ -648,6 +648,11 @@
         "copyFailed": "Kopieren fehlgeschlagen",
         "dismiss": "Schließen"
       }
+    },
+    "widgets": {
+      "sectionTitle": "Home-Bildschirm-Widgets",
+      "openAppOnStart": "Metic öffnen, wenn ein Bezug über ein Widget gestartet wird",
+      "openAppOnStartHint": "Wenn deaktiviert, wird ein Profil über ein Widget im Hintergrund gestartet, ohne die App zu öffnen."
     }
   },
   "profileBreakdown": {

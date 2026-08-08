@@ -648,6 +648,11 @@
         "copyFailed": "Copy failed",
         "dismiss": "Dismiss"
       }
+    },
+    "widgets": {
+      "sectionTitle": "Home-screen widgets",
+      "openAppOnStart": "Open Metic when starting a shot from a widget",
+      "openAppOnStartHint": "When off, starting a profile from a widget runs in the background without opening the app."
     }
   },
   "profileBreakdown": {

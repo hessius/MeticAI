@@ -648,6 +648,11 @@
         "copyFailed": "Copia non riuscita",
         "dismiss": "Chiudi"
       }
+    },
+    "widgets": {
+      "sectionTitle": "Widget della schermata Home",
+      "openAppOnStart": "Apri Metic quando avvii un'erogazione da un widget",
+      "openAppOnStartHint": "Quando disattivato, avviare un profilo da un widget viene eseguito in background senza aprire l'app."
     }
   },
   "profileBreakdown": {

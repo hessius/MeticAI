@@ -648,6 +648,11 @@
         "copyFailed": "Kopiering misslyckades",
         "dismiss": "Stäng"
       }
+    },
+    "widgets": {
+      "sectionTitle": "Widgetar på hemskärmen",
+      "openAppOnStart": "Öppna Metic när en shot startas från en widget",
+      "openAppOnStartHint": "När detta är av startas en profil från en widget i bakgrunden utan att appen öppnas."
     }
   },
   "profileBreakdown": {

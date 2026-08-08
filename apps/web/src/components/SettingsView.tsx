@@ -9,6 +9,9 @@ import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
+import { Capacitor } from '@capacitor/core'
+import { WidgetBridge } from '@/services/widgets/widgetBridge'
+import { capacitorStorage } from '@/services/storage/CapacitorStorage'
 import { hasFeature } from '@/lib/featureFlags'
 import { 
   CaretLeft, 
@@ -165,6 +168,8 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   const [aiProvider, setAiProviderState] = useState<ProviderId>(getActiveHostedProviderId())
   const [aiMode, setAiModeState] = useState<AIMode>(getAIMode())
   const [isRestarting, setIsRestarting] = useState(false)
+  const isIOS = Capacitor.getPlatform() === 'ios'
+  const [openAppOnStart, setOpenAppOnStart] = useState(false)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
   const [restartStatus, setRestartStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
@@ -265,6 +270,22 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSoundsEnabledState(getSoundsEnabled())
   }, [])
+
+  // Load the iOS widget "open app on start" setting.
+  useEffect(() => {
+    if (!isIOS) return
+    capacitorStorage.get(STORAGE_KEYS.OPEN_APP_ON_START)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- async storage read on mount
+      .then(v => setOpenAppOnStart(v === 'true'))
+      .catch(() => {})
+  }, [isIOS])
+
+  const handleOpenAppOnStart = async (enabled: boolean) => {
+    setOpenAppOnStart(enabled)
+    await capacitorStorage.set(STORAGE_KEYS.OPEN_APP_ON_START, String(enabled))
+    try { await WidgetBridge.setOpenAppOnStart({ enabled }) } catch { /* non-iOS */ }
+    if (enabled) playToggleOn(); else playToggleOff()
+  }
 
   // Load current settings on mount
   useEffect(() => {
@@ -1481,6 +1502,27 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                   </div>
                 )}
 
+              </CollapsibleSection>
+            )}
+
+            {/* iOS home-screen widgets (#584) — native iOS only */}
+            {isIOS && (
+              <CollapsibleSection title={t('settings.widgets.sectionTitle')} defaultOpen={false}>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="open-app-on-start-toggle" className="text-sm font-medium">
+                      {t('settings.widgets.openAppOnStart')}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {t('settings.widgets.openAppOnStartHint')}
+                    </p>
+                  </div>
+                  <Switch
+                    id="open-app-on-start-toggle"
+                    checked={openAppOnStart}
+                    onCheckedChange={(checked) => { void handleOpenAppOnStart(checked as boolean) }}
+                  />
+                </div>
               </CollapsibleSection>
             )}
 
