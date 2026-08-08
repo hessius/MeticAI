@@ -50,6 +50,9 @@ import { isAIConfigured, apiKeyStorageKey, getActiveProviderId } from '@/service
 // Phase 3 — Control Center & live telemetry
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useShotTelemetryRecorder } from '@/hooks/useShotTelemetryRecorder'
+import { useMachineService } from '@/hooks/useMachineService'
+import { useWidgetSync } from '@/hooks/useWidgetSync'
+import { capacitorStorage } from '@/services/storage/CapacitorStorage'
 import { useLastShot } from '@/hooks/useLastShot'
 import { useSmartGreeting } from '@/hooks/useSmartGreeting'
 import { useProfileImageSrc, getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
@@ -141,6 +144,8 @@ function App() {
   const [aiEnabled, setAiEnabled] = useState(true)
   const [hideAiWhenUnavailable, setHideAiWhenUnavailable] = useState(false)
   const machineState = useMachineTelemetry(mqttEnabled)
+  const machine = useMachineService()
+  const [openAppOnStart, setOpenAppOnStart] = useState(false)
   // Continuously record heating + shot telemetry into a persistent buffer so the
   // live-shot graph can be back-filled whenever the view is opened (issue #582).
   useShotTelemetryRecorder(machineState)
@@ -154,6 +159,43 @@ function App() {
   const { notifyPreheatComplete } = useBrewNotifications()
   const { machineReady: playMachineReady, brewingStarted: playBrewingStarted, generationComplete: playGenerationComplete, islandExpand: playIslandExpand, islandContract: playIslandContract } = useSoundEffects()
   useGlobalSoundDelegation()
+
+  // Load persisted openAppOnStart setting (drives widget "Start" behaviour).
+  useEffect(() => {
+    capacitorStorage.get(STORAGE_KEYS.OPEN_APP_ON_START)
+      .then(v => setOpenAppOnStart(v === 'true'))
+      .catch(() => {})
+  }, [])
+
+  // Mirror favourites / machine URL / settings into iOS widgets (no-op elsewhere).
+  useWidgetSync({ openAppOnStart })
+
+  // Handle metic:// deep links fired by iOS widgets.
+  useEffect(() => {
+    let remove: (() => void) | undefined
+    void import('@capacitor/app').then(({ App: CapApp }) => {
+      CapApp.addListener('appUrlOpen', async ({ url }) => {
+        const { handleMeticDeepLink } = await import('@/services/widgets/deepLinkHandler')
+        await handleMeticDeepLink(url, {
+          machine,
+          lookupName: async (id) => {
+            try {
+              const listRes = await fetch('/api/v1/profile/list')
+              if (!listRes.ok) return null
+              const profiles = await listRes.json()
+              const match = Array.isArray(profiles) && profiles.find(
+                (p: { id?: string; name?: string }) => p.id === id,
+              )
+              return match?.name ?? null
+            } catch {
+              return null
+            }
+          },
+        })
+      }).then((handle) => { remove = () => { void handle.remove() } })
+    })
+    return () => { remove?.() }
+  }, [machine])
 
   // Live profile breakdown data (fetched when in live-shot view)
   const [liveProfileData, setLiveProfileData] = useState<ProfileData | null>(null)
