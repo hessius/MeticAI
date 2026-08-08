@@ -36,6 +36,15 @@ export function useMachineService(): MachineService {
   return ctx
 }
 
+/**
+ * Non-throwing variant — returns null when no provider is mounted. Used by
+ * top-level consumers (e.g. the widget deep-link effect) that must not crash
+ * when rendered outside a MachineServiceProvider (such as in unit tests).
+ */
+export function useOptionalMachineService(): MachineService | null {
+  return useContext(MachineServiceContext)
+}
+
 // ---------------------------------------------------------------------------
 // Machine URL change event (dispatched by settings/discovery)
 // ---------------------------------------------------------------------------

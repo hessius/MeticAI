@@ -50,7 +50,7 @@ import { isAIConfigured, apiKeyStorageKey, getActiveProviderId } from '@/service
 // Phase 3 — Control Center & live telemetry
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useShotTelemetryRecorder } from '@/hooks/useShotTelemetryRecorder'
-import { useMachineService } from '@/hooks/useMachineService'
+import { useOptionalMachineService } from '@/services/machine/MachineServiceContext'
 import { useWidgetSync } from '@/hooks/useWidgetSync'
 import { capacitorStorage } from '@/services/storage/CapacitorStorage'
 import { useLastShot } from '@/hooks/useLastShot'
@@ -144,7 +144,7 @@ function App() {
   const [aiEnabled, setAiEnabled] = useState(true)
   const [hideAiWhenUnavailable, setHideAiWhenUnavailable] = useState(false)
   const machineState = useMachineTelemetry(mqttEnabled)
-  const machine = useMachineService()
+  const machine = useOptionalMachineService()
   const [openAppOnStart, setOpenAppOnStart] = useState(false)
   // Continuously record heating + shot telemetry into a persistent buffer so the
   // live-shot graph can be back-filled whenever the view is opened (issue #582).
@@ -170,8 +170,9 @@ function App() {
   // Mirror favourites / machine URL / settings into iOS widgets (no-op elsewhere).
   useWidgetSync({ openAppOnStart })
 
-  // Handle metic:// deep links fired by iOS widgets.
+    // Handle metic:// deep links fired by iOS widgets.
   useEffect(() => {
+    if (!machine) return
     let remove: (() => void) | undefined
     void import('@capacitor/app').then(({ App: CapApp }) => {
       CapApp.addListener('appUrlOpen', async ({ url }) => {

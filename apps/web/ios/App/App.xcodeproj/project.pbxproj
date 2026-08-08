@@ -7,8 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		036064346DF6C3F5A5EB73B9 /* FavouriteProfilesWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F3395C02F8FC13BD3CA6B3 /* FavouriteProfilesWidget.swift */; };
+		17AAABDE269198C9EC0B0561 /* MeticWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D9002DEDBB5C5EDE9E11D01 /* MeticWidgetsBundle.swift */; };
+		1FDC454A924855BC797F55C4 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBB498CAAA26EB7EF8CB0DE /* AppGroup.swift */; };
+		2293E69E244EE3D32F2E02E8 /* ControlIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F022BB0FF7FC634C03D214B7 /* ControlIntents.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		3E71555296CB72726A2D9284 /* MachineClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C3ACB4200397393E8FEF69 /* MachineClientTests.swift */; };
+		4045D280FC6E252252B7B9BA /* ControlCenterWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F200D3B013C5266601DC206 /* ControlCenterWidget.swift */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
+		4D7EDF44F6B79EC189EC0BEE /* MeticWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 65D946B06CB363F431631450 /* MeticWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
@@ -17,8 +24,20 @@
 		504ED0012C0000000016851F /* MeticulousDiscoveryPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504ED0002C0000000016851F /* MeticulousDiscoveryPlugin.swift */; };
 		504ED0032C0000000016851F /* MeticulousViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504ED0022C0000000016851F /* MeticulousViewController.swift */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		6869E828D35C6DB29A4B9E1C /* MachineClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A094DF44F18C8DE4DEF9A6 /* MachineClient.swift */; };
+		6BF3E75A13ECDFFD53CA0859 /* SocketIOStatusReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6EDF8C30FE3910E7C2D0D58 /* SocketIOStatusReader.swift */; };
+		6C08FD92D20CD5E30154BFBE /* SocketIOStatusReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6EDF8C30FE3910E7C2D0D58 /* SocketIOStatusReader.swift */; };
+		76A539D2BA76FFB6D5F8C9FD /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7774BC9E16930145EAD6BEE2 /* Models.swift */; };
 		783A4DD39BBD428FEDC16DB6 /* WidgetBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B58ED938C16A4703AD994F0B /* WidgetBridgePlugin.swift */; };
+		796C6014B15243111FE568AA /* WidgetSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E9DDC937E6A2575325A680E /* WidgetSupport.swift */; };
+		84339E407D2F51CE255759C5 /* StartProfileIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E90915895B55F6358F61E0C /* StartProfileIntent.swift */; };
 		9E222C543009E322009A1738 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9E222C4A3009E322009A1738 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B00E51FAE7D40B45484ED159 /* AppGroupStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C12D88D74CA0B1E0086FA54 /* AppGroupStoreTests.swift */; };
+		BBB95C68BF0F1BA63FA2F351 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBB498CAAA26EB7EF8CB0DE /* AppGroup.swift */; };
+		C8D5562BF1D9944C0D50E616 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 540C6065DA8AAD71A4478B0D /* Foundation.framework */; };
+		D6F22B46082F74D44E7BE98D /* MachineClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A094DF44F18C8DE4DEF9A6 /* MachineClient.swift */; };
+		F4FE02EF844F8BE14A4582D7 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7774BC9E16930145EAD6BEE2 /* Models.swift */; };
+		FC10AB353E36C04B1217772D /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 540C6065DA8AAD71A4478B0D /* Foundation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -28,6 +47,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 9E222C493009E322009A1738;
 			remoteInfo = ShareExtension;
+		};
+		D69DC2C7EE72FBF28C5914D7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C33B0A48B731A488B170606A;
+			remoteInfo = MeticWidgets;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -39,6 +65,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				9E222C543009E322009A1738 /* ShareExtension.appex in Embed Foundation Extensions */,
+				4D7EDF44F6B79EC189EC0BEE /* MeticWidgets.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -46,6 +73,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		1F200D3B013C5266601DC206 /* ControlCenterWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ControlCenterWidget.swift; sourceTree = "<group>"; };
+		2E9DDC937E6A2575325A680E /* WidgetSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetSupport.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* Metic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Metic.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -57,9 +86,24 @@
 		504ED0002C0000000016851F /* MeticulousDiscoveryPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeticulousDiscoveryPlugin.swift; sourceTree = "<group>"; };
 		504ED0022C0000000016851F /* MeticulousViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeticulousViewController.swift; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		540C6065DA8AAD71A4478B0D /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		59C3ACB4200397393E8FEF69 /* MachineClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MachineClientTests.swift; sourceTree = "<group>"; };
+		65D946B06CB363F431631450 /* MeticWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MeticWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		7774BC9E16930145EAD6BEE2 /* Models.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		8C12D88D74CA0B1E0086FA54 /* AppGroupStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppGroupStoreTests.swift; sourceTree = "<group>"; };
+		8D9002DEDBB5C5EDE9E11D01 /* MeticWidgetsBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeticWidgetsBundle.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		9E222C4A3009E322009A1738 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9E90915895B55F6358F61E0C /* StartProfileIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StartProfileIntent.swift; sourceTree = "<group>"; };
+		A2A094DF44F18C8DE4DEF9A6 /* MachineClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MachineClient.swift; sourceTree = "<group>"; };
+		A56628205E717B6AFEA905B3 /* MeticWidgetsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MeticWidgetsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B3F3395C02F8FC13BD3CA6B3 /* FavouriteProfilesWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FavouriteProfilesWidget.swift; sourceTree = "<group>"; };
 		B58ED938C16A4703AD994F0B /* WidgetBridgePlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetBridgePlugin.swift; sourceTree = "<group>"; };
+		BDB223470DA26D46A4750E8F /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C6EDF8C30FE3910E7C2D0D58 /* SocketIOStatusReader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocketIOStatusReader.swift; sourceTree = "<group>"; };
+		DDBB498CAAA26EB7EF8CB0DE /* AppGroup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppGroup.swift; sourceTree = "<group>"; };
+		F022BB0FF7FC634C03D214B7 /* ControlIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ControlIntents.swift; sourceTree = "<group>"; };
+		FA6E72224DAC431BC2A03E2D /* MeticWidgets.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = MeticWidgets.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -96,6 +140,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		6C570EAA788503C8F70A6AA0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C8D5562BF1D9944C0D50E616 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9E222C473009E322009A1738 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -103,9 +155,37 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		EAF31CCFB2542347B61BC0ED /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FC10AB353E36C04B1217772D /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		220E6FA6ADF710020F3A237F /* Intents */ = {
+			isa = PBXGroup;
+			children = (
+				F022BB0FF7FC634C03D214B7 /* ControlIntents.swift */,
+				9E90915895B55F6358F61E0C /* StartProfileIntent.swift */,
+			);
+			name = Intents;
+			path = Intents;
+			sourceTree = "<group>";
+		};
+		370DDA83C69706F958B66ECA /* MeticWidgetsTests */ = {
+			isa = PBXGroup;
+			children = (
+				8C12D88D74CA0B1E0086FA54 /* AppGroupStoreTests.swift */,
+				59C3ACB4200397393E8FEF69 /* MachineClientTests.swift */,
+			);
+			name = MeticWidgetsTests;
+			path = MeticWidgetsTests;
+			sourceTree = "<group>";
+		};
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
@@ -113,6 +193,10 @@
 				504EC3061FED79650016851F /* App */,
 				9E222C4B3009E322009A1738 /* ShareExtension */,
 				504EC3051FED79650016851F /* Products */,
+				AF2A3667608691E2C223FD06 /* MeticKit */,
+				C0C9C874895CF26505DC8C68 /* MeticWidgets */,
+				370DDA83C69706F958B66ECA /* MeticWidgetsTests */,
+				F62627D745E524C722B967B0 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -121,6 +205,8 @@
 			children = (
 				504EC3041FED79650016851F /* Metic.app */,
 				9E222C4A3009E322009A1738 /* ShareExtension.appex */,
+				65D946B06CB363F431631450 /* MeticWidgets.appex */,
+				A56628205E717B6AFEA905B3 /* MeticWidgetsTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -143,6 +229,49 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		A0DE1AC7831C0C472A2EF23A /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				540C6065DA8AAD71A4478B0D /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		AF2A3667608691E2C223FD06 /* MeticKit */ = {
+			isa = PBXGroup;
+			children = (
+				DDBB498CAAA26EB7EF8CB0DE /* AppGroup.swift */,
+				A2A094DF44F18C8DE4DEF9A6 /* MachineClient.swift */,
+				7774BC9E16930145EAD6BEE2 /* Models.swift */,
+				C6EDF8C30FE3910E7C2D0D58 /* SocketIOStatusReader.swift */,
+			);
+			name = MeticKit;
+			path = MeticKit;
+			sourceTree = "<group>";
+		};
+		C0C9C874895CF26505DC8C68 /* MeticWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				220E6FA6ADF710020F3A237F /* Intents */,
+				1F200D3B013C5266601DC206 /* ControlCenterWidget.swift */,
+				B3F3395C02F8FC13BD3CA6B3 /* FavouriteProfilesWidget.swift */,
+				8D9002DEDBB5C5EDE9E11D01 /* MeticWidgetsBundle.swift */,
+				2E9DDC937E6A2575325A680E /* WidgetSupport.swift */,
+				BDB223470DA26D46A4750E8F /* Info.plist */,
+				FA6E72224DAC431BC2A03E2D /* MeticWidgets.entitlements */,
+			);
+			name = MeticWidgets;
+			path = MeticWidgets;
+			sourceTree = "<group>";
+		};
+		F62627D745E524C722B967B0 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A0DE1AC7831C0C472A2EF23A /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -160,6 +289,7 @@
 			);
 			dependencies = (
 				9E222C533009E322009A1738 /* PBXTargetDependency */,
+				A0FD2BE06F06169EC41ED339 /* PBXTargetDependency */,
 			);
 			name = Metic;
 			packageProductDependencies = (
@@ -168,6 +298,23 @@
 			productName = Metic;
 			productReference = 504EC3041FED79650016851F /* Metic.app */;
 			productType = "com.apple.product-type.application";
+		};
+		8F4587A3B620D2835966403D /* MeticWidgetsTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 787F6A2806AC0F5953A3F938 /* Build configuration list for PBXNativeTarget "MeticWidgetsTests" */;
+			buildPhases = (
+				E24205CBD5E11F21CAFB04BC /* Sources */,
+				EAF31CCFB2542347B61BC0ED /* Frameworks */,
+				31E89512D43C150204C5D4E1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MeticWidgetsTests;
+			productName = MeticWidgetsTests;
+			productReference = A56628205E717B6AFEA905B3 /* MeticWidgetsTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		9E222C493009E322009A1738 /* ShareExtension */ = {
 			isa = PBXNativeTarget;
@@ -187,6 +334,23 @@
 			name = ShareExtension;
 			productName = ShareExtension;
 			productReference = 9E222C4A3009E322009A1738 /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		C33B0A48B731A488B170606A /* MeticWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F3B3F40FA63C4448B92F578A /* Build configuration list for PBXNativeTarget "MeticWidgets" */;
+			buildPhases = (
+				71CFF24E830D33E8EEABA188 /* Sources */,
+				6C570EAA788503C8F70A6AA0 /* Frameworks */,
+				29C85BBCAA5440EBFCE2A9DF /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MeticWidgets;
+			productName = MeticWidgets;
+			productReference = 65D946B06CB363F431631450 /* MeticWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -227,11 +391,27 @@
 			targets = (
 				504EC3031FED79650016851F /* Metic */,
 				9E222C493009E322009A1738 /* ShareExtension */,
+				C33B0A48B731A488B170606A /* MeticWidgets */,
+				8F4587A3B620D2835966403D /* MeticWidgetsTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		29C85BBCAA5440EBFCE2A9DF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		31E89512D43C150204C5D4E1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3021FED79650016851F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -288,10 +468,40 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		71CFF24E830D33E8EEABA188 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BBB95C68BF0F1BA63FA2F351 /* AppGroup.swift in Sources */,
+				D6F22B46082F74D44E7BE98D /* MachineClient.swift in Sources */,
+				76A539D2BA76FFB6D5F8C9FD /* Models.swift in Sources */,
+				6C08FD92D20CD5E30154BFBE /* SocketIOStatusReader.swift in Sources */,
+				4045D280FC6E252252B7B9BA /* ControlCenterWidget.swift in Sources */,
+				036064346DF6C3F5A5EB73B9 /* FavouriteProfilesWidget.swift in Sources */,
+				17AAABDE269198C9EC0B0561 /* MeticWidgetsBundle.swift in Sources */,
+				796C6014B15243111FE568AA /* WidgetSupport.swift in Sources */,
+				2293E69E244EE3D32F2E02E8 /* ControlIntents.swift in Sources */,
+				84339E407D2F51CE255759C5 /* StartProfileIntent.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		9E222C463009E322009A1738 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E24205CBD5E11F21CAFB04BC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1FDC454A924855BC797F55C4 /* AppGroup.swift in Sources */,
+				6869E828D35C6DB29A4B9E1C /* MachineClient.swift in Sources */,
+				F4FE02EF844F8BE14A4582D7 /* Models.swift in Sources */,
+				6BF3E75A13ECDFFD53CA0859 /* SocketIOStatusReader.swift in Sources */,
+				B00E51FAE7D40B45484ED159 /* AppGroupStoreTests.swift in Sources */,
+				3E71555296CB72726A2D9284 /* MachineClientTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -302,6 +512,12 @@
 			isa = PBXTargetDependency;
 			target = 9E222C493009E322009A1738 /* ShareExtension */;
 			targetProxy = 9E222C523009E322009A1738 /* PBXContainerItemProxy */;
+		};
+		A0FD2BE06F06169EC41ED339 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = MeticWidgets;
+			target = C33B0A48B731A488B170606A /* MeticWidgets */;
+			targetProxy = D69DC2C7EE72FBF28C5914D7 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -325,6 +541,48 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		4852C8576E307527558E7CE9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.metic.app.MeticWidgetsTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		4AE4C8F188E3F357F9F8A44E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = MeticWidgets/MeticWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MeticWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 3.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.metic.app.MeticWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		504EC3141FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
@@ -578,6 +836,50 @@
 			};
 			name = Release;
 		};
+		B389B07C9B70CAB5058CDA0C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = MeticWidgets/MeticWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MeticWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 3.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.metic.app.MeticWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		D95F342036FA1CF2ADEFEB91 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.metic.app.MeticWidgetsTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -599,11 +901,29 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		787F6A2806AC0F5953A3F938 /* Build configuration list for PBXNativeTarget "MeticWidgetsTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D95F342036FA1CF2ADEFEB91 /* Release */,
+				4852C8576E307527558E7CE9 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		9E222C593009E322009A1738 /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				9E222C563009E322009A1738 /* Debug */,
 				9E222C573009E322009A1738 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F3B3F40FA63C4448B92F578A /* Build configuration list for PBXNativeTarget "MeticWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B389B07C9B70CAB5058CDA0C /* Release */,
+				4AE4C8F188E3F357F9F8A44E /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
