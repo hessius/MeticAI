@@ -40,6 +40,10 @@ export const STORAGE_KEYS = {
   // -- Machine connection --
   MACHINE_URL: 'meticai-machine-url',
 
+  // -- Favourites (#584 iOS widgets) --
+  FAVOURITES: 'meticai-favourites',
+  OPEN_APP_ON_START: 'meticai-open-app-on-start',
+
   // -- Onboarding --
   ONBOARDING_COMPLETE: 'meticai-onboarding-complete',
 
@@ -61,3 +65,9 @@ export const STORAGE_KEYS = {
   DEMO_SHOTS: 'meticai-demo-shots',
   DEMO_ANNOTATIONS: 'meticai-demo-annotations',
 } as const
+
+/** Dispatched on window when the favourites list changes (#584). */
+export const FAVOURITES_CHANGED = 'favourites-changed'
+
+/** Maximum number of favourites (bounds App-Group storage for iOS widgets). */
+export const FAVOURITES_MAX = 12
