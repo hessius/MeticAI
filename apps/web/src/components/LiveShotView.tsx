@@ -10,7 +10,7 @@
  *  • Horizontal gauge layout — compact two-row indicators
  *  • Live profile breakdown — stages with current-stage highlight
  */
-import { useRef, useEffect, useState, useMemo } from 'react'
+import { useRef, useEffect, useState, useMemo, useSyncExternalStore } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { useHaptics } from '@/hooks/useHaptics'
@@ -53,7 +53,10 @@ import { getServerUrl } from '@/lib/config'
 import { getActiveShotOverride } from '@/lib/activeShotOverride'
 import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
 import { HeatingDashboard } from './LiveShotView/HeatingDashboard'
-import { useHeatingSamples } from './LiveShotView/useHeatingSamples'
+import {
+  subscribe as subscribeShotTelemetry,
+  getSnapshot as getShotTelemetrySnapshot,
+} from '@/lib/shotTelemetryRecorder'
 import type { ProfileData } from '@/components/ProfileBreakdown'
 
 // ---------------------------------------------------------------------------
@@ -115,16 +118,43 @@ export const TEMP_ON_TARGET_THRESHOLD = 2.3
 
 export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData, profileDescription }: LiveShotViewProps) {
   const { t } = useTranslation()
-  const chartDataRef = useRef<ChartDataPoint[]>([])
-  const [chartData, setChartData] = useState<ChartDataPoint[]>([])
+  // The persistent recorder (fed at App level) is the single source of live-shot
+  // + heating history, so opening this view late or navigating in/out no longer
+  // loses graphed data (issue #582). This view is a reader/renderer only.
+  const telemetry = useSyncExternalStore(
+    subscribeShotTelemetry,
+    getShotTelemetrySnapshot,
+    getShotTelemetrySnapshot,
+  )
+  // Frozen copy of the shot chart captured on completion, so the currently-open
+  // completed view keeps its graph even after the recorder clears on idle.
+  const [frozenChart, setFrozenChart] = useState<ChartDataPoint[] | null>(null)
+  const latestShotRef = useRef<ChartDataPoint[]>([])
   const [shotComplete, setShotComplete] = useState(false)
-  const renderFrameRef = useRef<number | null>(null)
   const [targetCurves, setTargetCurves] = useState<ProfileTargetPoint[] | undefined>()
   const fetchedProfileRef = useRef<string | null>(null)
   const [profileStages, setProfileStages] = useState<ProfileStageInfo[]>([])
 
   // Use machine state from props directly
   const ms = machineState
+
+  // Derived render buffers from the recorder. Downsample the live shot chart for
+  // performance; the completed view renders the frozen snapshot when present.
+  const liveChart = useMemo(
+    () =>
+      telemetry.shotSamples.length > MAX_VISIBLE_POINTS
+        ? downsample(telemetry.shotSamples, MAX_VISIBLE_POINTS)
+        : telemetry.shotSamples,
+    [telemetry.shotSamples],
+  )
+  const chartData = frozenChart ?? liveChart
+  const heatingSamples = telemetry.heatingSamples
+
+  // Keep the latest recorded shot samples in a ref so the brewing-completion
+  // cleanup (which closes over stale render values) can freeze a fresh snapshot.
+  useEffect(() => {
+    latestShotRef.current = telemetry.shotSamples
+  }, [telemetry.shotSamples])
 
   // Resolve profile image URL (works in both proxy and direct/Capacitor modes)
   const profileImgUrl = useProfileImageSrc(ms.active_profile)
@@ -193,12 +223,17 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
 
   // Detect shot completion: when ms.brewing transitions from true→false,
   // the cleanup fires to mark the shot complete and compute summary stats.
+  // It also freezes the recorded shot chart so the completed view survives the
+  // recorder clearing its buffers once the machine returns to idle.
   useEffect(() => {
     if (!ms.brewing) return
+    // A new shot is in progress — discard any previously frozen completed shot.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFrozenChart(null)
     // Brewing is active — return cleanup that fires when it stops
     return () => {
       setShotComplete(true)
-      const data = chartDataRef.current
+      const data = latestShotRef.current
       if (data.length > 0) {
         const totalTime = data[data.length - 1].time
         const finalWeight = data[data.length - 1].weight ?? 0
@@ -207,6 +242,7 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
         const avgFlow =
           data.reduce((s, p) => s + (p.flow ?? 0), 0) / data.length
         setSummary({ totalTime, finalWeight, avgPressure, avgFlow })
+        setFrozenChart(data.slice())
       }
     }
   }, [ms.brewing])
@@ -218,53 +254,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
     playShotComplete()
     notifyBrewComplete(ms.active_profile ?? 'Espresso')
   }, [shotComplete, hapticsNotification, playShotComplete, notifyBrewComplete, ms.active_profile])
-
-  // Accumulate data from WebSocket frames — push + rAF for O(1) per frame
-  useEffect(() => {
-    if (!ms.brewing) return
-
-    const point: ChartDataPoint = {
-      time: ms.shot_timer ?? 0,
-      pressure: ms.pressure ?? 0,
-      flow: Math.max(0, ms.flow_rate ?? 0),
-      weight: ms.shot_weight ?? 0,
-      power: ms.power ?? 0,
-      stage: ms.state ?? undefined,
-    }
-
-    // O(1) push instead of O(n) spread copy
-    chartDataRef.current.push(point)
-
-    // Coalesce rapid WebSocket bursts — render on next animation frame
-    if (renderFrameRef.current === null) {
-      renderFrameRef.current = requestAnimationFrame(() => {
-        const data = chartDataRef.current
-        setChartData(
-          data.length > MAX_VISIBLE_POINTS
-            ? downsample(data, MAX_VISIBLE_POINTS)
-            : data.slice(),  // cheap copy when small
-        )
-        renderFrameRef.current = null
-      })
-    }
-  }, [
-    ms.brewing,
-    ms.shot_timer,
-    ms.pressure,
-    ms.flow_rate,
-    ms.power,
-    ms.shot_weight,
-    ms.state,
-  ])
-
-  // Clean up any pending rAF on unmount
-  useEffect(() => {
-    return () => {
-      if (renderFrameRef.current !== null) {
-        cancelAnimationFrame(renderFrameRef.current)
-      }
-    }
-  }, [])
 
   // Command helper from shared hook
   const { cmd } = useMachineActions(machineState)
@@ -288,18 +277,6 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
     headTempVal != null &&
     targetTempVal != null &&
     Math.abs(headTempVal - targetTempVal) <= TEMP_ON_TARGET_THRESHOLD
-  // Accumulate a rolling temperature window throughout the heating *and* ready
-  // phases so the temperature chart stays populated once target is reached. The
-  // machine's preheat countdown (when present) drives sampling through plateaus
-  // where the head temp briefly stops changing near target.
-  const heatingSamples = useHeatingSamples({
-    temp: headTempVal ?? 0,
-    chamber: chamberTempVal ?? undefined,
-    active: isHeatingPhase,
-    // Treat a 0 countdown as absent so temperature changes still drive sampling
-    // near end-of-heat (0 would otherwise pin the hook's effect dependency).
-    tick: ms.preheat_countdown || undefined,
-  })
 
   // Compute stage ranges from data
   const stages = useMemo(

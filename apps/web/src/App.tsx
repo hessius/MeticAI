@@ -49,6 +49,7 @@ import { isAIConfigured, apiKeyStorageKey, getActiveProviderId } from '@/service
 
 // Phase 3 — Control Center & live telemetry
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
+import { useShotTelemetryRecorder } from '@/hooks/useShotTelemetryRecorder'
 import { useLastShot } from '@/hooks/useLastShot'
 import { useSmartGreeting } from '@/hooks/useSmartGreeting'
 import { useProfileImageSrc, getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
@@ -140,6 +141,9 @@ function App() {
   const [aiEnabled, setAiEnabled] = useState(true)
   const [hideAiWhenUnavailable, setHideAiWhenUnavailable] = useState(false)
   const machineState = useMachineTelemetry(mqttEnabled)
+  // Continuously record heating + shot telemetry into a persistent buffer so the
+  // live-shot graph can be back-filled whenever the view is opened (issue #582).
+  useShotTelemetryRecorder(machineState)
   const lastShotHook = useLastShot(mqttEnabled)
   const smartGreeting = useSmartGreeting(mqttEnabled && viewState === 'start')
   const prevBrewingRef = useRef(false)
