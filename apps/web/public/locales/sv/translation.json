@@ -1898,5 +1898,11 @@
       "skip": "Hoppa över",
       "analyzeWithTaste": "Analysera med smak"
     }
+  },
+  "favourites": {
+    "sectionTitle": "Favoriter",
+    "add": "Lägg till i favoriter",
+    "remove": "Ta bort från favoriter",
+    "empty": "Stjärnmärk en profil för att lägga till den bland dina favoriter."
   }
 }

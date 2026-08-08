@@ -1898,5 +1898,11 @@
       "skip": "Salta",
       "analyzeWithTaste": "Analizza con il gusto"
     }
+  },
+  "favourites": {
+    "sectionTitle": "Preferiti",
+    "add": "Aggiungi ai preferiti",
+    "remove": "Rimuovi dai preferiti",
+    "empty": "Aggiungi una stella a un profilo per inserirlo nei preferiti."
   }
 }

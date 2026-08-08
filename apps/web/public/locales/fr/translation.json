@@ -1898,5 +1898,11 @@
       "skip": "Ignorer",
       "analyzeWithTaste": "Analyser avec le goût"
     }
+  },
+  "favourites": {
+    "sectionTitle": "Favoris",
+    "add": "Ajouter aux favoris",
+    "remove": "Retirer des favoris",
+    "empty": "Ajoutez une étoile à un profil pour l'ajouter à vos favoris."
   }
 }
