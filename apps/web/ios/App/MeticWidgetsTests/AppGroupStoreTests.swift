@@ -39,11 +39,19 @@ final class AppGroupStoreTests: XCTestCase {
     func testMachineStateMapping() {
         XCTAssertEqual(MachineState(raw: "idle"), .idle)
         XCTAssertEqual(MachineState(raw: "brewing"), .brewing)
-        XCTAssertEqual(MachineState(raw: "extracting"), .brewing)
-        XCTAssertEqual(MachineState(raw: "preheating"), .heating)
-        XCTAssertEqual(MachineState(raw: "ready"), .ready)
+        XCTAssertEqual(MachineState(raw: "espresso"), .brewing)
+        XCTAssertEqual(MachineState(raw: "preheating"), .preheating)
+        XCTAssertEqual(MachineState(raw: "heating"), .heating)
+        XCTAssertEqual(MachineState(raw: "click to start"), .ready)
+        XCTAssertEqual(MachineState(raw: "Pour water..."), .pourWater)
         XCTAssertEqual(MachineState(raw: "wat"), .unknown)
-        XCTAssertTrue(MachineState(raw: "brewing").isBrewing)
+        // Brewing is driven by the `extracting` flag, mirroring the app — a
+        // heating state with extracting=true is still Brewing, and a brew-ish
+        // name without extracting is not.
+        XCTAssertEqual(MachineState(raw: "heating", extracting: true), .brewing)
+        XCTAssertEqual(MachineState(raw: "preheating", extracting: false), .preheating)
+        XCTAssertTrue(MachineState(raw: "anything", extracting: true).isBrewing)
+        XCTAssertEqual(MachineState(raw: "heating").label, "Heating")
     }
 
     // MARK: - Snapshot overlay lifecycle

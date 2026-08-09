@@ -80,23 +80,14 @@ struct ControlCenterWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: ControlEntry
 
-    /// Large uses a grid-only overlay so the control row stays live; the smaller
-    /// families overlay the whole face.
-    private var showsFullOverlay: Bool { entry.snapshot != nil && family != .systemLarge }
-
     var body: some View {
-        ZStack {
-            VStack(alignment: .leading, spacing: 0) {
-                MeticHeader()
-                if let fb = entry.feedback {
-                    FeedbackBanner(feedback: fb)
-                        .padding(.top, 4)
-                }
-                faceContent
+        VStack(alignment: .leading, spacing: 0) {
+            MeticHeader()
+            if let fb = entry.feedback {
+                FeedbackBanner(feedback: fb)
+                    .padding(.top, 4)
             }
-            if showsFullOverlay, let snap = entry.snapshot {
-                SnapshotOverlay(snapshot: snap)
-            }
+            faceContent
         }
         .containerBackground(.fill.tertiary, for: .widget)
     }
@@ -106,24 +97,34 @@ struct ControlCenterWidgetView: View {
         return fb.kind
     }
 
+    // The overlay *replaces* the content in place (rather than layering a
+    // frosted pane over it) so it sits seamlessly on the widget background and
+    // there's no material flash when dismissing.
     @ViewBuilder private var faceContent: some View {
         switch family {
         case .systemSmall:
             Spacer(minLength: 6)
-            controlGrid(columns: 2)
+            if let snap = entry.snapshot {
+                SnapshotOverlay(snapshot: snap)
+            } else {
+                controlGrid(columns: 2)
+            }
             Spacer(minLength: 4)
         case .systemMedium:
             Spacer(minLength: 8)
-            controlRow
+            if let snap = entry.snapshot {
+                SnapshotOverlay(snapshot: snap)
+            } else {
+                controlRow
+            }
             Spacer(minLength: 8)
         case .systemLarge:
             Spacer(minLength: 0)
-            ZStack {
+            // Only the profile grid is replaced; the control row stays live.
+            if let snap = entry.snapshot {
+                SnapshotOverlay(snapshot: snap)
+            } else {
                 favouritesGrid
-                if let snap = entry.snapshot {
-                    SnapshotOverlay(snapshot: snap)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                }
             }
             Spacer(minLength: 0)
             controlRow
@@ -176,7 +177,7 @@ struct ControlCenterWidgetView: View {
     private var favouritesGrid: some View {
         let cols = Array(repeating: GridItem(.flexible(), spacing: 6), count: 2)
         return LazyVGrid(columns: cols, spacing: 6) {
-            ForEach(Array(entry.favourites.prefix(6))) { fav in
+            ForEach(Array(entry.favourites.prefix(8))) { fav in
                 FavouriteTile(favourite: fav, openAppOnStart: entry.openAppOnStart,
                               imageSize: 30, compact: true)
             }
@@ -220,22 +221,14 @@ struct FeedbackBanner: View {
 struct SnapshotOverlay: View {
     let snapshot: MachineSnapshot
 
-    private var stateLabel: String {
-        switch snapshot.state {
-        case .idle: return "Idle"
-        case .heating: return "Heating"
-        case .ready: return "Ready"
-        case .brewing: return "Brewing"
-        case .unknown: return "—"
-        }
-    }
-
     var body: some View {
         ZStack {
-            // Tap anywhere on the overlay to dismiss.
+            // Tap anywhere to dismiss. No material — the overlay replaces the
+            // content in place and sits directly on the widget background, so
+            // it reads as "the content was swapped out" with no seam or flash.
             Button(intent: DismissSnapshotIntent()) {
                 content.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .background(.ultraThinMaterial)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
@@ -251,7 +244,6 @@ struct SnapshotOverlay: View {
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(10)
             }
         }
     }
@@ -259,7 +251,7 @@ struct SnapshotOverlay: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Label(stateLabel, systemImage: "circle.fill")
+                Label(snapshot.state.label, systemImage: "circle.fill")
                     .font(.caption).bold()
                 Spacer()
                 meticWordmark(baseSize: 11)
@@ -273,7 +265,6 @@ struct SnapshotOverlay: View {
                       current: snapshot.currentWeightG, target: snapshot.targetWeightG, unit: "g")
             Spacer(minLength: 0)
         }
-        .padding(10)
     }
 
     private func metricRow(icon: String, current: Double?, target: Double?, unit: String) -> some View {

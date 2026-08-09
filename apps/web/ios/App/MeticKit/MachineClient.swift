@@ -88,8 +88,14 @@ public struct MachineClient {
 
     /// Build a MachineSnapshot from a raw status dictionary. Exposed for tests.
     func makeSnapshot(from status: [String: Any]) async -> MachineSnapshot {
-        let state = MachineState(raw: status["state"] as? String)
-        let loadedName = status["loaded_profile"] as? String
+        // Mirror the server's derivation: state comes from `name` (falling back
+        // to `state`), and brewing is driven by the `extracting` flag, not the
+        // state string, so the widget agrees with the app.
+        let rawState = (status["name"] as? String) ?? (status["state"] as? String)
+        let extracting = (status["extracting"] as? NSNumber)?.boolValue
+            ?? (status["extracting"] as? Bool) ?? false
+        let state = MachineState(raw: rawState, extracting: extracting)
+        let loadedName = (status["loaded_profile"] as? String) ?? (status["profile"] as? String)
         let sensors = status["sensors"] as? [String: Any]
         let currentWeight = (sensors?["w"] as? NSNumber)?.doubleValue
         let currentTemp = (sensors?["t"] as? NSNumber)?.doubleValue

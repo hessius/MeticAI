@@ -36,12 +36,13 @@ private struct HeroWidgetView: View {
     let columns: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 8) {
             MeticHeader()
-            Spacer(minLength: 8)
+            Spacer(minLength: 6)
             content
-            Spacer(minLength: 8)
+            Spacer(minLength: 6)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .containerBackground(.fill.tertiary, for: .widget)
     }
 
@@ -53,7 +54,8 @@ private struct HeroWidgetView: View {
             let cols = Array(repeating: GridItem(.flexible(), spacing: 10), count: columns)
             LazyVGrid(columns: cols, spacing: 10) {
                 ForEach(Array(favs.prefix(count))) { fav in
-                    FavouriteHeroTile(favourite: fav, openAppOnStart: entry.openAppOnStart)
+                    FavouriteHeroTile(favourite: fav, openAppOnStart: entry.openAppOnStart,
+                                      imageSize: 44, fillHeight: false)
                         .padding(10)
                         .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }

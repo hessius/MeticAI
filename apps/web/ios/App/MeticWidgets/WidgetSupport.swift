@@ -114,10 +114,14 @@ struct FavouriteTile: View {
     }
 }
 
-/// Hero tile — a single large favourite filling a small widget.
+/// Hero tile — a single large favourite. `fillHeight` stretches it to fill a
+/// small widget; set it false inside multi-tile hero grids so tiles size to
+/// their content and don't overflow shorter medium/large containers.
 struct FavouriteHeroTile: View {
     let favourite: Favourite
     var openAppOnStart: Bool
+    var imageSize: CGFloat = 56
+    var fillHeight: Bool = true
 
     var body: some View {
         if openAppOnStart, let url = URL(string: "metic://start?profileId=\(favourite.id)") {
@@ -130,18 +134,22 @@ struct FavouriteHeroTile: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ProfileImageView(favourite: favourite, size: 56)
-            Spacer(minLength: 0)
+            ProfileImageView(favourite: favourite, size: imageSize)
+            if fillHeight { Spacer(minLength: 0) }
             Text(favourite.name)
-                .font(.headline)
+                .font(fillHeight ? .headline : .subheadline).bold()
                 .lineLimit(2)
+                .minimumScaleFactor(0.8)
             if let sub = favouriteSubtitle(favourite) {
                 Text(sub)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity,
+               maxHeight: fillHeight ? .infinity : nil,
+               alignment: .leading)
     }
 }
 

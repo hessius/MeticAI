@@ -52,26 +52,58 @@ public struct MachineSnapshot: Codable, Equatable {
     }
 }
 
-/// Normalised machine state derived from the raw Socket.IO `status.state` field.
+/// Normalised machine state, mirroring the web app's badge mapping so the
+/// widget and the app agree on what to display. Brewing is driven by the
+/// machine's `extracting` flag (not the state string), exactly like the app.
 public enum MachineState: String, Codable {
     case idle
     case heating
+    case preheating
     case ready
     case brewing
+    case steaming
+    case purging
+    case descaling
+    case pourWater
     case unknown
 
-    /// Map the machine's raw state strings to a normalised case.
-    public init(raw: String?) {
-        switch (raw ?? "").lowercased() {
-        case "idle": self = .idle
-        case "heating", "preheating", "warming": self = .heating
-        case "ready", "idle_ready": self = .ready
-        case "brewing", "extracting", "espresso", "pour", "preinfusion": self = .brewing
+    /// Map the machine's raw `name`/`state` string (and `extracting` flag) to a
+    /// normalised case, matching the app's derivation.
+    public init(raw: String?, extracting: Bool = false) {
+        if extracting { self = .brewing; return }
+        let s = (raw ?? "").lowercased()
+        if s.hasPrefix("pour water") { self = .pourWater; return }
+        if s.hasPrefix("click to purge") { self = .purging; return }
+        switch s {
+        case "idle", "": self = .idle
+        case "heating", "warming": self = .heating
+        case "preheating": self = .preheating
+        case "ready", "click to start", "idle_ready": self = .ready
+        case "steaming": self = .steaming
+        case "purging": self = .purging
+        case "descaling": self = .descaling
+        case "brewing", "extracting", "espresso": self = .brewing
         default: self = .unknown
         }
     }
 
     public var isBrewing: Bool { self == .brewing }
+
+    /// Display label mirroring the app's state badge.
+    public var label: String {
+        switch self {
+        case .idle: return "Idle"
+        case .heating: return "Heating"
+        case .preheating: return "Preheating"
+        case .ready: return "Ready"
+        case .brewing: return "Brewing"
+        case .steaming: return "Steaming"
+        case .purging: return "Purging"
+        case .descaling: return "Descaling"
+        case .pourWater: return "Pour water"
+        case .unknown: return "—"
+        }
+    }
 }
 
 /// Machine control actions exposed by the Control Center widget.

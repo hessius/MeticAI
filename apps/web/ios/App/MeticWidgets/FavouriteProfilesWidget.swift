@@ -31,7 +31,7 @@ struct FavouritesConfigIntent: WidgetConfigurationIntent {
     static var description = IntentDescription("Start a favourite profile from the home screen.")
 
     @Parameter(title: "Small style", default: .hero) var smallStyle: SmallStyle
-    @Parameter(title: "Large density", default: .sixUp) var largeDensity: LargeDensity
+    @Parameter(title: "Large density", default: .tenUp) var largeDensity: LargeDensity
 }
 
 // MARK: - Timeline

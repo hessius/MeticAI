@@ -49,6 +49,30 @@ final class MachineClientTests: XCTestCase {
         XCTAssertNil(snap.targetTempC)
     }
 
+    func testMakeSnapshotUsesNameAndExtractingLikeApp() async {
+        let c = MachineClient(baseURL: base)
+        // Machine reports the stage via `name` and brewing via `extracting`.
+        // A heating stage with extracting=false must read as Heating, not Brewing.
+        let heating: [String: Any] = [
+            "name": "heating",
+            "extracting": false,
+            "profile": "SPHE-50",
+            "sensors": ["w": 0.0, "t": 80.0],
+        ]
+        let hSnap = await c.makeSnapshot(from: heating)
+        XCTAssertEqual(hSnap.state, .heating)
+        XCTAssertEqual(hSnap.loadedProfileName, "SPHE-50")
+
+        // extracting=true is Brewing regardless of the stage name.
+        let brewing: [String: Any] = [
+            "name": "heating",
+            "extracting": true,
+            "sensors": ["w": 12.0, "t": 93.0],
+        ]
+        let bSnap = await c.makeSnapshot(from: brewing)
+        XCTAssertEqual(bSnap.state, .brewing)
+    }
+
     func testEffectiveTargetWeightSuppressedWhenIdle() {
         // Idle → suppress the stale target weight; any other state passes through.
         XCTAssertNil(MachineClient.effectiveTargetWeight(36.0, state: .idle))
