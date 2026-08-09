@@ -38,28 +38,46 @@ private struct HeroWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             MeticHeader()
-            Spacer(minLength: 6)
-            content
-            Spacer(minLength: 6)
+            grid
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .containerBackground(.fill.tertiary, for: .widget)
     }
 
-    @ViewBuilder private var content: some View {
-        let favs = entry.favourites
+    private func rows(_ favs: [Favourite]) -> [[Favourite]] {
+        stride(from: 0, to: favs.count, by: columns).map {
+            Array(favs[$0 ..< min($0 + columns, favs.count)])
+        }
+    }
+
+    // Row-based layout (rather than a LazyVGrid whose cells size to their own
+    // content): every row shares the remaining height equally and every card
+    // fills its row, so all hero cards are the same size regardless of how long
+    // their profile names are.
+    @ViewBuilder private var grid: some View {
+        let favs = Array(entry.favourites.prefix(count))
         if favs.isEmpty {
             FavouritesEmptyState()
         } else {
-            let cols = Array(repeating: GridItem(.flexible(), spacing: 10), count: columns)
-            LazyVGrid(columns: cols, spacing: 10) {
-                ForEach(Array(favs.prefix(count))) { fav in
-                    FavouriteHeroTile(favourite: fav, openAppOnStart: entry.openAppOnStart,
-                                      imageSize: 44, fillHeight: false)
-                        .padding(10)
-                        .background(.fill.quaternary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            VStack(spacing: 10) {
+                ForEach(Array(rows(favs).enumerated()), id: \.offset) { _, row in
+                    HStack(spacing: 10) {
+                        ForEach(row) { fav in
+                            FavouriteHeroTile(favourite: fav, openAppOnStart: entry.openAppOnStart,
+                                              imageSize: 44, fillHeight: true)
+                                .padding(10)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(.fill.quaternary,
+                                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        }
+                        // Keep widths consistent if the last row is short.
+                        ForEach(0 ..< (columns - row.count), id: \.self) { _ in
+                            Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }

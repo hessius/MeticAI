@@ -250,12 +250,8 @@ struct SnapshotOverlay: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Label(snapshot.state.label, systemImage: "circle.fill")
-                    .font(.caption).bold()
-                Spacer()
-                meticWordmark(baseSize: 11)
-            }
+            Label(snapshot.state.label, systemImage: "circle.fill")
+                .font(.caption).bold()
             if let name = snapshot.loadedProfileName {
                 Text(name).font(.headline).lineLimit(1)
             }

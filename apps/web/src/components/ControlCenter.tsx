@@ -89,11 +89,11 @@ function stateBadge(state: string | null, brewing: boolean, t: ReturnType<typeof
 }
 
 function connectionDot(machineState: MachineState) {
-  if (!machineState._wsConnected) return { dot: 'bg-gray-400', key: 'disconnected' }
-  if (machineState.availability === 'offline') return { dot: 'bg-red-500', key: 'offline' }
-  if (machineState._stale) return { dot: 'bg-amber-400', key: 'stale' }
-  if (machineState.connected) return { dot: 'bg-emerald-400', key: 'connected' }
-  return { dot: 'bg-gray-400', key: 'connecting' }
+  if (!machineState._wsConnected) return { dot: 'bg-gray-400' }
+  if (machineState.availability === 'offline') return { dot: 'bg-red-500' }
+  if (machineState._stale) return { dot: 'bg-amber-400' }
+  if (machineState.connected) return { dot: 'bg-emerald-400' }
+  return { dot: 'bg-gray-400' }
 }
 
 // ---------------------------------------------------------------------------
@@ -148,19 +148,17 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const statusRowRef = useRef<HTMLDivElement>(null)
   const [hideTarget, setHideTarget] = useState(false)
   const [hideWeightTarget, setHideWeightTarget] = useState(false)
-  const [hideConnLabel, setHideConnLabel] = useState(false)
   const [hideWeight, setHideWeight] = useState(false)
 
   useEffect(() => {
     const el = statusRowRef.current
     if (!el) return
     // Ordered hide cascade — each step is applied only while the row overflows.
-    const steps = [setHideTarget, setHideWeightTarget, setHideConnLabel, setHideWeight]
+    const steps = [setHideTarget, setHideWeightTarget, setHideWeight]
     const check = () => {
       // Reset to full content, then re-measure and hide step-by-step.
       setHideTarget(false)
       setHideWeightTarget(false)
-      setHideConnLabel(false)
       setHideWeight(false)
       let i = 0
       const stepOnce = () => {
@@ -405,14 +403,9 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             })()}
             <div className="flex items-center gap-1.5 shrink min-w-0">
               {(() => {
-                const { dot, key } = connectionDot(machineState)
+                const { dot } = connectionDot(machineState)
                 return (
                   <>
-                    {!hideConnLabel && (
-                      <span className="text-[10px] text-muted-foreground truncate">
-                        {t(`controlCenter.connection.${key}`)}
-                      </span>
-                    )}
                     {machineState.state && machineState._wsConnected && (
                       stateBadge(machineState.state, false, t)
                     )}
