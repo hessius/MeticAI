@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence, Reorder } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,7 @@ import { getCatalogueCache, setCatalogueCache, invalidateCatalogueCache, CATALOG
 import { getAutoSync, setAutoSync, getAutoSyncAiDescription, setAutoSyncAiDescription } from '@/lib/aiPreferences'
 import { useProfileImageCache } from '@/hooks/useProfileImageCache'
 import { useFavourites } from '@/hooks/useFavourites'
+import { resolveScroller } from '@/lib/scrollAnchor'
 import { getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
 import { isDirectMode, isNativePlatform } from '@/lib/machineMode'
 import { hasFeature } from '@/lib/featureFlags'
@@ -148,6 +149,34 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
   // Profile image cache
   const { getImageUrl, fetchImagesForProfiles } = useProfileImageCache()
   const { favourites, toggle: toggleFav, isFavourite } = useFavourites()
+
+  // Anchor the viewport when the Favourites section grows/shrinks above the
+  // list, so toggling a favourite doesn't make the page jump (issue #584).
+  const catalogueRootRef = useRef<HTMLDivElement | null>(null)
+  const favSectionRef = useRef<HTMLElement | null>(null)
+  const scrollCompRef = useRef<
+    { scroller: HTMLElement; prevScrollTop: number; prevScrollHeight: number } | null
+  >(null)
+
+  const handleToggleFav = useCallback((fav: Parameters<typeof toggleFav>[0]) => {
+    const scroller = resolveScroller(favSectionRef.current ?? catalogueRootRef.current)
+    scrollCompRef.current = scroller
+      ? {
+          scroller,
+          prevScrollTop: scroller.scrollTop,
+          prevScrollHeight: scroller.scrollHeight,
+        }
+      : null
+    void toggleFav(fav)
+  }, [toggleFav])
+
+  useLayoutEffect(() => {
+    const pending = scrollCompRef.current
+    if (!pending) return
+    scrollCompRef.current = null
+    const delta = pending.scroller.scrollHeight - pending.prevScrollHeight
+    if (delta !== 0) pending.scroller.scrollTop = pending.prevScrollTop + delta
+  }, [favourites.length])
 
   // Fetch profiles — stale-while-revalidate pattern
   const fetchProfiles = useCallback(async (forceRefresh = false) => {
@@ -649,7 +678,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
             onPointerDownCapture={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation()
-              void toggleFav({
+              handleToggleFav({
                 id: profile.id,
                 name: profile.name,
                 targetTempC: profile.temperature,
@@ -706,7 +735,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
   )
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" ref={catalogueRootRef}>
       <Card className="max-w-4xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="space-y-3">
@@ -984,7 +1013,7 @@ export function ProfileCatalogueView({ onBack, onViewProfile }: ProfileCatalogue
         )}
 
         {!isLoading && favourites.length > 0 && (
-          <section aria-label={t('favourites.sectionTitle')} className="space-y-3">
+          <section ref={favSectionRef} aria-label={t('favourites.sectionTitle')} className="space-y-3">
             <h2 className="text-sm font-semibold text-muted-foreground px-1">
               {t('favourites.sectionTitle')}
             </h2>
