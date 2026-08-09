@@ -29,4 +29,9 @@ describe('getScaleReadout', () => {
     expect(getScaleReadout(18, null).target).toBeNull()
     expect(getScaleReadout(18, undefined).target).toBeNull()
   })
+
+  it('suppresses the target while idle (stale remnant of the last shot)', () => {
+    expect(getScaleReadout(0, 36, true).target).toBeNull()
+    expect(getScaleReadout(18, 36, false).target).toBe('36')
+  })
 })

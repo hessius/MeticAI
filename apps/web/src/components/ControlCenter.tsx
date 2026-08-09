@@ -110,14 +110,17 @@ export interface ScaleReadout {
 /**
  * Format the collapsed-state scale readout. Current weight is shown to 1 dp
  * (0.0 at rest); the target — when the machine reports one — is a whole number.
+ * A target while idle is just a stale remnant of the last shot, not a goal
+ * being pursued, so it is suppressed.
  */
 export function getScaleReadout(
   shotWeight: number | null | undefined,
   targetWeight: number | null | undefined,
+  isIdle = false,
 ): ScaleReadout {
   return {
     value: (shotWeight ?? 0).toFixed(1),
-    target: targetWeight != null ? targetWeight.toFixed(0) : null,
+    target: !isIdle && targetWeight != null ? targetWeight.toFixed(0) : null,
   }
 }
 
@@ -385,7 +388,7 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
             </div>
             {/* Live scale readout — visible even in the collapsed state (#583) */}
             {!hideWeight && isConnected && machineState.shot_weight != null && (() => {
-              const { value, target } = getScaleReadout(machineState.shot_weight, machineState.target_weight)
+              const { value, target } = getScaleReadout(machineState.shot_weight, machineState.target_weight, isIdle)
               return (
                 <div
                   className="flex items-baseline gap-1 shrink-0"

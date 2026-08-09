@@ -17,6 +17,9 @@ export function useFavourites() {
   }, [])
 
   useEffect(() => {
+    // Initial load on mount; refresh() sets state after an await, not
+    // synchronously. Matches the suppression used elsewhere in the app.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh()
     const onChange = () => { refresh() }
     window.addEventListener(FAVOURITES_CHANGED, onChange)
