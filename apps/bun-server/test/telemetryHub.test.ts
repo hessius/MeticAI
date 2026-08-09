@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { TelemetryHub, type TelemetryClient } from "../src/telemetryHub.ts";
+import { TelemetryHub, extractFinalWeight, type TelemetryClient } from "../src/telemetryHub.ts";
 
 const silentLogger = { info() {}, error() {}, debug() {} };
 
@@ -34,5 +34,20 @@ describe("TelemetryHub", () => {
     expect(hub.clientCount).toBe(2);
     hub.close();
     expect(hub.clientCount).toBe(0);
+  });
+
+  describe("extractFinalWeight", () => {
+    test("reads the effective loaded profile's final_weight", () => {
+      // Shape of GET /api/v1/profile/last — reflects temporary on-machine edits.
+      expect(extractFinalWeight({ load_time: 1, profile: { final_weight: 42 } })).toBe(42);
+    });
+
+    test("returns null when profile or weight is missing or non-numeric", () => {
+      expect(extractFinalWeight(null)).toBeNull();
+      expect(extractFinalWeight({})).toBeNull();
+      expect(extractFinalWeight({ profile: {} })).toBeNull();
+      expect(extractFinalWeight({ profile: { final_weight: "42" } })).toBeNull();
+      expect(extractFinalWeight({ profile: { final_weight: Number.NaN } })).toBeNull();
+    });
   });
 });

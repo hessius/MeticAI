@@ -21,10 +21,10 @@ final class MachineClientTests: XCTestCase {
                        "http://machine.local:8080/api/v1/profile/load/abc")
     }
 
-    func testProfileURL() {
+    func testLastProfileURL() {
         let c = MachineClient(baseURL: base)
-        XCTAssertEqual(c.profileURL(id: "abc").absoluteString,
-                       "http://machine.local:8080/api/v1/profile/get/abc")
+        XCTAssertEqual(c.lastProfileURL.absoluteString,
+                       "http://machine.local:8080/api/v1/profile/last")
     }
 
     func testSettingsURL() {

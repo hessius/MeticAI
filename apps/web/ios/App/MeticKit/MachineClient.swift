@@ -4,7 +4,8 @@ import Foundation
 /// web `DirectAdapter` uses:
 ///   POST /api/v1/action/{start|stop|preheat|tare}
 ///   GET  /api/v1/profile/load/{id}
-///   GET  /api/v1/profile/get/{id}
+///   GET  /api/v1/profile/last            (effective loaded profile — reflects
+///                                         temporary on-machine edits)
 ///   GET  /api/v1/settings                (liveness pre-flight)
 /// Live status is read via Socket.IO (see SocketIOStatusReader).
 public struct MachineClient {
@@ -30,9 +31,11 @@ public struct MachineClient {
         baseURL.appendingPathComponent("api/v1/profile/load/\(id)")
     }
 
-    public func profileURL(id: String) -> URL {
-        baseURL.appendingPathComponent("api/v1/profile/get/\(id)")
-    }
+    /// The *effective* loaded profile, including temporary edits made directly on
+    /// the machine. Fetching a stored profile by id (`/profile/get/{id}`) returns
+    /// the saved definition and would miss on-machine tweaks such as a changed
+    /// target weight, so target temp/weight are derived from this endpoint.
+    public var lastProfileURL: URL { baseURL.appendingPathComponent("api/v1/profile/last") }
 
     public var settingsURL: URL { baseURL.appendingPathComponent("api/v1/settings") }
 
@@ -102,8 +105,10 @@ public struct MachineClient {
 
         var targetTemp: Double?
         var targetWeight: Double?
-        if let profileId = status["id"] as? String, !profileId.isEmpty,
-           let (temp, weight) = try? await fetchProfileTargets(id: profileId) {
+        // Derive targets from the *effective* loaded profile (reflects temporary
+        // on-machine edits). Only attempt when a profile is actually loaded.
+        let hasProfile = (status["id"] as? String).map { !$0.isEmpty } ?? (loadedName != nil)
+        if hasProfile, let (temp, weight) = try? await fetchProfileTargets() {
             targetTemp = temp
             targetWeight = weight
         }
@@ -128,12 +133,13 @@ public struct MachineClient {
         state == .idle ? nil : weight
     }
 
-    private func fetchProfileTargets(id: String) async throws -> (Double?, Double?) {
-        var req = URLRequest(url: profileURL(id: id))
+    private func fetchProfileTargets() async throws -> (Double?, Double?) {
+        var req = URLRequest(url: lastProfileURL)
         req.timeoutInterval = 3
         let (data, resp) = try await session.data(for: req)
         guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let obj = root["profile"] as? [String: Any] else {
             throw ClientError.badResponse
         }
         let temp = (obj["temperature"] as? NSNumber)?.doubleValue

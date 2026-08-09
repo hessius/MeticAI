@@ -22,6 +22,7 @@ const mockApi = {
   listProfiles: vi.fn(() => ({ data: [] as unknown[] })),
   fetchAllProfiles: vi.fn(() => ({ data: [] as unknown[] })),
   getProfile: vi.fn(() => ({ data: {} })),
+  getLastProfile: vi.fn((): { data: unknown } => ({ data: { profile: {} } })),
   saveProfile: vi.fn(() => ({ data: {} })),
   deleteProfile: vi.fn(),
   loadProfileByID: vi.fn(),
@@ -523,6 +524,21 @@ describe('DirectAdapter', () => {
     it('deleteProfile() delegates to api', async () => {
       await svc.deleteProfile('abc')
       expect(mockApi.deleteProfile).toHaveBeenCalledWith('abc')
+    })
+
+    it('getLastProfile() returns the effective loaded profile (temp edits included)', async () => {
+      // /api/v1/profile/last returns { load_time, profile } and reflects
+      // temporary on-machine edits — e.g. an overridden final_weight.
+      const profile = { id: '7f84', name: 'SPHE-50', final_weight: 42 }
+      mockApi.getLastProfile.mockResolvedValueOnce({ data: { load_time: 1, profile } })
+      const result = await svc.getLastProfile()
+      expect(result).toEqual(profile)
+    })
+
+    it('getLastProfile() returns null when no profile is loaded', async () => {
+      mockApi.getLastProfile.mockResolvedValueOnce({ data: null })
+      const result = await svc.getLastProfile()
+      expect(result).toBeNull()
     })
   })
 

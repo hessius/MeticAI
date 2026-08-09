@@ -336,6 +336,10 @@ export function createDemoAdapter(): MachineService {
       return p
     },
 
+    async getLastProfile(): Promise<Profile | null> {
+      return loadedProfile ?? store.getProfiles()[0] ?? null
+    },
+
     async saveProfile(profile: Profile): Promise<ProfileIdent> {
       store.saveProfile(profile)
       profileCbs.forEach((cb) => cb({ change: 'update', profile_id: profile.id }))

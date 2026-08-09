@@ -59,6 +59,28 @@ describe("profiles-crud: machine/profiles list", () => {
   });
 });
 
+describe("profiles-crud: profile/last GET", () => {
+  test("returns the effective loaded profile (reflects temporary on-machine edits)", async () => {
+    const p = makeMockPlatform({
+      machine: scriptedMachine({
+        "/api/v1/profile/last": {
+          load_time: 123,
+          profile: { id: "p1", name: "SPHE-50", final_weight: 42 },
+        },
+      }),
+    });
+    const body = await (await handle(get("/api/machine/profile/last"), p)).json();
+    expect(body.profile.final_weight).toBe(42);
+    expect(body.profile.name).toBe("SPHE-50");
+  });
+
+  test("returns { profile: null } when the machine is unreachable", async () => {
+    const p = makeMockPlatform({ machine: scriptedMachine({}) });
+    const body = await (await handle(get("/api/machine/profile/last"), p)).json();
+    expect(body).toEqual({ profile: null });
+  });
+});
+
 describe("profiles-crud: profile/{name} GET", () => {
   test("returns success with the summary shape", async () => {
     const p = makeMockPlatform({

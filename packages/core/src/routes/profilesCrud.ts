@@ -21,6 +21,7 @@
  *   DELETE /api/machine/profile/{id}
  *   GET    /api/machine/profiles
  *   GET    /api/machine/profiles/orphaned
+ *   GET    /api/machine/profile/last
  *   GET    /api/machine/profile/{id}/json
  *   GET    /api/profile/{name}/target-curves
  *   GET    /api/profile/{name}/image-proxy
@@ -477,6 +478,19 @@ export async function handleProfilesCrudRoutes(
       return jsonResponse(result);
     } catch {
       return jsonResponse({ profiles: [] });
+    }
+  }
+
+  // GET /api/machine/profile/last -> effective loaded profile (reflects
+  // temporary on-machine edits). Must precede the generic /{id} matchers.
+  if (pathname === "/api/machine/profile/last" && method === "GET") {
+    try {
+      const r = await platform.machine.fetch("/api/v1/profile/last");
+      if (!r.ok) return jsonResponse({ profile: null });
+      const data = (await r.json()) as { profile?: unknown };
+      return jsonResponse({ profile: data?.profile ?? null });
+    } catch {
+      return jsonResponse({ profile: null });
     }
   }
 

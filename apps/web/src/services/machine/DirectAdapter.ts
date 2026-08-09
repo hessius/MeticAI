@@ -260,6 +260,12 @@ export function createDirectAdapter(baseUrl: string): MachineService {
     getProfile: async (id: string) => {
       return unwrap(await api.getProfile(id)) as Profile
     },
+    getLastProfile: async () => {
+      // /api/v1/profile/last returns the effective loaded profile (including
+      // temporary on-machine edits) as { load_time, profile }.
+      const res = unwrap(await api.getLastProfile()) as { profile?: Profile } | null
+      return res?.profile ?? null
+    },
     saveProfile: async (profile: Profile) => {
       return unwrap(await api.saveProfile(profile)) as ProfileIdent
     },

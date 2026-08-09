@@ -53,6 +53,19 @@ function num(val: unknown, fallback: number | null): number | null {
   return typeof val === "number" && !Number.isNaN(val) ? val : fallback;
 }
 
+/**
+ * Extract the effective target weight from a `/api/v1/profile/last` response.
+ * Returns null when the payload is missing or the weight isn't a finite number.
+ * The "last profile" reflects temporary on-machine edits, so this is the source
+ * of truth for the live target weight (a stored profile fetched by id would
+ * miss those edits).
+ */
+export function extractFinalWeight(payload: unknown): number | null {
+  const profile = (payload as { profile?: { final_weight?: unknown } } | null)?.profile;
+  const weight = profile?.final_weight;
+  return typeof weight === "number" && !Number.isNaN(weight) ? weight : null;
+}
+
 const HEARTBEAT_MS = 5_000;
 const FRAME_INTERVAL_MS = 100; // cap fan-out at ~10 FPS to protect low-power hosts
 
@@ -65,6 +78,7 @@ interface StatusData {
   state?: string;
   profile?: string;
   loaded_profile?: string;
+  id?: string;
   extracting?: boolean;
   // Seeded / optimistic fields.
   total_shots?: number;
@@ -113,6 +127,7 @@ export class TelemetryHub {
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private lastFrameAt = 0;
   private pendingFlush: ReturnType<typeof setTimeout> | null = null;
+  private lastLoadedProfileId: string | null = null;
 
   constructor(
     private readonly baseUrl: string,
@@ -199,6 +214,9 @@ export class TelemetryHub {
     });
 
     socket.on("status", (data: StatusData) => this.applyStatus(data));
+    // The machine emits `profile` when a profile is loaded or edited (including
+    // temporary on-machine edits). Re-read the effective target weight.
+    socket.on("profile", () => void this.refreshTargetWeight());
     socket.on("sensors", (data: { t_bar_up?: number; t_bar_down?: number }) => {
       this.snapshot = {
         ...this.snapshot,
@@ -266,6 +284,32 @@ export class TelemetryHub {
         data.preheat_countdown != null ? data.preheat_countdown : prev.preheat_countdown,
     };
     this.broadcast();
+
+    // When the loaded profile changes, refresh the effective target weight from
+    // /api/v1/profile/last (reflects temporary on-machine edits — the stored
+    // profile fetched by id would miss them).
+    if (data.id && data.id !== this.lastLoadedProfileId) {
+      this.lastLoadedProfileId = data.id;
+      void this.refreshTargetWeight();
+    }
+  }
+
+  /**
+   * Read the effective loaded profile's target weight from the machine and push
+   * it into the snapshot. Best-effort: failures leave target_weight unchanged.
+   */
+  private async refreshTargetWeight(): Promise<void> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/v1/profile/last`);
+      if (!res.ok) return;
+      const weight = extractFinalWeight(await res.json());
+      if (weight != null) {
+        this.snapshot = { ...this.snapshot, target_weight: weight };
+        this.broadcast();
+      }
+    } catch {
+      // ignore — best effort
+    }
   }
 
   private async applySeed(): Promise<void> {
@@ -295,6 +339,7 @@ export class TelemetryHub {
       this.socket = null;
     }
     this.snapshot = emptySnapshot();
+    this.lastLoadedProfileId = null;
   }
 
   /** Release all resources (test teardown / server shutdown). */
