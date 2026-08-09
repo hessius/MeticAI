@@ -5,6 +5,8 @@ import SwiftUI
 struct MeticWidgetsBundle: WidgetBundle {
     var body: some Widget {
         FavouriteProfilesWidget()
+        MediumHeroWidget()
+        LargeHeroWidget()
         ControlCenterWidget()
     }
 }

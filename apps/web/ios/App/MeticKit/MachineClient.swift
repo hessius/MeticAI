@@ -102,6 +102,10 @@ public struct MachineClient {
             targetWeight = weight
         }
 
+        // A target weight while idle is just a remnant of the last shot, not a
+        // goal being pursued — don't surface it.
+        targetWeight = Self.effectiveTargetWeight(targetWeight, state: state)
+
         return MachineSnapshot(
             state: state,
             loadedProfileName: loadedName,
@@ -110,6 +114,12 @@ public struct MachineClient {
             currentWeightG: currentWeight,
             targetWeightG: targetWeight
         )
+    }
+
+    /// Suppresses a target weight while idle — an idle machine's "target" is a
+    /// stale remnant of the last shot, not a goal being pursued. Pure + tested.
+    static func effectiveTargetWeight(_ weight: Double?, state: MachineState) -> Double? {
+        state == .idle ? nil : weight
     }
 
     private func fetchProfileTargets(id: String) async throws -> (Double?, Double?) {

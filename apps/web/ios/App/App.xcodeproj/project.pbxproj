@@ -34,6 +34,7 @@
 		9E222C543009E322009A1738 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9E222C4A3009E322009A1738 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B00E51FAE7D40B45484ED159 /* AppGroupStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C12D88D74CA0B1E0086FA54 /* AppGroupStoreTests.swift */; };
 		BBB95C68BF0F1BA63FA2F351 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBB498CAAA26EB7EF8CB0DE /* AppGroup.swift */; };
+		C598517EFF03BF0763C589DF /* HeroWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB98958FAB39748EF18BB70 /* HeroWidgets.swift */; };
 		C8D5562BF1D9944C0D50E616 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 540C6065DA8AAD71A4478B0D /* Foundation.framework */; };
 		D6F22B46082F74D44E7BE98D /* MachineClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A094DF44F18C8DE4DEF9A6 /* MachineClient.swift */; };
 		F4FE02EF844F8BE14A4582D7 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7774BC9E16930145EAD6BEE2 /* Models.swift */; };
@@ -88,6 +89,7 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		540C6065DA8AAD71A4478B0D /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		59C3ACB4200397393E8FEF69 /* MachineClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MachineClientTests.swift; sourceTree = "<group>"; };
+		5DB98958FAB39748EF18BB70 /* HeroWidgets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HeroWidgets.swift; sourceTree = "<group>"; };
 		65D946B06CB363F431631450 /* MeticWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MeticWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7774BC9E16930145EAD6BEE2 /* Models.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		8C12D88D74CA0B1E0086FA54 /* AppGroupStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppGroupStoreTests.swift; sourceTree = "<group>"; };
@@ -172,7 +174,6 @@
 				F022BB0FF7FC634C03D214B7 /* ControlIntents.swift */,
 				9E90915895B55F6358F61E0C /* StartProfileIntent.swift */,
 			);
-			name = Intents;
 			path = Intents;
 			sourceTree = "<group>";
 		};
@@ -182,7 +183,6 @@
 				8C12D88D74CA0B1E0086FA54 /* AppGroupStoreTests.swift */,
 				59C3ACB4200397393E8FEF69 /* MachineClientTests.swift */,
 			);
-			name = MeticWidgetsTests;
 			path = MeticWidgetsTests;
 			sourceTree = "<group>";
 		};
@@ -245,7 +245,6 @@
 				7774BC9E16930145EAD6BEE2 /* Models.swift */,
 				C6EDF8C30FE3910E7C2D0D58 /* SocketIOStatusReader.swift */,
 			);
-			name = MeticKit;
 			path = MeticKit;
 			sourceTree = "<group>";
 		};
@@ -259,8 +258,8 @@
 				2E9DDC937E6A2575325A680E /* WidgetSupport.swift */,
 				BDB223470DA26D46A4750E8F /* Info.plist */,
 				FA6E72224DAC431BC2A03E2D /* MeticWidgets.entitlements */,
+				5DB98958FAB39748EF18BB70 /* HeroWidgets.swift */,
 			);
-			name = MeticWidgets;
 			path = MeticWidgets;
 			sourceTree = "<group>";
 		};
@@ -482,6 +481,7 @@
 				796C6014B15243111FE568AA /* WidgetSupport.swift in Sources */,
 				2293E69E244EE3D32F2E02E8 /* ControlIntents.swift in Sources */,
 				84339E407D2F51CE255759C5 /* StartProfileIntent.swift in Sources */,
+				C598517EFF03BF0763C589DF /* HeroWidgets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -546,7 +546,7 @@
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = A5J788W4Q9;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.metic.app.MeticWidgetsTests;
@@ -564,7 +564,7 @@
 				CODE_SIGN_ENTITLEMENTS = MeticWidgets/MeticWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = A5J788W4Q9;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MeticWidgets/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -844,7 +844,7 @@
 				CODE_SIGN_ENTITLEMENTS = MeticWidgets/MeticWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = A5J788W4Q9;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MeticWidgets/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -869,7 +869,7 @@
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = A5J788W4Q9;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.metic.app.MeticWidgetsTests;

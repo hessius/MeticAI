@@ -1,14 +1,29 @@
 import SwiftUI
 import WidgetKit
 
-/// Metic header shown on every widget.
+extension Color {
+    /// Metic brand orange — matches the app header dot (#d77100).
+    static let meticBrand = Color(red: 0.843, green: 0.443, blue: 0.0)
+}
+
+/// The "Metic." wordmark as a single Text run so the dot keeps its baseline.
+/// The dot is ~1.5× the word size and uses the brand orange, mirroring the app.
+func meticWordmark(baseSize: CGFloat) -> Text {
+    Text("Metic")
+        .font(.system(size: baseSize, weight: .bold))
+        .foregroundStyle(.secondary)
+    + Text(".")
+        .font(.system(size: baseSize * 1.5, weight: .bold))
+        .foregroundStyle(Color.meticBrand)
+}
+
+/// Metic header shown on every widget, pinned to the top edge.
 struct MeticHeader: View {
     var trailing: String?
+    var baseSize: CGFloat = 12
     var body: some View {
         HStack(spacing: 4) {
-            Text("Metic.")
-                .font(.caption2).bold()
-                .opacity(0.7)
+            meticWordmark(baseSize: baseSize)
             Spacer(minLength: 0)
             if let trailing {
                 Text(trailing)

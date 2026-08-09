@@ -45,4 +45,70 @@ final class AppGroupStoreTests: XCTestCase {
         XCTAssertEqual(MachineState(raw: "wat"), .unknown)
         XCTAssertTrue(MachineState(raw: "brewing").isBrewing)
     }
+
+    // MARK: - Snapshot overlay lifecycle
+
+    private func freshDefaults() -> (UserDefaults, String) {
+        let suite = "test.suite.\(UUID().uuidString)"
+        return (UserDefaults(suiteName: suite)!, suite)
+    }
+
+    func testShowSnapshotIsActiveWithinWindowAndExpires() {
+        let (defaults, suite) = freshDefaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let writer = AppGroupWriter(defaults: defaults)
+        let store = AppGroupStore(defaults: defaults, containerURL: nil)
+        let now = Date()
+        let snap = MachineSnapshot(state: .brewing, loadedProfileName: "SPHE-50",
+                                   currentTempC: 92, targetTempC: 90,
+                                   currentWeightG: 18, targetWeightG: 50)
+        writer.showSnapshot(snap, for: 10, now: now)
+
+        XCTAssertEqual(store.activeSnapshot(now: now.addingTimeInterval(2)), snap)
+        XCTAssertNil(store.activeSnapshot(now: now.addingTimeInterval(11)))
+    }
+
+    func testClearSnapshotDismissesImmediately() {
+        let (defaults, suite) = freshDefaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let writer = AppGroupWriter(defaults: defaults)
+        let store = AppGroupStore(defaults: defaults, containerURL: nil)
+        let now = Date()
+        writer.showSnapshot(MachineSnapshot(state: .brewing, loadedProfileName: nil,
+                                            currentTempC: nil, targetTempC: nil,
+                                            currentWeightG: nil, targetWeightG: nil),
+                            for: 10, now: now)
+        writer.clearSnapshot()
+        XCTAssertNil(store.activeSnapshot(now: now))
+    }
+
+    func testRecordActionRoundTripsAndFreshnessWindow() {
+        let (defaults, suite) = freshDefaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let writer = AppGroupWriter(defaults: defaults)
+        let store = AppGroupStore(defaults: defaults, containerURL: nil)
+        let now = Date()
+        writer.recordAction(.error, message: "Machine unreachable", now: now)
+
+        let fb = store.lastActionFeedback()
+        XCTAssertEqual(fb?.kind, .error)
+        XCTAssertEqual(fb?.message, "Machine unreachable")
+        XCTAssertTrue(fb?.isFresh(now: now.addingTimeInterval(1)) ?? false)
+        XCTAssertFalse(fb?.isFresh(now: now.addingTimeInterval(3)) ?? true)
+    }
+
+    func testRecordActionClearsStaleMessage() {
+        let (defaults, suite) = freshDefaults()
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let writer = AppGroupWriter(defaults: defaults)
+        let store = AppGroupStore(defaults: defaults, containerURL: nil)
+        writer.recordAction(.error, message: "boom", now: Date())
+        writer.recordAction(.start, message: nil, now: Date())
+        XCTAssertEqual(store.lastActionFeedback()?.kind, .start)
+        XCTAssertNil(store.lastActionFeedback()?.message)
+    }
 }

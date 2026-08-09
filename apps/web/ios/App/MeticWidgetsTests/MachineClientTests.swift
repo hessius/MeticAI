@@ -49,6 +49,27 @@ final class MachineClientTests: XCTestCase {
         XCTAssertNil(snap.targetTempC)
     }
 
+    func testEffectiveTargetWeightSuppressedWhenIdle() {
+        // Idle → suppress the stale target weight; any other state passes through.
+        XCTAssertNil(MachineClient.effectiveTargetWeight(36.0, state: .idle))
+        XCTAssertEqual(MachineClient.effectiveTargetWeight(36.0, state: .brewing), 36.0)
+        XCTAssertEqual(MachineClient.effectiveTargetWeight(50.0, state: .ready), 50.0)
+        XCTAssertEqual(MachineClient.effectiveTargetWeight(40.0, state: .heating), 40.0)
+    }
+
+    func testMakeSnapshotDropsTargetWeightWhenIdle() async {
+        let c = MachineClient(baseURL: base)
+        let status: [String: Any] = [
+            "state": "idle",
+            "loaded_profile": "SPHE-50",
+            "sensors": ["w": 36.0, "t": 40.0],
+            "id": "abc",
+        ]
+        let snap = await c.makeSnapshot(from: status)
+        XCTAssertEqual(snap.state, .idle)
+        XCTAssertNil(snap.targetWeightG)
+    }
+
     func testParseSocketIOEvent() {
         let parsed = SocketIOStatusReader.parseEvent(#"42["status",{"state":"idle","sensors":{"w":1.2}}]"#)
         XCTAssertEqual(parsed?.name, "status")

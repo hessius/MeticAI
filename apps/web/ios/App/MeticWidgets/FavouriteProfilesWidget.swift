@@ -17,10 +17,12 @@ enum SmallStyle: String, AppEnum {
 enum LargeDensity: String, AppEnum {
     case sixUp
     case eightUp
+    case tenUp
     static var typeDisplayRepresentation: TypeDisplayRepresentation = "Large Density"
     static var caseDisplayRepresentations: [LargeDensity: DisplayRepresentation] = [
         .sixUp: "6 profiles (2×3)",
         .eightUp: "8 profiles (2×4)",
+        .tenUp: "10 profiles (2×5)",
     ]
 }
 
@@ -67,9 +69,11 @@ struct FavouritesWidgetView: View {
     let entry: FavouritesEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
             MeticHeader()
+            Spacer(minLength: 6)
             content
+            Spacer(minLength: 6)
         }
         .containerBackground(.fill.tertiary, for: .widget)
     }
@@ -89,11 +93,19 @@ struct FavouritesWidgetView: View {
             case .systemMedium:
                 grid(Array(favs.prefix(4)), columns: 2, compact: false)
             case .systemLarge:
-                let n = entry.config.largeDensity == .sixUp ? 6 : 8
-                grid(Array(favs.prefix(n)), columns: 2, compact: false)
+                grid(Array(favs.prefix(largeCount)), columns: 2,
+                     compact: entry.config.largeDensity == .tenUp)
             default:
                 grid(Array(favs.prefix(4)), columns: 2, compact: false)
             }
+        }
+    }
+
+    private var largeCount: Int {
+        switch entry.config.largeDensity {
+        case .sixUp: return 6
+        case .eightUp: return 8
+        case .tenUp: return 10
         }
     }
 

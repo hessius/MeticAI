@@ -27,7 +27,7 @@ public struct Favourite: Codable, Identifiable, Hashable {
 }
 
 /// A one-shot snapshot of the machine's live state, read on demand.
-public struct MachineSnapshot: Equatable {
+public struct MachineSnapshot: Codable, Equatable {
     public let state: MachineState
     public let loadedProfileName: String?
     public let currentTempC: Double?
@@ -53,7 +53,7 @@ public struct MachineSnapshot: Equatable {
 }
 
 /// Normalised machine state derived from the raw Socket.IO `status.state` field.
-public enum MachineState: String {
+public enum MachineState: String, Codable {
     case idle
     case heating
     case ready
@@ -80,4 +80,26 @@ public enum MachineAction: String {
     case stop
     case preheat
     case tare
+}
+
+/// Transient feedback for the last control the user tapped, surfaced by the
+/// Control Center widget as a banner + button highlight.
+public struct ActionFeedback: Equatable {
+    public enum Kind: String {
+        case start, preheat, tare, stop, error
+    }
+    public let kind: Kind
+    public let message: String?
+    public let at: Date
+
+    public init(kind: Kind, message: String? = nil, at: Date) {
+        self.kind = kind
+        self.message = message
+        self.at = at
+    }
+
+    /// Whether this feedback is still within its display window.
+    public func isFresh(now: Date = Date(), window: TimeInterval = 2.5) -> Bool {
+        now.timeIntervalSince(at) < window && now.timeIntervalSince(at) >= 0
+    }
 }
