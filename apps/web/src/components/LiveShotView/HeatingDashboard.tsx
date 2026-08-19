@@ -1,7 +1,9 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check } from 'lucide-react'
+import { Check, Timer } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +41,13 @@ export interface HeatingDashboardProps {
   startDisabled: boolean
   onStart: () => void
   onAbort: () => void
+  /** Auto-start on stable temperature (#588). */
+  autoStartEnabled?: boolean
+  onAutoStartChange?: (enabled: boolean) => void
+  /** Currently dwelling within the on-target band (counting down to fire). */
+  autoStartArmed?: boolean
+  /** Milliseconds remaining before auto-start fires, when armed. */
+  autoStartRemainingMs?: number | null
 }
 
 function formatMmSs(totalSeconds: number): string {
@@ -252,6 +261,41 @@ export function HeatingDashboard(props: HeatingDashboardProps) {
 
       {/* Profile breakdown — resolved values, no variable chips/warnings */}
       <ProfileBreakdown profile={props.profile} hideVariables />
+
+      {/* Auto-start on stable temperature (#588) — on-the-fly toggle */}
+      {props.onAutoStartChange && (
+        <div className="rounded-xl border border-border bg-card px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 space-y-0.5">
+              <Label htmlFor="autoStartLive" className="flex items-center gap-2 text-sm font-medium">
+                <Timer
+                  className={`h-4 w-4 ${props.autoStartEnabled ? 'text-primary' : 'text-muted-foreground'}`}
+                  aria-hidden="true"
+                />
+                {t('controlCenter.heating.autoStart')}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {t('controlCenter.heating.autoStartDescription')}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t('controlCenter.heating.autoStartAppOpenNote')}
+              </p>
+            </div>
+            <Switch
+              id="autoStartLive"
+              checked={props.autoStartEnabled ?? false}
+              onCheckedChange={props.onAutoStartChange}
+            />
+          </div>
+          {props.autoStartEnabled && props.autoStartArmed && (
+            <p className="mt-2 text-xs font-medium text-primary">
+              {t('controlCenter.heating.autoStartArmed', {
+                seconds: Math.ceil((props.autoStartRemainingMs ?? 0) / 1000),
+              })}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Sticky action bar */}
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">

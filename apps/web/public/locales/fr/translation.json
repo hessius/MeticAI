@@ -316,7 +316,10 @@
     "newProfileNamePlaceholder": "Nom du nouveau profil...",
     "titleRun": "Lancer",
     "temperatureBoost": "Boost de température",
-    "temperatureBoostDescription": "Les premiers cafés après un démarrage à froid peuvent être ~3 °C plus froids. Le boost augmente temporairement la température d’infusion de 3 °C (max. 99 °C) pour atteindre la cible dès la première tasse."
+    "temperatureBoostDescription": "Les premiers cafés après un démarrage à froid peuvent être ~3 °C plus froids. Le boost augmente temporairement la température d’infusion de 3 °C (max. 99 °C) pour atteindre la cible dès la première tasse.",
+    "autoStart": "Démarrage auto à température stable",
+    "autoStartDescription": "Attendre que la température se stabilise, puis démarrer le café automatiquement. Contrairement au démarrage auto de Meticulous, celui-ci patiente jusqu’à ce que les deux températures soient stables sur la cible.",
+    "autoStartAppOpenNote": "Gardez l’application Metic ouverte pour que cela se déclenche, sauf si vous exécutez le serveur Metic (par ex. sur un Raspberry Pi) en arrière-plan."
   },
   "shotHistory": {
     "duration": "Durée",
@@ -844,7 +847,11 @@
       "temperatureChart": "Température",
       "deltaToTarget": "Vers la cible",
       "target": "Cible",
-      "stabilityReached": "Température stable"
+      "stabilityReached": "Température stable",
+      "autoStart": "Démarrage auto à température stable",
+      "autoStartDescription": "Démarrer le café automatiquement dès que les deux températures sont stables sur la cible.",
+      "autoStartAppOpenNote": "Gardez cette application ouverte pour que le démarrage auto se déclenche, sauf si le serveur Metic tourne en arrière-plan.",
+      "autoStartArmed": "Stable · démarrage auto dans {{seconds}} s"
     },
     "offline": "La machine est hors ligne",
     "stale": "Périmé",

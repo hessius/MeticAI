@@ -53,6 +53,7 @@ import { getServerUrl } from '@/lib/config'
 import { getActiveShotOverride } from '@/lib/activeShotOverride'
 import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
 import { HeatingDashboard } from './LiveShotView/HeatingDashboard'
+import { useAutoStart } from '@/hooks/useAutoStart'
 import {
   subscribe as subscribeShotTelemetry,
   getSnapshot as getShotTelemetrySnapshot,
@@ -72,6 +73,9 @@ interface LiveShotViewProps {
   profileData?: ProfileData | null
   /** Optional profile description for the heating-view collapsible disclosure */
   profileDescription?: string
+  /** Auto-start on stable temperature (#588) — shared with the Run Shot menu. */
+  autoStartEnabled?: boolean
+  onAutoStartChange?: (enabled: boolean) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +120,13 @@ interface ProfileStageInfo {
  */
 export const TEMP_ON_TARGET_THRESHOLD = 2.3
 
-export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData, profileDescription }: LiveShotViewProps) {
+/**
+ * Auto-start dwell (#588): how long both temps must stay within the on-target
+ * band before auto-start fires the shot.
+ */
+export const AUTO_START_DWELL_MS = 30_000
+
+export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData, profileDescription, autoStartEnabled = false, onAutoStartChange }: LiveShotViewProps) {
   const { t } = useTranslation()
   // The persistent recorder (fed at App level) is the single source of live-shot
   // + heating history, so opening this view late or navigating in/out no longer
@@ -278,6 +288,22 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
     targetTempVal != null &&
     Math.abs(headTempVal - targetTempVal) <= TEMP_ON_TARGET_THRESHOLD
 
+  // Auto-start on stable temperature (#588): when enabled, press "Start" for the
+  // user once the machine is parked at the ready gate and both temps have held
+  // within the on-target band for a sustained dwell (30s). Never fires from idle.
+  const autoStartStatus = useAutoStart(
+    {
+      enabled: autoStartEnabled && isHeatingPhase,
+      isReady: isReadyState,
+      headTemp: headTempVal,
+      chamberTemp: chamberTempVal,
+      targetTemp: targetTempVal,
+      band: TEMP_ON_TARGET_THRESHOLD,
+      dwellMs: AUTO_START_DWELL_MS,
+    },
+    () => cmd(() => machine.continueShot(), 'startingShot'),
+  )
+
   // Compute stage ranges from data
   const stages = useMemo(
     () => extractStageRanges(chartData),
@@ -418,6 +444,10 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
               startDisabled={!ms.connected}
               onStart={() => cmd(() => machine.continueShot(), 'startingShot')}
               onAbort={() => { cmd(() => machine.abortShot(), 'warmupCancelled'); onBack() }}
+              autoStartEnabled={autoStartEnabled}
+              onAutoStartChange={onAutoStartChange}
+              autoStartArmed={autoStartStatus.armed}
+              autoStartRemainingMs={autoStartStatus.remainingMs}
             />
           )}
 

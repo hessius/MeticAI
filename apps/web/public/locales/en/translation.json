@@ -316,7 +316,10 @@
     "newProfileNamePlaceholder": "New profile name...",
     "titleRun": "Run",
     "temperatureBoost": "Temperature Boost",
-    "temperatureBoostDescription": "Cold-start shots can run ~3 °C cooler. Boost temporarily raises brew temperature by 3 °C (max 99 °C) so the first shot still hits the mark."
+    "temperatureBoostDescription": "Cold-start shots can run ~3 °C cooler. Boost temporarily raises brew temperature by 3 °C (max 99 °C) so the first shot still hits the mark.",
+    "autoStart": "Auto-start when stable",
+    "autoStartDescription": "Wait for the temperature to stabilize, then start the shot automatically. Unlike the Meticulous auto-start, this holds until both temperatures are steady on target.",
+    "autoStartAppOpenNote": "Keep the Metic app open for this to trigger, unless you run the Metic server (e.g. on a Raspberry Pi) in the background."
   },
   "shotHistory": {
     "title": "Shot History",
@@ -849,7 +852,11 @@
       "temperatureChart": "Temperature",
       "deltaToTarget": "To target",
       "target": "Target",
-      "stabilityReached": "Temperature stable"
+      "stabilityReached": "Temperature stable",
+      "autoStart": "Auto-start when stable",
+      "autoStartDescription": "Start the shot automatically once both temperatures hold steady on target.",
+      "autoStartAppOpenNote": "Keep this app open for auto-start to fire, unless the Metic server is running in the background.",
+      "autoStartArmed": "Stable · auto-starting in {{seconds}}s"
     },
     "offline": "Machine is offline",
     "stale": "Stale",

@@ -122,6 +122,10 @@ function App() {
   const [createdProfileId, setCreatedProfileId] = useState<string | null>(null)
   const [runShotProfileId, setRunShotProfileId] = useState<string | undefined>(undefined)
   const [runShotProfileName, setRunShotProfileName] = useState<string | undefined>(undefined)
+  // Auto-start on stable temperature (#588). Shared between the Run Shot menu
+  // and the Live View warm-up so the toggle carries across navigation. Not
+  // persisted — defaults off for every fresh shot.
+  const [autoStartEnabled, setAutoStartEnabled] = useState(false)
   const [shotHistoryProfileName, setShotHistoryProfileName] = useState<string | undefined>(undefined)
   const [shotHistoryInitialDate, setShotHistoryInitialDate] = useState<string | undefined>(undefined)
   const [shotHistoryInitialFilename, setShotHistoryInitialFilename] = useState<string | undefined>(undefined)
@@ -969,6 +973,7 @@ function App() {
 
   const handleBackToStart = useCallback(() => {
     refreshProfileCount()
+    setAutoStartEnabled(false)
     setViewState('start')
   }, [refreshProfileCount])
 
@@ -1759,6 +1764,8 @@ function App() {
                     onNavigateToLive={() => setViewState('live-shot')}
                     initialProfileId={runShotProfileId}
                     initialProfileName={runShotProfileName}
+                    autoStartEnabled={autoStartEnabled}
+                    onAutoStartChange={setAutoStartEnabled}
                   />
                 </FeatureErrorBoundary>
               )}
@@ -1770,6 +1777,8 @@ function App() {
                     onBack={handleBackToStart}
                     profileData={liveProfileData}
                     profileDescription={liveProfileDescription}
+                    autoStartEnabled={autoStartEnabled}
+                    onAutoStartChange={setAutoStartEnabled}
                     onAnalyzeShot={(profileName) => {
                       setShotHistoryProfileName(profileName)
                       setShotHistoryInitialDate(undefined)

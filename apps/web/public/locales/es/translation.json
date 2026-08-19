@@ -316,7 +316,10 @@
     "newProfileNamePlaceholder": "Nombre del nuevo perfil...",
     "titleRun": "Ejecutar",
     "temperatureBoost": "Aumento de temperatura",
-    "temperatureBoostDescription": "El primer café desde arranque en frío puede ser ~3 °C más frío. El aumento eleva la temperatura de infusión temporalmente 3 °C (máx. 99 °C) para que incluso el primer café alcance el objetivo."
+    "temperatureBoostDescription": "El primer café desde arranque en frío puede ser ~3 °C más frío. El aumento eleva la temperatura de infusión temporalmente 3 °C (máx. 99 °C) para que incluso el primer café alcance el objetivo.",
+    "autoStart": "Inicio automático al estabilizarse",
+    "autoStartDescription": "Espera a que la temperatura se estabilice y luego inicia el café automáticamente. A diferencia del inicio automático de Meticulous, este espera hasta que ambas temperaturas se mantengan estables en el objetivo.",
+    "autoStartAppOpenNote": "Mantén la app de Metic abierta para que se active, salvo que ejecutes el servidor Metic (p. ej. en una Raspberry Pi) en segundo plano."
   },
   "shotHistory": {
     "duration": "Duración",
@@ -844,7 +847,11 @@
       "temperatureChart": "Temperatura",
       "deltaToTarget": "Al objetivo",
       "target": "Objetivo",
-      "stabilityReached": "Temperatura estable"
+      "stabilityReached": "Temperatura estable",
+      "autoStart": "Inicio automático al estabilizarse",
+      "autoStartDescription": "Inicia el café automáticamente cuando ambas temperaturas se mantengan estables en el objetivo.",
+      "autoStartAppOpenNote": "Mantén esta app abierta para que el inicio automático se active, salvo que el servidor Metic esté ejecutándose en segundo plano.",
+      "autoStartArmed": "Estable · inicio automático en {{seconds}} s"
     },
     "offline": "La máquina está desconectada",
     "stale": "Obsoleto",

@@ -316,7 +316,10 @@
     "newProfileNamePlaceholder": "Neuer Profilname...",
     "titleRun": "Ausführen",
     "temperatureBoost": "Temperatur-Boost",
-    "temperatureBoostDescription": "Der erste Bezug nach dem Kaltstart kann ca. 3 °C kühler ausfallen. Der Boost erhöht die Brühtemperatur vorübergehend um 3 °C (max. 99 °C), damit auch der erste Bezug die gewünschte Temperatur erreicht."
+    "temperatureBoostDescription": "Der erste Bezug nach dem Kaltstart kann ca. 3 °C kühler ausfallen. Der Boost erhöht die Brühtemperatur vorübergehend um 3 °C (max. 99 °C), damit auch der erste Bezug die gewünschte Temperatur erreicht.",
+    "autoStart": "Autostart bei stabiler Temperatur",
+    "autoStartDescription": "Warten, bis sich die Temperatur stabilisiert hat, und den Bezug dann automatisch starten. Anders als der Meticulous-Autostart wartet dies, bis beide Temperaturen stabil auf dem Ziel liegen.",
+    "autoStartAppOpenNote": "Halte die Metic-App geöffnet, damit dies ausgelöst wird, sofern du nicht den Metic-Server (z. B. auf einem Raspberry Pi) im Hintergrund betreibst."
   },
   "shotHistory": {
     "duration": "Dauer",
@@ -844,7 +847,11 @@
       "temperatureChart": "Temperatur",
       "deltaToTarget": "Bis Ziel",
       "target": "Ziel",
-      "stabilityReached": "Temperatur stabil"
+      "stabilityReached": "Temperatur stabil",
+      "autoStart": "Autostart bei stabiler Temperatur",
+      "autoStartDescription": "Den Bezug automatisch starten, sobald beide Temperaturen stabil auf dem Ziel liegen.",
+      "autoStartAppOpenNote": "Halte diese App geöffnet, damit der Autostart auslöst, sofern der Metic-Server nicht im Hintergrund läuft.",
+      "autoStartArmed": "Stabil · Autostart in {{seconds}} s"
     },
     "offline": "Maschine ist offline",
     "stale": "Veraltet",
