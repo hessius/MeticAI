@@ -2159,7 +2159,10 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
         </Card>
       )}
 
-      {/* Diagnostics — passive freeze/error capture for field debugging */}
+      {/* Diagnostics — passive freeze/error capture for field debugging.
+          Native-only: the boot overlay and freeze heuristics only apply to the
+          native app; there's nothing useful to surface in a browser. */}
+      {isNativePlatform() && (
       <CollapsibleSection title={t('settings.diagnostics.title')} defaultOpen={false}>
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
@@ -2219,6 +2222,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           )}
         </div>
       </CollapsibleSection>
+      )}
 
       {/* Footer */}
       <div className="text-center text-xs text-muted-foreground/50 pb-4 space-y-1">
