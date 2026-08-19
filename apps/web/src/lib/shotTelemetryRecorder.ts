@@ -179,6 +179,9 @@ function recordShot(ms: MachineState) {
     flow: Math.max(0, ms.flow_rate ?? 0),
     weight: ms.shot_weight ?? 0,
     power: ms.power ?? 0,
+    temperature: validTemp(ms.brew_head_temperature)
+      ? ms.brew_head_temperature
+      : undefined,
     stage: ms.state ?? undefined,
   }
 
