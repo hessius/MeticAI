@@ -1,4 +1,17 @@
 {
+  "charts": {
+    "layout": {
+      "label": "Diagramlayout",
+      "combined": "Kombinerat",
+      "separated": "Separerat"
+    },
+    "metric": {
+      "pressure": "Tryck",
+      "flow": "Flöde",
+      "weight": "Vikt",
+      "temperature": "Temperatur"
+    }
+  },
   "common": {
     "save": "Spara",
     "cancel": "Avbryt",

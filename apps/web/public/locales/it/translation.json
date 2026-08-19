@@ -1,4 +1,17 @@
 {
+  "charts": {
+    "layout": {
+      "label": "Layout del grafico",
+      "combined": "Combinato",
+      "separated": "Separato"
+    },
+    "metric": {
+      "pressure": "Pressione",
+      "flow": "Flusso",
+      "weight": "Peso",
+      "temperature": "Temperatura"
+    }
+  },
   "common": {
     "save": "Salva",
     "cancel": "Annulla",

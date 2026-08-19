@@ -1,4 +1,17 @@
 {
+  "charts": {
+    "layout": {
+      "label": "Disposition du graphique",
+      "combined": "Combiné",
+      "separated": "Séparé"
+    },
+    "metric": {
+      "pressure": "Pression",
+      "flow": "Débit",
+      "weight": "Poids",
+      "temperature": "Température"
+    }
+  },
   "common": {
     "save": "Enregistrer",
     "cancel": "Annuler",

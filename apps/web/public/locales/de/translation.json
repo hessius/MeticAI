@@ -1,4 +1,17 @@
 {
+  "charts": {
+    "layout": {
+      "label": "Diagrammlayout",
+      "combined": "Kombiniert",
+      "separated": "Getrennt"
+    },
+    "metric": {
+      "pressure": "Druck",
+      "flow": "Fluss",
+      "weight": "Gewicht",
+      "temperature": "Temperatur"
+    }
+  },
   "common": {
     "save": "Speichern",
     "cancel": "Abbrechen",
