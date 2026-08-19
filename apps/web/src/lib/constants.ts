@@ -64,6 +64,9 @@ export const STORAGE_KEYS = {
   //    Disabled by default so it never nags users who saw no problem. --
   DIAGNOSTICS_ENABLED: 'meticai-diagnostics-enabled',
 
+  // -- Chart layout preference (#589): 'combined' | 'separated' --
+  CHART_LAYOUT: 'meticai-chart-layout',
+
   // -- Demo mode --
   DEMO_PREV_URL: 'meticai-demo-prev-url',
   DEMO_PROFILES: 'meticai-demo-profiles',
