@@ -24,7 +24,12 @@ describe('MetricPanels', () => {
   })
 
   it('omits a panel whose series is entirely absent', () => {
-    const noTemp = data.map(({ temperature: _t, ...rest }) => rest)
+    const noTemp = data.map(p => ({
+      time: p.time,
+      pressure: p.pressure,
+      flow: p.flow,
+      weight: p.weight,
+    }))
     const { container } = render(
       <MetricPanels data={noTemp} panels={panels} layout="stack" heightClass="h-96" />,
     )
