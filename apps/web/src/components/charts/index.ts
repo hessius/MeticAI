@@ -3,6 +3,8 @@ export type { EspressoChartProps, ChartReferenceLine } from './EspressoChart'
 export { CustomTooltip } from './CustomTooltip'
 export { MetricPanels } from './MetricPanels'
 export type { MetricPanelDef, MetricPanelsProps } from './MetricPanels'
+export { ChartLayoutToggle } from './ChartLayoutToggle'
+export type { ChartLayoutToggleProps } from './ChartLayoutToggle'
 export {
   CHART_COLORS,
   COMPARISON_COLORS,

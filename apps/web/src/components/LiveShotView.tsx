@@ -35,9 +35,10 @@ import {
 import type { MachineState } from '@/hooks/useWebSocket'
 import { useMachineActions } from '@/hooks/useMachineActions'
 import { useMachineService } from '@/hooks/useMachineService'
-import { EspressoChart } from '@/components/charts'
+import { EspressoChart, MetricPanels, ChartLayoutToggle, type MetricPanelDef } from '@/components/charts'
 import type { ChartDataPoint, ProfileTargetPoint } from '@/components/charts/chartConstants'
-import { extractStageRanges, STAGE_COLORS, STAGE_BORDER_COLORS } from '@/components/charts/chartConstants'
+import { extractStageRanges, STAGE_COLORS, STAGE_BORDER_COLORS, CHART_COLORS } from '@/components/charts/chartConstants'
+import { useChartLayout } from '@/hooks/useChartLayout'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -401,6 +402,18 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
   // Current stage name (from latest data point)
   const currentStageName = ms.state ?? null
 
+  // Chart layout preference (#589): combined single chart vs. per-metric panels.
+  const { canSeparate, pref, setPref, layout } = useChartLayout()
+  const livePanels: MetricPanelDef[] = useMemo(
+    () => [
+      { key: 'pressure', labelKey: 'charts.metric.pressure', color: CHART_COLORS.pressure, targetKey: 'target_pressure' },
+      { key: 'flow', labelKey: 'charts.metric.flow', color: CHART_COLORS.flow, overlayKey: 'gravimetricFlow', targetKey: 'target_flow' },
+      { key: 'weight', labelKey: 'charts.metric.weight', color: CHART_COLORS.weight },
+      { key: 'temperature', labelKey: 'charts.metric.temperature', color: CHART_COLORS.temperature },
+    ],
+    [],
+  )
+
   return (
     <motion.div
       key="live-shot"
@@ -526,15 +539,31 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
           {/* ── Chart ────────────────────────────────────── */}
           {(ms.brewing || chartData.length > 0) && (
             <Card className="p-4">
-              <EspressoChart
-                data={chartData}
-                stages={stages}
-                heightClass="h-[40vh] lg:h-[50vh] max-h-[400px]"
-                liveMode
-                showWeight
-                targetCurves={adjustedTargetCurves}
-                xMax={liveXMax}
-              />
+              {canSeparate && (
+                <div className="mb-2 flex justify-end">
+                  <ChartLayoutToggle pref={pref} onChange={setPref} />
+                </div>
+              )}
+              {layout === 'combined' ? (
+                <EspressoChart
+                  data={chartData}
+                  stages={stages}
+                  heightClass="h-[40vh] lg:h-[50vh] max-h-[400px]"
+                  liveMode
+                  showWeight
+                  targetCurves={adjustedTargetCurves}
+                  xMax={liveXMax}
+                />
+              ) : (
+                <MetricPanels
+                  data={chartData}
+                  panels={livePanels}
+                  layout={layout}
+                  heightClass="h-[60vh] max-h-[560px]"
+                  xMax={liveXMax}
+                  targetCurves={adjustedTargetCurves}
+                />
+              )}
             </Card>
           )}
 
