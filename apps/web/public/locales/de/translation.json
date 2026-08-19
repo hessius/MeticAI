@@ -639,6 +639,8 @@
       "generate": "Bericht erstellen",
       "copy": "Kopieren",
       "clear": "Löschen",
+      "enable": "Diagnose aktivieren",
+      "enableHint": "Standardmäßig aus. Aktiviere sie, damit Metic Einfrierungen und Fehler aufzeichnet und du einen Bericht senden kannst. Es werden keine persönlichen Daten erfasst.",
       "overlay": {
         "title": "Metic-Diagnose",
         "intro": "Metic hat ein Einfrieren erkannt. Kopiere oder teile diesen Bericht und sende ihn an die Entwickler, damit sie das Problem beheben können.",

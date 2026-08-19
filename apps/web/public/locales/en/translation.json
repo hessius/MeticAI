@@ -639,6 +639,8 @@
       "generate": "Generate Report",
       "copy": "Copy",
       "clear": "Clear",
+      "enable": "Enable diagnostics",
+      "enableHint": "Off by default. Turn on to let Metic record freezes and errors so you can send a report. No personal data is collected.",
       "overlay": {
         "title": "Metic diagnostics",
         "intro": "Metic detected a freeze. Copy or share this report and send it to the developers so they can fix it.",

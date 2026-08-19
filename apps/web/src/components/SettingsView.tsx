@@ -39,7 +39,7 @@ import {
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isDemoMode, isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
-import { getDiagnosticsReport, clearDiagnostics } from '@/lib/diagnostics'
+import { getDiagnosticsReport, clearDiagnostics, isDiagnosticsEnabled, setDiagnosticsEnabled } from '@/lib/diagnostics'
 import { STORAGE_KEYS } from '@/lib/constants'
 import {
   PROVIDERS,
@@ -154,7 +154,9 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
 
   // Diagnostics panel — passive on-device capture of freezes/errors, surfaced
   // so users can copy and send a report when we cannot attach a debugger.
+  // Opt-in (default OFF) so it never nags users who noticed no problem.
   const [diagReport, setDiagReport] = useState('')
+  const [diagnosticsEnabled, setDiagnosticsEnabledState] = useState(() => isDiagnosticsEnabled())
 
   // Direct and demo modes both use local storage for settings (no backend server)
   const isLocalMode = () => isDirectMode() || isDemoMode()
@@ -2163,10 +2165,28 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           <p className="text-sm text-muted-foreground">
             {t('settings.diagnostics.description')}
           </p>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5 pr-3">
+              <Label htmlFor="diagnostics-toggle" className="text-sm font-medium">{t('settings.diagnostics.enable')}</Label>
+              <p className="text-xs text-muted-foreground">{t('settings.diagnostics.enableHint')}</p>
+            </div>
+            <Switch
+              id="diagnostics-toggle"
+              checked={diagnosticsEnabled}
+              onCheckedChange={(checked) => {
+                const next = checked as boolean
+                setDiagnosticsEnabledState(next)
+                setDiagnosticsEnabled(next)
+                if (next) playToggleOn(); else playToggleOff()
+                if (!next) setDiagReport('')
+              }}
+            />
+          </div>
           <div className="flex gap-2">
             <Button
               variant="outline"
               className="flex-1"
+              disabled={!diagnosticsEnabled}
               onClick={() => setDiagReport(getDiagnosticsReport())}
             >
               <Bug size={18} className="mr-2" weight="bold" />
@@ -2183,6 +2203,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             </Button>
             <Button
               variant="outline"
+              disabled={!diagnosticsEnabled}
               onClick={() => {
                 clearDiagnostics()
                 setDiagReport(getDiagnosticsReport())

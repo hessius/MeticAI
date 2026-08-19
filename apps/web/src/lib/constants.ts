@@ -59,6 +59,11 @@ export const STORAGE_KEYS = {
   // -- Sound effects --
   SOUNDS_ENABLED: 'meticai-sounds-enabled',
 
+  // -- On-device diagnostics (opt-in). When 'true', passive freeze/error
+  //    capture runs and the boot overlay may auto-surface on native platforms.
+  //    Disabled by default so it never nags users who saw no problem. --
+  DIAGNOSTICS_ENABLED: 'meticai-diagnostics-enabled',
+
   // -- Demo mode --
   DEMO_PREV_URL: 'meticai-demo-prev-url',
   DEMO_PROFILES: 'meticai-demo-profiles',

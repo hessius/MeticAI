@@ -10,7 +10,7 @@ import { ShotDataServiceProvider } from '@/services/shots'
 import { CatalogueServiceProvider } from '@/services/catalogue'
 import { isDirectMode, isDemoMode } from '@/lib/machineMode'
 import { installCoreInterceptor } from '@/services/interceptor/coreInterceptor'
-import { startDiagnostics, showBootDiagnosticsIfNeeded } from '@/lib/diagnostics'
+import { startDiagnostics, showBootDiagnosticsIfNeeded, isDiagnosticsEnabled } from '@/lib/diagnostics'
 
 // Initialize i18n
 import './i18n/config'
@@ -22,14 +22,18 @@ import "./index.css"
 // Start passive on-device diagnostics as early as possible so we capture
 // main-thread stalls (ANR/freeze) and errors from the very first frame. This
 // is our only window into field freezes on devices we cannot attach a debugger
-// to. See src/lib/diagnostics.ts.
-startDiagnostics()
+// to. Opt-in only (default OFF) so it never runs or nags unless the user
+// enables it in Settings. See src/lib/diagnostics.ts.
+if (isDiagnosticsEnabled()) {
+  startDiagnostics()
+}
 
 // Escape hatch for the "app freezes before I can ever reach Settings" case:
 // if the previous session recorded a freeze, surface a plain-DOM report overlay
 // now, before React mounts and before any native plugin work — so it stays
-// interactive even if this session deadlocks again. Also openable anywhere via
-// a `#diagnostics` URL. See src/lib/diagnostics.ts.
+// interactive even if this session deadlocks again. The automatic overlay is
+// gated on the opt-in flag internally; the `#diagnostics` URL always works so
+// support can reach it regardless. See src/lib/diagnostics.ts.
 showBootDiagnosticsIfNeeded()
 
 // In direct mode (native/PWA on the machine), route MeticAI proxy API calls

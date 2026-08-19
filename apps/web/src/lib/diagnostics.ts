@@ -18,7 +18,14 @@
  *    Observer), plus any explicit reports (e.g. from the React error boundary).
  *
  * The report is surfaced in Settings so a user can copy and send it back.
+ *
+ * Opt-in: collection and the automatic boot overlay only run when the user
+ * enables diagnostics in Settings (persisted flag, default OFF). The manual
+ * `#diagnostics` URL escape hatch always works so support can talk any user
+ * through reaching it.
  */
+
+import { STORAGE_KEYS } from '@/lib/constants'
 
 export type DiagnosticKind = 'boot' | 'stall' | 'longtask' | 'error' | 'rejection' | 'info'
 
@@ -57,6 +64,42 @@ let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 
 function hasWindow(): boolean {
   return typeof window !== 'undefined'
+}
+
+/**
+ * Whether the user has opted in to on-device diagnostics. Default OFF so passive
+ * capture and the automatic boot overlay never run — and never nag — unless the
+ * user explicitly enables them in Settings. Read synchronously from
+ * localStorage so it is available during the earliest boot, before React mounts.
+ */
+export function isDiagnosticsEnabled(): boolean {
+  if (!hasWindow()) return false
+  try {
+    return window.localStorage.getItem(STORAGE_KEYS.DIAGNOSTICS_ENABLED) === 'true'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Persist the opt-in flag and start or stop collection accordingly, so toggling
+ * it in Settings takes effect immediately without an app restart. Disabling also
+ * clears any captured data so a stale freeze can never resurface later.
+ */
+export function setDiagnosticsEnabled(enabled: boolean): void {
+  if (hasWindow()) {
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.DIAGNOSTICS_ENABLED, enabled ? 'true' : 'false')
+    } catch {
+      // best-effort
+    }
+  }
+  if (enabled) {
+    startDiagnostics()
+  } else {
+    stopDiagnostics()
+    clearDiagnostics()
+  }
 }
 
 function safeStringify(value: unknown): string {
@@ -343,10 +386,10 @@ async function shareReport(text: string, title: string): Promise<boolean> {
  * it surfaces the PREVIOUS session's captured freeze data (which was persisted
  * before the freeze).
  *
- * It appears automatically on native platforms when there is an unacknowledged
- * freeze, and on any platform when the URL contains `#diagnostics` (so we can
- * always talk a user through reaching it). Copying or sharing the report, or
- * dismissing it, acknowledges the freeze so it does not reappear until the next
+ * It appears automatically on native platforms when diagnostics are enabled and
+ * there is an unacknowledged freeze, and on any platform when the URL contains
+ * `#diagnostics` (so we can always talk a user through reaching it, even when
+ * diagnostics are disabled). Copying or sharing the report, or dismissing it, acknowledges the freeze so it does not reappear until the next
  * one.
  *
  * @returns true when the overlay was shown.
@@ -358,7 +401,9 @@ export function showBootDiagnosticsIfNeeded(options?: { force?: boolean }): bool
   loadPersisted()
   const freezeAt = lastUnacknowledgedFreeze()
   const forced = options?.force === true || overlayForcedByUrl()
-  const autoShow = freezeAt > 0 && isNativePlatform()
+  // Auto-show only when the user has opted in; the URL escape hatch (forced)
+  // always works so support can reach it even when diagnostics are disabled.
+  const autoShow = isDiagnosticsEnabled() && freezeAt > 0 && isNativePlatform()
   if (!forced && !autoShow) return false
 
   const t = (key: string, fallback: string): string => {

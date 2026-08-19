@@ -9,10 +9,14 @@ import {
   stopDiagnostics,
   lastUnacknowledgedFreeze,
   showBootDiagnosticsIfNeeded,
+  isDiagnosticsEnabled,
+  setDiagnosticsEnabled,
 } from './diagnostics'
+import { STORAGE_KEYS } from '@/lib/constants'
 
 const STORAGE_KEY = 'metic.diagnostics.v1'
 const ACK_KEY = 'metic.diagnostics.ack'
+const enableDiagnostics = () => localStorage.setItem(STORAGE_KEYS.DIAGNOSTICS_ENABLED, 'true')
 
 describe('diagnostics', () => {
   beforeEach(() => {
@@ -171,6 +175,7 @@ describe('diagnostics', () => {
     })
 
     it('auto-shows on native platforms when there is an unacknowledged freeze', () => {
+      enableDiagnostics()
       ;(window as unknown as Record<string, unknown>).Capacitor = {
         isNativePlatform: () => true,
       }
@@ -179,13 +184,30 @@ describe('diagnostics', () => {
       expect(document.getElementById('metic-diag-overlay')).not.toBeNull()
     })
 
+    it('does not auto-show on native when diagnostics are disabled (default)', () => {
+      ;(window as unknown as Record<string, unknown>).Capacitor = {
+        isNativePlatform: () => true,
+      }
+      seed([{ t: Date.now(), kind: 'stall', detail: 'blocked', ms: 3000 }])
+      expect(showBootDiagnosticsIfNeeded()).toBe(false)
+      expect(document.getElementById('metic-diag-overlay')).toBeNull()
+    })
+
+    it('still shows when forced via URL even if diagnostics are disabled', () => {
+      seed([])
+      expect(showBootDiagnosticsIfNeeded({ force: true })).toBe(true)
+      expect(document.getElementById('metic-diag-overlay')).not.toBeNull()
+    })
+
     it('does not auto-show on web even with a freeze (only native or forced)', () => {
+      enableDiagnostics()
       seed([{ t: Date.now(), kind: 'stall', detail: 'blocked', ms: 3000 }])
       expect(showBootDiagnosticsIfNeeded()).toBe(false)
       expect(document.getElementById('metic-diag-overlay')).toBeNull()
     })
 
     it('dismiss acknowledges the freeze so it does not reappear', () => {
+      enableDiagnostics()
       ;(window as unknown as Record<string, unknown>).Capacitor = {
         isNativePlatform: () => true,
       }
@@ -204,6 +226,34 @@ describe('diagnostics', () => {
       expect(Number(localStorage.getItem(ACK_KEY))).toBe(freezeAt)
       // A second boot with the same persisted freeze must not re-show.
       expect(showBootDiagnosticsIfNeeded()).toBe(false)
+    })
+  })
+
+  describe('isDiagnosticsEnabled / setDiagnosticsEnabled', () => {
+    afterEach(() => {
+      stopDiagnostics()
+    })
+
+    it('is disabled by default (opt-in)', () => {
+      expect(isDiagnosticsEnabled()).toBe(false)
+    })
+
+    it('persists the flag and starts collecting when enabled', () => {
+      setDiagnosticsEnabled(true)
+      expect(isDiagnosticsEnabled()).toBe(true)
+      expect(localStorage.getItem(STORAGE_KEYS.DIAGNOSTICS_ENABLED)).toBe('true')
+      // startDiagnostics records a boot marker.
+      expect(getDiagnosticEvents().some(e => e.kind === 'boot')).toBe(true)
+    })
+
+    it('clears captured data and the flag when disabled', () => {
+      setDiagnosticsEnabled(true)
+      recordDiagnostic('stall', 'blocked', 3000)
+      setDiagnosticsEnabled(false)
+      expect(isDiagnosticsEnabled()).toBe(false)
+      expect(localStorage.getItem(STORAGE_KEYS.DIAGNOSTICS_ENABLED)).toBe('false')
+      expect(getDiagnosticEvents()).toHaveLength(0)
+      expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
     })
   })
 })

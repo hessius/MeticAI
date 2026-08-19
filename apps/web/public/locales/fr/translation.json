@@ -639,6 +639,8 @@
       "generate": "Générer le rapport",
       "copy": "Copier",
       "clear": "Effacer",
+      "enable": "Activer le diagnostic",
+      "enableHint": "Désactivé par défaut. Activez-le pour que Metic enregistre les blocages et les erreurs afin que vous puissiez envoyer un rapport. Aucune donnée personnelle n'est collectée.",
       "overlay": {
         "title": "Diagnostics Metic",
         "intro": "Metic a détecté un blocage. Copiez ou partagez ce rapport et envoyez-le aux développeurs pour qu'ils puissent le corriger.",

@@ -639,6 +639,8 @@
       "generate": "Genera rapporto",
       "copy": "Copia",
       "clear": "Cancella",
+      "enable": "Attiva diagnostica",
+      "enableHint": "Disattivato per impostazione predefinita. Attivalo per consentire a Metic di registrare blocchi ed errori così puoi inviare un report. Non vengono raccolti dati personali.",
       "overlay": {
         "title": "Diagnostica Metic",
         "intro": "Metic ha rilevato un blocco. Copia o condividi questo rapporto e invialo agli sviluppatori affinché possano risolverlo.",

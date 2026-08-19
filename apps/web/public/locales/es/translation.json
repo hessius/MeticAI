@@ -639,6 +639,8 @@
       "generate": "Generar informe",
       "copy": "Copiar",
       "clear": "Borrar",
+      "enable": "Activar diagnóstico",
+      "enableHint": "Desactivado de forma predeterminada. Actívalo para que Metic registre bloqueos y errores y puedas enviar un informe. No se recopilan datos personales.",
       "overlay": {
         "title": "Diagnóstico de Metic",
         "intro": "Metic detectó un bloqueo. Copia o comparte este informe y envíalo a los desarrolladores para que puedan solucionarlo.",

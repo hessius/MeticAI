@@ -639,6 +639,8 @@
       "generate": "Skapa rapport",
       "copy": "Kopiera",
       "clear": "Rensa",
+      "enable": "Aktivera diagnostik",
+      "enableHint": "Av som standard. Slå på för att låta Metic registrera frysningar och fel så att du kan skicka en rapport. Ingen personlig data samlas in.",
       "overlay": {
         "title": "Metic-diagnostik",
         "intro": "Metic upptäckte en frysning. Kopiera eller dela rapporten och skicka den till utvecklarna så att de kan åtgärda felet.",
