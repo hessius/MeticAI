@@ -42,4 +42,17 @@ describe('MetricPanels', () => {
     )
     expect(container.firstElementChild?.className).toContain('grid')
   })
+
+  it('still renders all panels when replayLineTime is set', () => {
+    const { container } = render(
+      <MetricPanels
+        data={data}
+        panels={panels}
+        layout="stack"
+        heightClass="h-96"
+        replayLineTime={1}
+      />,
+    )
+    expect(container.querySelectorAll('[data-metric-panel]')).toHaveLength(4)
+  })
 })

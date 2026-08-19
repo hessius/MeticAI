@@ -4,6 +4,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   XAxis,
   YAxis,
@@ -41,6 +42,8 @@ export interface MetricPanelsProps {
   xMax?: number
   /** Optional target curves rendered as dashed guides (per-panel via targetKey). */
   targetCurves?: ProfileTargetPoint[]
+  /** When set, draws a synchronized scrub/replay reference line at this time. */
+  replayLineTime?: number
   className?: string
 }
 
@@ -61,6 +64,7 @@ export function MetricPanels({
   heightClass,
   xMax,
   targetCurves,
+  replayLineTime,
   className,
 }: MetricPanelsProps) {
   const { t } = useTranslation()
@@ -125,6 +129,14 @@ export function MetricPanels({
                     tickLine={{ stroke: theme.axisLineStroke }}
                     axisLine={{ stroke: theme.axisLineStroke }}
                   />
+                  {typeof replayLineTime === 'number' && (
+                    <ReferenceLine
+                      x={replayLineTime}
+                      stroke={theme.replayLineStroke}
+                      strokeWidth={2}
+                      strokeDasharray="4 2"
+                    />
+                  )}
                   {showTarget && (
                     <Line
                       data={targetCurves}

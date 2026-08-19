@@ -127,6 +127,7 @@ interface ReplayChartProps {
   isPlaying: boolean
   playbackSpeed: number
   isDark: boolean
+  profileTargetCurves?: ProfileTargetPoint[]
   variant?: 'mobile' | 'desktop'
 }
 
@@ -144,6 +145,7 @@ export function ReplayChart({
   isPlaying,
   playbackSpeed,
   isDark,
+  profileTargetCurves,
   variant = 'mobile'
 }: ReplayChartProps) {
   const { t } = useTranslation()
@@ -156,8 +158,8 @@ export function ReplayChart({
   // Chart layout preference (#589): combined single chart vs. per-metric panels.
   const { canSeparate, pref, setPref, layout } = useChartLayout()
   const replayPanels: MetricPanelDef[] = [
-    { key: 'pressure', labelKey: 'charts.metric.pressure', color: CHART_COLORS.pressure },
-    { key: 'flow', labelKey: 'charts.metric.flow', color: CHART_COLORS.flow, overlayKey: 'gravimetricFlow' },
+    { key: 'pressure', labelKey: 'charts.metric.pressure', color: CHART_COLORS.pressure, targetKey: 'target_pressure' },
+    { key: 'flow', labelKey: 'charts.metric.flow', color: CHART_COLORS.flow, overlayKey: 'gravimetricFlow', targetKey: 'target_flow' },
     { key: 'weight', labelKey: 'charts.metric.weight', color: CHART_COLORS.weight },
     { key: 'temperature', labelKey: 'charts.metric.temperature', color: CHART_COLORS.temperature },
   ]
@@ -176,12 +178,12 @@ export function ReplayChart({
               {t('shotCharts.replaying', { speed: playbackSpeed })}
             </Badge>
           )}
-          {canSeparate && !isShowingReplay && (
+          {canSeparate && (
             <ChartLayoutToggle pref={pref} onChange={setPref} />
           )}
         </div>
       </div>
-      {layout !== 'combined' && !isShowingReplay ? (
+      {layout !== 'combined' ? (
         <div className="min-h-[300px] max-h-[60vh] h-[60vh]" role="img" aria-label={t('a11y.chart.extractionReplay')}>
           <MetricPanels
             data={displayData}
@@ -189,6 +191,8 @@ export function ReplayChart({
             layout={layout}
             heightClass="h-full"
             xMax={dataMaxTime}
+            targetCurves={profileTargetCurves}
+            replayLineTime={isShowingReplay ? currentTime : undefined}
           />
         </div>
       ) : (
@@ -321,6 +325,7 @@ interface CompareChartProps {
   comparisonIsPlaying: boolean
   comparisonPlaybackSpeed: number
   isDark: boolean
+  profileTargetCurves?: ProfileTargetPoint[]
   variant?: 'mobile' | 'desktop'
 }
 
@@ -334,6 +339,7 @@ export function CompareChart({
   comparisonIsPlaying,
   comparisonPlaybackSpeed,
   isDark,
+  profileTargetCurves,
   variant = 'mobile'
 }: CompareChartProps) {
   const { t } = useTranslation()
@@ -348,8 +354,8 @@ export function CompareChart({
   // Chart layout preference (#589): combined overlay vs. per-metric A/B panels.
   const { canSeparate, pref, setPref, layout } = useChartLayout()
   const comparePanels: MetricPanelDef[] = [
-    { key: 'pressureA', labelKey: 'charts.metric.pressure', color: COMPARISON_COLORS.pressure, compareKey: 'pressureB' },
-    { key: 'flowA', labelKey: 'charts.metric.flow', color: COMPARISON_COLORS.flow, compareKey: 'flowB' },
+    { key: 'pressureA', labelKey: 'charts.metric.pressure', color: COMPARISON_COLORS.pressure, compareKey: 'pressureB', targetKey: 'target_pressure' },
+    { key: 'flowA', labelKey: 'charts.metric.flow', color: COMPARISON_COLORS.flow, compareKey: 'flowB', targetKey: 'target_flow' },
     { key: 'weightA', labelKey: 'charts.metric.weight', color: COMPARISON_COLORS.weight, compareKey: 'weightB' },
   ]
 
@@ -367,12 +373,12 @@ export function CompareChart({
               {comparisonPlaybackSpeed}x
             </Badge>
           )}
-          {canSeparate && !isShowingReplay && (
+          {canSeparate && (
             <ChartLayoutToggle pref={pref} onChange={setPref} />
           )}
         </div>
       </div>
-      {layout !== 'combined' && !isShowingReplay ? (
+      {layout !== 'combined' ? (
         <div className="min-h-[300px] max-h-[60vh] h-[60vh]" role="img" aria-label={t('a11y.chart.extractionComparison')}>
           <MetricPanels
             data={displayData}
@@ -380,6 +386,8 @@ export function CompareChart({
             layout={layout}
             heightClass="h-full"
             xMax={dataMaxTime}
+            targetCurves={profileTargetCurves}
+            replayLineTime={isShowingReplay ? comparisonCurrentTime : undefined}
           />
         </div>
       ) : (
