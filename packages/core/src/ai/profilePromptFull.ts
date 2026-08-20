@@ -334,10 +334,10 @@ export function buildFullProfilePrompt(
 }
 
 function extractProfileJson(reply: string): Record<string, unknown> | null {
-  const match = reply.match(/```json\s*([\s\S]*?)```/)
+  const match = reply.match(/```json([\s\S]*?)```/)
   if (!match) return null
   try {
-    return JSON.parse(match[1])
+    return JSON.parse(match[1].trim())
   } catch {
     return null
   }
@@ -388,7 +388,7 @@ export async function validateAndRetryProfile(
       if (fixedJson) {
         profileJson = fixedJson
         currentReply = currentReply.replace(
-          /```json\s*[\s\S]*?```/,
+          /```json[\s\S]*?```/,
           '```json\n' + JSON.stringify(fixedJson, null, 2) + '\n```',
         )
       }

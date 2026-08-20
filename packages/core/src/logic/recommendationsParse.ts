@@ -14,7 +14,7 @@ export function termMatches(query: string, candidate: string): boolean {
 }
 
 export function parseRecommendationsJson(analysisText: string): Array<Record<string, unknown>> {
-  const match = analysisText.match(/RECOMMENDATIONS_JSON:\s*\n\s*(\[[\s\S]*?\])\s*\n\s*END_RECOMMENDATIONS_JSON/)
+  const match = analysisText.match(/RECOMMENDATIONS_JSON:\s*(\[[\s\S]*?\])\s*END_RECOMMENDATIONS_JSON/)
   if (!match) return []
   try {
     const parsed = JSON.parse(match[1])

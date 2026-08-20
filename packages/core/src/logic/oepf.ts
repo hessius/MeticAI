@@ -1,5 +1,5 @@
 export function convertGeminiToOEPF(p: Record<string, unknown>): Record<string, unknown> {
-  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/_+$/, '')
+  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/_$/, '')
   const uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = Math.random() * 16 | 0
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)

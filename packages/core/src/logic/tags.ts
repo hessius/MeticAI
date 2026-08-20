@@ -149,8 +149,11 @@ export const AI_TAGS_PROMPT =
 // Extract and validate sensory tags from a generated description's `Tags:` line.
 // Small on-device models often decorate the line with markdown (e.g. "**Tags:**"
 // or "- Tags:"), so tolerate leading bullets/quotes and bold/italic markers.
-const TAGS_LINE_RE = /^[ \t]*(?:[>*+\-#]+[ \t]*)?(?:\*\*|__|\*|_)?[ \t]*Tags[ \t]*(?:\*\*|__|\*|_)?[ \t]*:[ \t]*(.*)$/im
-const TAGS_LINE_STRIP_RE = /^[ \t]*(?:[>*+\-#]+[ \t]*)?(?:\*\*|__|\*|_)?[ \t]*Tags[ \t]*(?:\*\*|__|\*|_)?[ \t]*:[ \t]*.*$/gim
+// A single combined character class (whitespace + markdown markers) is used for
+// each optional run so there is no ambiguous adjacency between two whitespace
+// quantifiers (which would make the regex vulnerable to polynomial backtracking).
+const TAGS_LINE_RE = /^[ \t>*+#_-]*Tags[ \t*_]*:[ \t]*(.*)$/im
+const TAGS_LINE_STRIP_RE = /^[ \t>*+#_-]*Tags[ \t*_]*:[ \t]*.*$/gim
 
 export function parseAiTags(text: string | null | undefined): string[] {
   if (!text) return []
@@ -159,7 +162,11 @@ export function parseAiTags(text: string | null | undefined): string[] {
   const result: string[] = []
   const seen = new Set<string>()
   for (const raw of match[1].split(',')) {
-    const candidate = raw.replace(/[[\]*_]/g, '').trim().replace(/\.+$/, '').trim()
+    const stripped = raw.replace(/[[\]*_]/g, '').trim()
+    // Strip trailing dots without regex backtracking (ReDoS-safe).
+    let end = stripped.length
+    while (end > 0 && stripped[end - 1] === '.') end--
+    const candidate = stripped.slice(0, end).trim()
     const canonical = AI_TAG_LOOKUP.get(candidate.toLowerCase())
     if (canonical && !seen.has(canonical)) {
       seen.add(canonical)
