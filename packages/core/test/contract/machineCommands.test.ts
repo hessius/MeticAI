@@ -72,6 +72,27 @@ describe("machine-commands: status + info", () => {
     expect(res.status).toBe(501);
   });
 
+  test("POST detect returns the configured machine when it verifies", async () => {
+    const p = makeMockPlatform({
+      machine: scriptedMachine({ "/api/v1/settings": {} }),
+    });
+    const res = await handle(post("/api/machine/detect"), p);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { found: boolean; method?: string };
+    expect(body.found).toBe(true);
+    expect(body.method).toBe("configured");
+  });
+
+  test("POST detect returns not-found guidance when nothing responds", async () => {
+    // Default mock machine's fetch rejects, and no netScan capability is wired.
+    const p = makeMockPlatform();
+    const res = await handle(post("/api/machine/detect"), p);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { found: boolean; guidance_key?: string };
+    expect(body.found).toBe(false);
+    expect(body.guidance_key).toBe("notFound");
+  });
+
   test("schedule-shot is unsupported (501)", async () => {
     const p = makeMockPlatform({ machine: scriptedMachine({}) });
     const res = await handle(post("/api/machine/schedule-shot"), p);

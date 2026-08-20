@@ -11,6 +11,7 @@
 import { mkdir, readFile, writeFile, readdir, unlink, rename } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { networkInterfaces } from "node:os";
 import { GoogleGenAI } from "@google/genai";
 import {
   listAvailableModels,
@@ -471,6 +472,30 @@ export function createNodePlatform(options: NodePlatformOptions = {}): Platform 
     },
     ai: geminiAI(getAIConfig),
     scheduler: timerScheduler(logger),
+    netScan: {
+      // Own non-internal IPv4 addresses, used to derive the /24 to scan.
+      localIPv4s: () => {
+        const out: string[] = [];
+        const ifaces = networkInterfaces();
+        for (const name of Object.keys(ifaces)) {
+          for (const ni of ifaces[name] ?? []) {
+            // Node >=18 reports family as the string "IPv4"; guard both forms.
+            const isV4 = ni.family === "IPv4" || (ni.family as unknown as number) === 4;
+            if (isV4 && !ni.internal) out.push(ni.address);
+          }
+        }
+        return out;
+      },
+      // Raw HTTP GET returning the status code, or null on network/timeout error.
+      probe: async (url: string, timeoutMs: number) => {
+        try {
+          const resp = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+          return resp.status;
+        } catch {
+          return null;
+        }
+      },
+    },
     clock,
     logger,
     appVersion: resolveAppVersion(),

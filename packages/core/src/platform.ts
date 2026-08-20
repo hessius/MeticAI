@@ -113,6 +113,14 @@ export interface Platform {
   ai: PlatformAI;
   /** Optional: hosts without a scheduler cause schedule routes to return 501. */
   scheduler?: Scheduler;
+  /**
+   * Optional LAN subnet-scanning capability, used by `POST /api/machine/detect`
+   * to auto-detect an espresso machine when no working URL is configured. Only
+   * server hosts (Node/Bun) implement this — they can probe arbitrary LAN
+   * addresses without browser CORS constraints. Native/mock platforms omit it
+   * (native runs its own client-side discovery in `services/machine/discovery`).
+   */
+  netScan?: PlatformNetScan;
   clock: () => number;
   logger: Logger;
   /** Optional app/build version surfaced by GET /api/version (defaults to "unknown"). */
@@ -132,4 +140,15 @@ export interface GenerationProgressEvent {
   message: string;
   attempt?: number;
   maxAttempts?: number;
+}
+
+/**
+ * LAN subnet-scanning capability for machine auto-detection (server hosts only).
+ * `localIPv4s` returns the host's own non-internal IPv4 addresses (used to
+ * derive the /24 to scan). `probe` performs a raw HTTP GET and returns the
+ * status code, or `null` on a network/timeout error.
+ */
+export interface PlatformNetScan {
+  localIPv4s(): string[];
+  probe(url: string, timeoutMs: number): Promise<number | null>;
 }

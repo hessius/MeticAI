@@ -15,12 +15,14 @@
  *   GET  /api/machine/system-info           -> firmware/network/hostname
  *   GET  /api/machine/status                -> synthetic idle status
  *   GET  /api/machine/detect                -> 501 (not applicable)
+ *   POST /api/machine/detect                -> server-side auto-detection (scan)
  *   POST /api/machine/schedule-shot         -> 501 (no scheduler)
  */
 
 import type { Platform } from "../platform";
 import { jsonResponse } from "../http";
 import { transformWatcherResponse, watcherStatusUrl } from "../logic/watcher";
+import { detectMachine } from "../logic/machineDiscovery";
 
 interface MachineProfileListEntry {
   id?: string;
@@ -111,6 +113,13 @@ export async function handleMachineCommandRoutes(
   // GET /api/machine/detect -> not applicable
   if (pathname === "/api/machine/detect" && method === "GET") {
     return jsonResponse({ detail: "Machine detection not available in direct mode" }, 501);
+  }
+
+  // POST /api/machine/detect -> server-side auto-detection (configured IP,
+  // then LAN /24 subnet scan via platform.netScan). Native/direct hosts lack
+  // netScan and run their own client-side discovery instead.
+  if (pathname === "/api/machine/detect" && method === "POST") {
+    return jsonResponse(await detectMachine(platform));
   }
 
   // GET /api/machine/status/health -> watcher service (port 3000)
