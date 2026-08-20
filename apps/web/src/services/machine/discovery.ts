@@ -151,6 +151,149 @@ async function probeMachine(baseUrl: string): Promise<DiscoveredMachine | null> 
 }
 
 // ---------------------------------------------------------------------------
+// Subnet-scan fallback (native)
+//
+// mDNS is the primary discovery path, but it fails when the machine service
+// isn't resolved to an IPv4 (Android can't reach a randomized `.local` host) or
+// when mDNS is unavailable entirely. As a fallback we derive the device's own
+// LAN IPv4 via a WebRTC host ICE candidate, then probe that /24 for a machine.
+// CapacitorHttp bypasses the WebView CORS restriction that blocks a browser
+// from doing the same, so this runs on native only.
+// ---------------------------------------------------------------------------
+
+const SCAN_PORT = 8080
+const SCAN_TIMEOUT_MS = 800
+const SCAN_CONCURRENCY = 24
+
+/** True for a dotted-quad IPv4 literal (not a hostname / `.local` name). */
+function isIPv4Literal(host: string): boolean {
+  return /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.test(host)
+}
+
+/** True for an RFC 1918 private IPv4 address. */
+export function isPrivateIPv4(ip: string): boolean {
+  if (!isIPv4Literal(ip)) return false
+  const [a, b] = ip.split('.').map(Number)
+  if ([a, b].some((n) => n < 0 || n > 255)) return false
+  if (a === 10) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  if (a === 192 && b === 168) return true
+  return false
+}
+
+/**
+ * Extract the first IPv4 address from a WebRTC ICE candidate line, but only for
+ * `typ host` candidates (the device's own LAN address). Returns null for
+ * server-reflexive candidates or mDNS-obfuscated (`.local`) candidates, which
+ * carry no usable LAN IPv4.
+ */
+export function parseIPv4FromCandidate(candidate: string): string | null {
+  if (!candidate || !candidate.includes('typ host')) return null
+  const match = candidate.match(/\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/)
+  return match ? match[1] : null
+}
+
+/**
+ * Discover the device's own LAN IPv4 via a WebRTC host ICE candidate. Resolves
+ * null when WebRTC is unavailable, times out, or only yields obfuscated
+ * (`.local`) candidates (browser privacy hardening).
+ */
+export async function getLocalIPv4ViaWebRTC(timeoutMs = 2000): Promise<string | null> {
+  const RTC = (globalThis as unknown as { RTCPeerConnection?: unknown }).RTCPeerConnection
+  if (typeof RTC !== 'function') return null
+
+  return new Promise<string | null>((resolve) => {
+    let settled = false
+    let pc: RTCPeerConnection | null = null
+    const finish = (ip: string | null) => {
+      if (settled) return
+      settled = true
+      try {
+        if (pc) {
+          pc.onicecandidate = null
+          pc.close()
+        }
+      } catch { /* ignore */ }
+      resolve(ip)
+    }
+
+    try {
+      pc = new (RTC as new (config?: RTCConfiguration) => RTCPeerConnection)({ iceServers: [] })
+    } catch {
+      finish(null)
+      return
+    }
+
+    const timer = setTimeout(() => finish(null), timeoutMs)
+    pc.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
+      const cand = event.candidate?.candidate
+      if (!cand) return
+      const ip = parseIPv4FromCandidate(cand)
+      if (ip && isPrivateIPv4(ip)) {
+        clearTimeout(timer)
+        finish(ip)
+      }
+    }
+
+    try {
+      pc.createDataChannel('discovery')
+      pc.createOffer()
+        .then((offer) => pc!.setLocalDescription(offer))
+        .catch(() => finish(null))
+    } catch {
+      finish(null)
+    }
+  })
+}
+
+/**
+ * Probe every host in the /24 that `localIp` belongs to for a Meticulous
+ * machine, skipping the device's own address. Returns the first reachable
+ * machine, or null. Uses {@link fetchStatus} (CapacitorHttp on native).
+ */
+export async function scanLocalSubnet(localIp: string): Promise<DiscoveredMachine | null> {
+  if (!isPrivateIPv4(localIp)) return null
+  const octets = localIp.split('.')
+  const prefix = `${octets[0]}.${octets[1]}.${octets[2]}`
+  const self = Number(octets[3])
+
+  const targets: string[] = []
+  for (let host = 1; host <= 254; host++) {
+    if (host === self) continue
+    targets.push(`${prefix}.${host}`)
+  }
+
+  let found: DiscoveredMachine | null = null
+  let cursor = 0
+  const worker = async () => {
+    while (cursor < targets.length && found === null) {
+      const ip = targets[cursor++]
+      const status = await fetchStatus(`http://${ip}:${SCAN_PORT}/api/v1/settings`, SCAN_TIMEOUT_MS)
+      if (status !== null && isReachableStatus(status) && found === null) {
+        found = { name: ip, host: ip, port: SCAN_PORT, url: `http://${ip}:${SCAN_PORT}` }
+      }
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(SCAN_CONCURRENCY, targets.length) }, () => worker()),
+  )
+  return found
+}
+
+/** WebRTC-derived device IP -> /24 subnet scan. Native fallback for mDNS. */
+async function nativeSubnetScan(): Promise<DiscoveredMachine | null> {
+  const localIp = await getLocalIPv4ViaWebRTC()
+  if (!localIp) {
+    dlog('SUBNET SCAN: no local IPv4 available (WebRTC unavailable or obfuscated)')
+    return null
+  }
+  dlog(`SUBNET SCAN: local IPv4 ${localIp} → scanning /24 for a machine...`)
+  const machine = await scanLocalSubnet(localIp)
+  dlog(machine ? `SUBNET SCAN: found machine at ${machine.host}` : 'SUBNET SCAN: no machine found')
+  return machine
+}
+
+// ---------------------------------------------------------------------------
 // Network discovery
 // ---------------------------------------------------------------------------
 
@@ -216,7 +359,12 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
           dlog(`Zeroconf event: action=${result?.action} name=${svc?.name} host=${svc?.hostname} ipv4=${JSON.stringify(svc?.ipv4Addresses)} ipv6=${JSON.stringify(svc?.ipv6Addresses)} port=${svc?.port} type=${svc?.type} domain=${svc?.domain} txt=${JSON.stringify(svc?.txtRecord)}`)
 
           if (svc && (result.action === 'added' || result.action === 'resolved')) {
-            const host = svc.ipv4Addresses?.[0] || svc.hostname || `${svc.name}.local`
+            // Prefer a real (private) IPv4 — Android's HTTP resolver cannot
+            // reach a randomized `.local` mDNS hostname, so a `.local`-only
+            // sighting is not yet a usable machine. iOS/Bonjour can resolve
+            // `.local`, so we still keep it as a lower-priority fallback.
+            const ipv4 = svc.ipv4Addresses?.find(isPrivateIPv4) || svc.ipv4Addresses?.[0]
+            const host = ipv4 || svc.hostname || `${svc.name}.local`
             // Use mDNS port; the machine's nginx proxies port 80 to the API on 8080
             const port = svc.port > 0 ? svc.port : 8080
             const existing = discovered.findIndex(d => d.name === svc.name)
@@ -227,12 +375,17 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
               url: `http://${host}:${port}`,
             }
             if (existing >= 0) {
-              discovered[existing] = machine
+              // Never downgrade a resolved IPv4 host back to a `.local` name.
+              if (ipv4 || !isIPv4Literal(discovered[existing].host)) {
+                discovered[existing] = machine
+              }
             } else {
               discovered.push(machine)
             }
-            dlog(`Matched machine: ${svc.name} → ${host}:${port}`)
-            if (result.action === 'resolved' && discovered.length === 1) {
+            dlog(`Matched machine: ${svc.name} → ${host}:${port}${ipv4 ? '' : ' (no IPv4 yet)'}`)
+            // Only settle early once we have a reachable IPv4 for a single hit;
+            // otherwise keep waiting for the `resolved` event that carries it.
+            if (ipv4 && discovered.filter(d => isIPv4Literal(d.host)).length === 1) {
               setTimeout(() => resolveWatch(), 2000)
             }
           }
@@ -264,12 +417,29 @@ export async function discoverMachines(): Promise<DiscoveredMachine[]> {
     ZeroConf.close().catch(() => {})
     dlog('STEP 8: cleanup dispatched (non-blocking)')
 
+    // Prefer machines resolved to a real IPv4 — those are reachable on every
+    // platform (a randomized `.local` host is not reachable on Android).
+    const withIp = discovered.filter(m => isIPv4Literal(m.host))
+    if (withIp.length > 0) {
+      dlog(`DONE: found ${withIp.length} IPv4 machine(s): ${withIp.map(m => m.host).join(', ')}`)
+      return withIp
+    }
+
+    // Only `.local` (or nothing) from mDNS: try a subnet scan to obtain a
+    // reachable IP (fixes Android, where `.local` can't be resolved).
+    const scanned = await nativeSubnetScan()
+    if (scanned) {
+      dlog(`DONE: subnet scan found machine at ${scanned.host}`)
+      return [scanned]
+    }
+
+    // Fall back to any `.local` sighting (works on iOS/Bonjour).
     if (discovered.length > 0) {
-      dlog(`DONE: found ${discovered.length} machine(s): ${discovered.map(m => m.name).join(', ')}`)
+      dlog(`DONE: returning ${discovered.length} .local machine(s): ${discovered.map(m => m.name).join(', ')}`)
       return discovered
     }
 
-    dlog('No machines found via Zeroconf, falling back to hostname probe')
+    dlog('No machines found via Zeroconf or subnet scan, falling back to hostname probe')
   } else {
     dlog('STEP 1: isNativePlatform=false, skipping Zeroconf')
   }

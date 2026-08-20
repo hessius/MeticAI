@@ -29,7 +29,12 @@ import {
   testMachineConnection,
   machineUrlCandidates,
   resolveReachableMachineUrl,
+  isPrivateIPv4,
+  parseIPv4FromCandidate,
+  getLocalIPv4ViaWebRTC,
+  scanLocalSubnet,
 } from './discovery'
+import { CapacitorHttp } from '@capacitor/core'
 
 const mockedIsNative = vi.mocked(isNativePlatform)
 
@@ -212,6 +217,156 @@ describe('discovery', () => {
         vi.useRealTimers()
         mockedIsNative.mockReturnValue(false)
       }
+    })
+
+    it('returns the resolved IPv4 (not the randomized .local host) on native', async () => {
+      // The core Android fix: a machine resolved to a private IPv4 must be
+      // returned by its IP, never the unreachable `.local` hostname.
+      vi.useFakeTimers()
+      try {
+        mockedIsNative.mockReturnValue(true)
+        const { ZeroConf } = await import('capacitor-zeroconf')
+        let cb: ((r: unknown) => void) | null = null
+        vi.mocked(ZeroConf.watch).mockImplementation(((_opts: unknown, c: (r: unknown) => void) => {
+          cb = c
+          return Promise.resolve(undefined)
+        }) as unknown as typeof ZeroConf.watch)
+        vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('timeout'))
+
+        const promise = discoverMachines()
+        await vi.advanceTimersByTimeAsync(0)
+        cb?.({
+          action: 'resolved',
+          service: {
+            name: 'Meticulous-a3f7',
+            hostname: 'Meticulous-a3f7.local',
+            ipv4Addresses: ['192.168.50.168'],
+            port: 8080,
+          },
+        })
+        // Early-resolve fires 2s after a single IPv4 hit.
+        await vi.advanceTimersByTimeAsync(2100)
+        const machines = await promise
+        expect(machines).toEqual([
+          {
+            name: 'Meticulous-a3f7',
+            host: '192.168.50.168',
+            port: 8080,
+            url: 'http://192.168.50.168:8080',
+          },
+        ])
+      } finally {
+        vi.useRealTimers()
+        mockedIsNative.mockReturnValue(false)
+      }
+    })
+  })
+
+  // -------------------------------------------------------------------
+  // Subnet-scan fallback helpers (native)
+  // -------------------------------------------------------------------
+  describe('isPrivateIPv4', () => {
+    it('accepts RFC 1918 ranges', () => {
+      expect(isPrivateIPv4('192.168.50.168')).toBe(true)
+      expect(isPrivateIPv4('10.0.0.5')).toBe(true)
+      expect(isPrivateIPv4('172.16.0.1')).toBe(true)
+      expect(isPrivateIPv4('172.31.255.254')).toBe(true)
+    })
+    it('rejects public / link-local / non-IPv4', () => {
+      expect(isPrivateIPv4('8.8.8.8')).toBe(false)
+      expect(isPrivateIPv4('169.254.1.1')).toBe(false)
+      expect(isPrivateIPv4('172.32.0.1')).toBe(false)
+      expect(isPrivateIPv4('meticulous.local')).toBe(false)
+    })
+  })
+
+  describe('parseIPv4FromCandidate', () => {
+    it('extracts the LAN IPv4 from a host candidate', () => {
+      const cand = 'candidate:1 1 udp 2122260223 192.168.50.10 55328 typ host generation 0'
+      expect(parseIPv4FromCandidate(cand)).toBe('192.168.50.10')
+    })
+    it('returns null for non-host (srflx) candidates', () => {
+      const cand = 'candidate:2 1 udp 1686052607 203.0.113.5 55328 typ srflx raddr 0.0.0.0'
+      expect(parseIPv4FromCandidate(cand)).toBeNull()
+    })
+    it('returns null for mDNS-obfuscated (.local) candidates', () => {
+      const cand = 'candidate:3 1 udp 2122260223 abcd-1234.local 55328 typ host generation 0'
+      expect(parseIPv4FromCandidate(cand)).toBeNull()
+    })
+  })
+
+  describe('getLocalIPv4ViaWebRTC', () => {
+    afterEach(() => {
+      delete (globalThis as unknown as { RTCPeerConnection?: unknown }).RTCPeerConnection
+    })
+
+    it('resolves the private IPv4 from the first host candidate', async () => {
+      class FakePC {
+        onicecandidate: ((e: unknown) => void) | null = null
+        createDataChannel() {}
+        async createOffer() { return {} }
+        async setLocalDescription() {
+          // Emit candidates asynchronously, as a real PC would.
+          setTimeout(() => {
+            this.onicecandidate?.({
+              candidate: { candidate: 'candidate:1 1 udp 1 192.168.50.10 5 typ host' },
+            })
+          }, 0)
+        }
+        close() {}
+      }
+      ;(globalThis as unknown as { RTCPeerConnection: unknown }).RTCPeerConnection = FakePC
+      expect(await getLocalIPv4ViaWebRTC(1000)).toBe('192.168.50.10')
+    })
+
+    it('resolves null when WebRTC is unavailable', async () => {
+      expect(await getLocalIPv4ViaWebRTC(50)).toBeNull()
+    })
+
+    it('resolves null (timeout) when only obfuscated candidates arrive', async () => {
+      class FakePC {
+        onicecandidate: ((e: unknown) => void) | null = null
+        createDataChannel() {}
+        async createOffer() { return {} }
+        async setLocalDescription() {
+          setTimeout(() => {
+            this.onicecandidate?.({
+              candidate: { candidate: 'candidate:1 1 udp 1 abcd.local 5 typ host' },
+            })
+          }, 0)
+        }
+        close() {}
+      }
+      ;(globalThis as unknown as { RTCPeerConnection: unknown }).RTCPeerConnection = FakePC
+      expect(await getLocalIPv4ViaWebRTC(30)).toBeNull()
+    })
+  })
+
+  describe('scanLocalSubnet', () => {
+    beforeEach(() => {
+      mockedIsNative.mockReturnValue(true)
+    })
+    afterEach(() => {
+      vi.restoreAllMocks()
+      mockedIsNative.mockReturnValue(false)
+    })
+
+    it('returns the first host that answers on the /24 (via CapacitorHttp)', async () => {
+      vi.mocked(CapacitorHttp.get).mockImplementation(async ({ url }: { url: string }) => {
+        return { status: url.includes('192.168.50.42:') ? 200 : 0, data: '', headers: {}, url } as never
+      })
+      const machine = await scanLocalSubnet('192.168.50.10')
+      expect(machine?.host).toBe('192.168.50.42')
+      expect(machine?.url).toBe('http://192.168.50.42:8080')
+    })
+
+    it('returns null when no host answers', async () => {
+      vi.mocked(CapacitorHttp.get).mockRejectedValue(new Error('unreachable'))
+      expect(await scanLocalSubnet('192.168.50.10')).toBeNull()
+    })
+
+    it('refuses to scan a non-private base address', async () => {
+      expect(await scanLocalSubnet('8.8.8.8')).toBeNull()
     })
   })
 
