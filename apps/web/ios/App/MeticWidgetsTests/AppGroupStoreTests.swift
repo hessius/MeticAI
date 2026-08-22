@@ -120,3 +120,29 @@ final class AppGroupStoreTests: XCTestCase {
         XCTAssertNil(store.lastActionFeedback()?.message)
     }
 }
+
+extension AppGroupStoreTests {
+    func testGlanceableConfigRoundTrip() {
+        let suite = "test.glanceable.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let writer = AppGroupWriter(defaults: defaults)
+        writer.setGlanceableConfig(GlanceableConfig(shot: .pressure, heating: .estimatedTime))
+
+        let store = AppGroupStore(defaults: defaults, containerURL: nil)
+        let cfg = store.glanceableConfig()
+        XCTAssertEqual(cfg.shot, .pressure)
+        XCTAssertEqual(cfg.heating, .estimatedTime)
+    }
+
+    func testGlanceableConfigDefaults() {
+        let suite = "test.glanceable.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let cfg = AppGroupStore(defaults: defaults, containerURL: nil).glanceableConfig()
+        XCTAssertEqual(cfg.shot, .weight)
+        XCTAssertEqual(cfg.heating, .temp)
+    }
+}

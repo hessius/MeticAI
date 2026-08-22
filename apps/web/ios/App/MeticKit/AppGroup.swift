@@ -4,13 +4,17 @@ import Foundation
 /// the app (writer) and the widget extension (reader).
 public enum AppGroup {
     public static let identifier = "group.com.metic.app"
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
 
     public enum Keys {
         public static let favourites = "favourites"
         public static let machineURL = "machineUrl"
         public static let openAppOnStart = "openAppOnStart"
         public static let schemaVersion = "schemaVersion"
+
+        // Live Activity glanceable configuration.
+        public static let glanceableShot = "glanceableShot"
+        public static let glanceableHeating = "glanceableHeating"
 
         // Control Center live snapshot overlay.
         public static let snapshotJSON = "snapshotJSON"
@@ -28,6 +32,16 @@ public enum AppGroup {
 
     public static var containerURL: URL? {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: identifier)
+    }
+}
+
+/// User-selected glanceable stats for the shot Live Activity. Native-only.
+public struct GlanceableConfig: Equatable {
+    public var shot: ShotGlanceableStat
+    public var heating: HeatingGlanceableStat
+    public init(shot: ShotGlanceableStat = .weight, heating: HeatingGlanceableStat = .temp) {
+        self.shot = shot
+        self.heating = heating
     }
 }
 
@@ -64,6 +78,15 @@ public struct AppGroupStore {
         // Treat "never written" (0) as compatible-but-empty so the widget can
         // still render its empty state without a scary mismatch message.
         return v == 0 || v == AppGroup.schemaVersion
+    }
+
+    /// The user's glanceable configuration (defaults: weight / temp).
+    public func glanceableConfig() -> GlanceableConfig {
+        let shot = (defaults?.string(forKey: AppGroup.Keys.glanceableShot))
+            .flatMap(ShotGlanceableStat.init(rawValue:)) ?? .weight
+        let heating = (defaults?.string(forKey: AppGroup.Keys.glanceableHeating))
+            .flatMap(HeatingGlanceableStat.init(rawValue:)) ?? .temp
+        return GlanceableConfig(shot: shot, heating: heating)
     }
 
     public func imageURL(for favourite: Favourite) -> URL? {
@@ -132,5 +155,11 @@ public struct AppGroupWriter {
         } else {
             defaults?.removeObject(forKey: AppGroup.Keys.lastActionMessage)
         }
+    }
+
+    /// Persist the glanceable configuration chosen in Settings.
+    public func setGlanceableConfig(_ cfg: GlanceableConfig) {
+        defaults?.set(cfg.shot.rawValue, forKey: AppGroup.Keys.glanceableShot)
+        defaults?.set(cfg.heating.rawValue, forKey: AppGroup.Keys.glanceableHeating)
     }
 }
