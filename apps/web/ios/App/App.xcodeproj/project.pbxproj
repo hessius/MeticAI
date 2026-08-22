@@ -21,6 +21,7 @@
 		3E71555296CB72726A2D9284 /* MachineClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C3ACB4200397393E8FEF69 /* MachineClientTests.swift */; };
 		4045D280FC6E252252B7B9BA /* ControlCenterWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F200D3B013C5266601DC206 /* ControlCenterWidget.swift */; };
 		4574AD9D26DC60A3D05ED22A /* StartShotIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4546CA7AA0E6E376F4C4A6 /* StartShotIntent.swift */; };
+		4C4A2FEC8DFCF6B26F6275E5 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBB498CAAA26EB7EF8CB0DE /* AppGroup.swift */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		4D7EDF44F6B79EC189EC0BEE /* MeticWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 65D946B06CB363F431631450 /* MeticWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -31,6 +32,7 @@
 		504ED0012C0000000016851F /* MeticulousDiscoveryPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504ED0002C0000000016851F /* MeticulousDiscoveryPlugin.swift */; };
 		504ED0032C0000000016851F /* MeticulousViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504ED0022C0000000016851F /* MeticulousViewController.swift */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		521479CA40C31B3033FCB0A4 /* ShotActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC9D1511714709CEC5978A1A /* ShotActivityController.swift */; };
 		55D7ED31487EB217B58FA202 /* ShotContentMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24588123C419E4F20CABF95 /* ShotContentMapperTests.swift */; };
 		56CE82BEC4AD0258C52AD0D7 /* ShotGlanceable.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80FD34DC498D748822CFC10 /* ShotGlanceable.swift */; };
 		5F08916E83D38CFF3F30660A /* ShotGlanceable.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80FD34DC498D748822CFC10 /* ShotGlanceable.swift */; };
@@ -131,6 +133,7 @@
 		AE6E3C4B1E108ACC057FB819 /* ShotGraphBufferTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShotGraphBufferTests.swift; sourceTree = "<group>"; };
 		B3F3395C02F8FC13BD3CA6B3 /* FavouriteProfilesWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FavouriteProfilesWidget.swift; sourceTree = "<group>"; };
 		B58ED938C16A4703AD994F0B /* WidgetBridgePlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetBridgePlugin.swift; sourceTree = "<group>"; };
+		BC9D1511714709CEC5978A1A /* ShotActivityController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShotActivityController.swift; sourceTree = "<group>"; };
 		BDB223470DA26D46A4750E8F /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BE3F46964C8408DFA12F8C42 /* ShotActivityAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShotActivityAttributes.swift; sourceTree = "<group>"; };
 		C6EDF8C30FE3910E7C2D0D58 /* SocketIOStatusReader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocketIOStatusReader.swift; sourceTree = "<group>"; };
@@ -265,6 +268,7 @@
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
 				B58ED938C16A4703AD994F0B /* WidgetBridgePlugin.swift */,
+				BC9D1511714709CEC5978A1A /* ShotActivityController.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -517,6 +521,8 @@
 				0FDD8F08EBB0643DF10384B7 /* ShotGraphBuffer.swift in Sources */,
 				5F08916E83D38CFF3F30660A /* ShotGlanceable.swift in Sources */,
 				65D70819BDC96E205C5AD6EE /* ShotStreamer.swift in Sources */,
+				521479CA40C31B3033FCB0A4 /* ShotActivityController.swift in Sources */,
+				4C4A2FEC8DFCF6B26F6275E5 /* AppGroup.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
