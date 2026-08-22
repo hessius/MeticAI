@@ -21,6 +21,8 @@ final class ShotActivityController {
     private var targetWeightG: Double?
     private var lastChamber: Double?
     private var lastHead: Double?
+    private var lastWeightG: Double?
+    private var lastElapsedSec: Double?
 
     func start(
         profileName: String,
@@ -40,6 +42,8 @@ final class ShotActivityController {
         tempSamples = []
         lastChamber = nil
         lastHead = nil
+        lastWeightG = nil
+        lastElapsedSec = nil
 
         let attributes = ShotActivityAttributes(
             profileName: profileName,
@@ -81,8 +85,26 @@ final class ShotActivityController {
         streamer = nil
         endBackground()
         if let activity {
+            let summary = ShotContentBuilder.summary(
+                finalWeightG: lastWeightG,
+                finalTimeSec: lastElapsedSec,
+                doseG: doseG,
+                tempSamples: tempSamples
+            )
+            let doneState = ShotActivityAttributes.ContentState(
+                phase: .done,
+                elapsedSec: lastElapsedSec,
+                graph: graph.downsampled(),
+                finalWeightG: summary.finalWeightG,
+                finalTimeSec: summary.finalTimeSec,
+                ratio: summary.ratio,
+                avgTempC: summary.avgTempC
+            )
             Task {
-                await activity.end(nil, dismissalPolicy: .after(.now + 30))
+                await activity.end(
+                    .init(state: doneState, staleDate: nil),
+                    dismissalPolicy: .after(.now + 30)
+                )
             }
         }
         activity = nil
@@ -106,6 +128,8 @@ final class ShotActivityController {
                     w: shotFrame.weightG ?? 0
                 )
                 if let brewTempC = shotFrame.brewTempC { tempSamples.append(brewTempC) }
+                if let w = shotFrame.weightG { lastWeightG = w }
+                lastElapsedSec = elapsedSec
             }
             let newState = ShotContentBuilder.state(
                 from: shotFrame,
