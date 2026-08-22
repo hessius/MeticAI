@@ -19,6 +19,11 @@ import { createDirectAdapter } from './DirectAdapter'
 import { createDemoAdapter } from './DemoAdapter'
 import { getMachineMode } from '@/lib/machineMode'
 import { useResolvedMachineUrl } from './useResolvedMachineUrl'
+import { resolveAndHealMachineUrl } from './discovery'
+
+/** How long to wait for a first successful connection before assuming the
+ *  stored URL is stale and re-running full discovery (IP change recovery). */
+const REDISCOVER_AFTER_MS = 8_000
 
 // ---------------------------------------------------------------------------
 // Context
@@ -84,8 +89,39 @@ export function MachineServiceProvider({
     value.connect(machineUrl).catch((err) => {
       console.error('[MachineService] Failed to connect:', err)
     })
-    return () => value.disconnect()
-  }, [value, machineUrl])
+
+    // Recovery: if the machine never connects on the stored URL (e.g. DHCP moved
+    // it to a new IP), re-run full discovery once and adopt the machine's current
+    // address. persistMachineUrl() fires MACHINE_URL_CHANGED, which re-resolves
+    // the URL here and rebuilds the adapter against the healed address. Only
+    // direct mode talks to a discoverable machine on the LAN.
+    let rediscoverTimer: ReturnType<typeof setTimeout> | null = null
+    let unsubscribe: (() => void) | undefined
+    if (mode === 'direct') {
+      const armRediscover = () => {
+        if (rediscoverTimer) return
+        rediscoverTimer = setTimeout(() => {
+          rediscoverTimer = null
+          if (value.isConnected()) return
+          void resolveAndHealMachineUrl(machineUrl).catch(() => {})
+        }, REDISCOVER_AFTER_MS)
+      }
+      unsubscribe = value.onConnectionChange((connected) => {
+        if (connected) {
+          if (rediscoverTimer) { clearTimeout(rediscoverTimer); rediscoverTimer = null }
+        } else {
+          armRediscover()
+        }
+      })
+      if (!value.isConnected()) armRediscover()
+    }
+
+    return () => {
+      if (rediscoverTimer) clearTimeout(rediscoverTimer)
+      unsubscribe?.()
+      value.disconnect()
+    }
+  }, [value, machineUrl, mode])
 
   return (
     <MachineServiceContext.Provider value={value}>

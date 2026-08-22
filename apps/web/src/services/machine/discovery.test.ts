@@ -21,6 +21,11 @@ vi.mock('capacitor-zeroconf', () => ({
   },
 }))
 
+// Mock machineUrl — persistMachineUrl writes to Capacitor storage / fires events
+vi.mock('./machineUrl', () => ({
+  persistMachineUrl: vi.fn().mockResolvedValue(undefined),
+}))
+
 import { isNativePlatform } from '@/lib/machineMode'
 import {
   parseMachineInput,
@@ -29,12 +34,16 @@ import {
   testMachineConnection,
   machineUrlCandidates,
   resolveReachableMachineUrl,
+  resolveAndHealMachineUrl,
   isPrivateIPv4,
   parseIPv4FromCandidate,
   getLocalIPv4ViaWebRTC,
   scanLocalSubnet,
 } from './discovery'
 import { CapacitorHttp } from '@capacitor/core'
+import { persistMachineUrl } from './machineUrl'
+
+const mockedPersist = vi.mocked(persistMachineUrl)
 
 const mockedIsNative = vi.mocked(isNativePlatform)
 
@@ -494,6 +503,57 @@ describe('discovery', () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch')
       expect(await resolveReachableMachineUrl('demo')).toBe('demo')
       expect(fetchSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  // -------------------------------------------------------------------
+  // resolveAndHealMachineUrl
+  // -------------------------------------------------------------------
+  describe('resolveAndHealMachineUrl', () => {
+    beforeEach(() => {
+      mockedPersist.mockClear()
+    })
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('returns the stored url and does not persist when it is already reachable', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response('{}', { status: 200 }),
+      )
+      expect(await resolveAndHealMachineUrl('http://192.168.1.42:8080')).toBe(
+        'http://192.168.1.42:8080',
+      )
+      expect(mockedPersist).not.toHaveBeenCalled()
+    })
+
+    it('heals to port 80 and persists it when :8080 is refused', async () => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(
+        (async (input: RequestInfo | URL) => {
+          const u = String(input)
+          if (u.includes(':8080')) throw new Error('ECONNREFUSED')
+          return new Response('{}', { status: 200 })
+        }) as typeof fetch,
+      )
+      expect(await resolveAndHealMachineUrl('http://192.168.1.42:8080')).toBe(
+        'http://192.168.1.42',
+      )
+      expect(mockedPersist).toHaveBeenCalledWith('http://192.168.1.42')
+    })
+
+    it('keeps the stored url (no persist) when nothing is reachable and discovery finds nothing', async () => {
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unreachable'))
+      expect(await resolveAndHealMachineUrl('http://192.168.1.42:8080')).toBe(
+        'http://192.168.1.42:8080',
+      )
+      expect(mockedPersist).not.toHaveBeenCalled()
+    })
+
+    it('resolves demo without fetching or persisting', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      expect(await resolveAndHealMachineUrl('demo')).toBe('demo')
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(mockedPersist).not.toHaveBeenCalled()
     })
   })
 })

@@ -10,6 +10,8 @@ const adapterMocks = vi.hoisted(() => ({
     url,
     connect: adapterMocks.connect,
     disconnect: adapterMocks.disconnect,
+    isConnected: () => true,
+    onConnectionChange: () => () => undefined,
   } as unknown as MachineService)),
   resolveMachineUrl: vi.fn(async () => 'http://native-preferences:8080'),
 }))
@@ -24,10 +26,17 @@ vi.mock('./machineUrl', () => ({
   MACHINE_URL_CHANGED: 'machine-url-changed',
   getMachineUrlFallback: vi.fn(() => 'http://meticulous.local:8080'),
   resolveMachineUrl: adapterMocks.resolveMachineUrl,
+  persistMachineUrl: vi.fn(async () => undefined),
 }))
 
 vi.mock('./DirectAdapter', () => ({
   createDirectAdapter: adapterMocks.createDirectAdapter,
+}))
+
+vi.mock('./discovery', () => ({
+  // Network probes; keep them no-ops (URL unchanged) in unit tests.
+  resolveReachableMachineUrl: vi.fn(async (url: string) => url),
+  resolveAndHealMachineUrl: vi.fn(async (url: string) => url),
 }))
 
 vi.mock('./MeticAIAdapter', () => ({

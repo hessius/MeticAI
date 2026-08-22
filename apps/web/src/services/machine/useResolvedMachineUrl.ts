@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { getDefaultMachineUrl } from '@/lib/machineMode'
-import { MACHINE_URL_CHANGED, resolveMachineUrl } from './machineUrl'
+import { MACHINE_URL_CHANGED, persistMachineUrl, resolveMachineUrl } from './machineUrl'
+import { resolveReachableMachineUrl } from './discovery'
 
 /**
  * Reactive hook that tracks the machine URL.
@@ -19,7 +20,20 @@ export function useResolvedMachineUrl(enabled: boolean): string {
 
     // On mount, also check Capacitor Preferences (may have URL not in localStorage)
     resolveMachineUrl()
-      .then(url => setMachineUrl(url))
+      .then(async (url) => {
+        setMachineUrl(url)
+        // Cheap self-heal: if the stored port no longer answers (e.g. a firmware
+        // update moved the API :8080 → :80), adopt the reachable port. Bounded
+        // to a quick probe of the same host — full rediscovery (IP change) is
+        // handled on sustained connection failure by the provider, not here.
+        try {
+          const reachable = await resolveReachableMachineUrl(url)
+          if (reachable && reachable !== url) {
+            await persistMachineUrl(reachable)
+            setMachineUrl(reachable)
+          }
+        } catch { /* keep the stored url; a later retry will recover */ }
+      })
       .catch(() => {})
 
     // Sync handler — reads localStorage directly, exactly like the base branch.

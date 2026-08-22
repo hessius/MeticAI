@@ -16,6 +16,7 @@
 
 import { CapacitorHttp } from '@capacitor/core'
 import { isNativePlatform } from '@/lib/machineMode'
+import { persistMachineUrl } from './machineUrl'
 
 export interface DiscoveredMachine {
   /** Human-readable name (e.g. "meticulous-a3f7") */
@@ -131,6 +132,47 @@ export async function resolveReachableMachineUrl(url: string): Promise<string | 
     }
   }
   return null
+}
+
+/**
+ * Resolve the machine URL to a currently-reachable base, self-healing when the
+ * stored URL has gone stale (e.g. a firmware update moved the API from :8080 to
+ * :80, or DHCP reassigned the machine a new IP). Order:
+ *
+ *  1. Probe the stored URL's port candidates (:8080 → :80). If one answers,
+ *     adopt it — persisting when the port changed so the fix sticks.
+ *  2. If nothing answers at the stored host, re-run discovery (mDNS + subnet
+ *     scan on native) to find the machine's current address; adopt + persist it.
+ *  3. If discovery finds nothing, keep the stored URL so a later retry recovers
+ *     once the machine comes back online.
+ *
+ * This is the live-connection counterpart to the onboarding/settings detect
+ * paths, and mirrors the server runtime's lazy self-heal in platform/node.ts.
+ */
+export async function resolveAndHealMachineUrl(stored: string): Promise<string> {
+  if (stored.toLowerCase() === 'demo') return 'demo'
+
+  const reachable = await resolveReachableMachineUrl(stored)
+  if (reachable) {
+    if (reachable !== stored) {
+      dlog(`Healed machine URL: ${stored} → ${reachable}`)
+      await persistMachineUrl(reachable)
+    }
+    return reachable
+  }
+
+  // Stored host/port is dead — rediscover the machine on the network.
+  dlog(`Stored URL ${stored} unreachable; attempting rediscovery`)
+  const found = await discoverMachines()
+  const candidate = found[0]?.url
+  if (candidate) {
+    const healed = (await resolveReachableMachineUrl(candidate)) ?? candidate
+    dlog(`Rediscovered machine at ${healed}`)
+    await persistMachineUrl(healed)
+    return healed
+  }
+
+  return stored
 }
 
 /**
