@@ -8,5 +8,6 @@ struct MeticWidgetsBundle: WidgetBundle {
         MediumHeroWidget()
         LargeHeroWidget()
         ControlCenterWidget()
+        ShotLiveActivity()
     }
 }
