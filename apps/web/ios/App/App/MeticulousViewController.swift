@@ -77,6 +77,10 @@ class MeticulousViewController: CAPBridgeViewController {
         let widgetBridge = WidgetBridgePlugin()
         _ = bridge.perform(registerSelector, with: widgetBridge)
         NSLog("MeticAI: WidgetBridgePlugin registered successfully")
+
+        let liveActivity = LiveActivityPlugin()
+        _ = bridge.perform(registerSelector, with: liveActivity)
+        NSLog("MeticAI: LiveActivityPlugin registered successfully")
     }
 
     /// Locate the private `capacitorBridge` ivar on `CAPBridgeViewController`

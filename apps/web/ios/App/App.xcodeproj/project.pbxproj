@@ -18,6 +18,7 @@
 		229B7B2E2B0562147CB399FD /* ShotGlanceableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AEC17A099323A471C131E0B /* ShotGlanceableTests.swift */; };
 		2B601A498CC824426923F37A /* ShotGraphBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E2F64F1D8D8AA67BC42E0D4 /* ShotGraphBuffer.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		3636A7C37BF534DB9994AF34 /* LiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6584A231A09DD35B0DEB8E9F /* LiveActivityPlugin.swift */; };
 		3E71555296CB72726A2D9284 /* MachineClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C3ACB4200397393E8FEF69 /* MachineClientTests.swift */; };
 		4045D280FC6E252252B7B9BA /* ControlCenterWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F200D3B013C5266601DC206 /* ControlCenterWidget.swift */; };
 		4574AD9D26DC60A3D05ED22A /* StartShotIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4546CA7AA0E6E376F4C4A6 /* StartShotIntent.swift */; };
@@ -117,6 +118,7 @@
 		540C6065DA8AAD71A4478B0D /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		59C3ACB4200397393E8FEF69 /* MachineClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MachineClientTests.swift; sourceTree = "<group>"; };
 		5DB98958FAB39748EF18BB70 /* HeroWidgets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HeroWidgets.swift; sourceTree = "<group>"; };
+		6584A231A09DD35B0DEB8E9F /* LiveActivityPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveActivityPlugin.swift; sourceTree = "<group>"; };
 		65D946B06CB363F431631450 /* MeticWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MeticWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		666EDE04426FCCA3D9BB5BA5 /* ShotContentMapper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShotContentMapper.swift; sourceTree = "<group>"; };
 		7774BC9E16930145EAD6BEE2 /* Models.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -269,6 +271,7 @@
 				50B271D01FEDC1A000F3C39B /* public */,
 				B58ED938C16A4703AD994F0B /* WidgetBridgePlugin.swift */,
 				BC9D1511714709CEC5978A1A /* ShotActivityController.swift */,
+				6584A231A09DD35B0DEB8E9F /* LiveActivityPlugin.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -523,6 +526,7 @@
 				65D70819BDC96E205C5AD6EE /* ShotStreamer.swift in Sources */,
 				521479CA40C31B3033FCB0A4 /* ShotActivityController.swift in Sources */,
 				4C4A2FEC8DFCF6B26F6275E5 /* AppGroup.swift in Sources */,
+				3636A7C37BF534DB9994AF34 /* LiveActivityPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
