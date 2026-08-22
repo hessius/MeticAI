@@ -42,6 +42,10 @@ export const STORAGE_KEYS = {
 
   // -- Favourites (#584 iOS widgets) --
   FAVOURITES: 'meticai-favourites',
+
+  // -- iOS Live Activity glanceable configuration --
+  LA_SHOT_GLANCEABLE: 'meticai-la-shot-glanceable',
+  LA_HEATING_GLANCEABLE: 'meticai-la-heating-glanceable',
   OPEN_APP_ON_START: 'meticai-open-app-on-start',
 
   // -- Onboarding --

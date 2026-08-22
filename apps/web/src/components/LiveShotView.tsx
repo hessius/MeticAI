@@ -55,6 +55,7 @@ import { getActiveShotOverride } from '@/lib/activeShotOverride'
 import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
 import { HeatingDashboard } from './LiveShotView/HeatingDashboard'
 import { useAutoStart } from '@/hooks/useAutoStart'
+import { useLiveActivitySync } from '@/hooks/useLiveActivitySync'
 import {
   subscribe as subscribeShotTelemetry,
   getSnapshot as getShotTelemetrySnapshot,
@@ -269,6 +270,9 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
   // Command helper from shared hook
   const { cmd } = useMachineActions(machineState)
   const machine = useMachineService()
+
+  // Mirror the shot into an iOS Live Activity (native-only; no-op elsewhere).
+  useLiveActivitySync(ms, chartData.length > 0)
 
   // Heating-phase derivation (#494): before a shot starts and before any chart
   // data has arrived, the live view becomes a heating dashboard.
