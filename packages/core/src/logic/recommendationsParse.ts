@@ -14,10 +14,20 @@ export function termMatches(query: string, candidate: string): boolean {
 }
 
 export function parseRecommendationsJson(analysisText: string): Array<Record<string, unknown>> {
-  const match = analysisText.match(/RECOMMENDATIONS_JSON:\s*(\[[\s\S]*?\])\s*END_RECOMMENDATIONS_JSON/)
-  if (!match) return []
+  // Locate the delimited block with plain string scans (no regex) so the parser
+  // is guaranteed linear-time and immune to polynomial-backtracking (ReDoS).
+  const START = 'RECOMMENDATIONS_JSON:'
+  const END = 'END_RECOMMENDATIONS_JSON'
+  const startIdx = analysisText.indexOf(START)
+  if (startIdx === -1) return []
+  const endIdx = analysisText.indexOf(END, startIdx + START.length)
+  if (endIdx === -1) return []
+  const between = analysisText.slice(startIdx + START.length, endIdx)
+  const open = between.indexOf('[')
+  const close = between.lastIndexOf(']')
+  if (open === -1 || close <= open) return []
   try {
-    const parsed = JSON.parse(match[1])
+    const parsed = JSON.parse(between.slice(open, close + 1))
     return Array.isArray(parsed) ? parsed.filter(isRecord).filter(isActionableRecommendation) : []
   } catch {
     return []

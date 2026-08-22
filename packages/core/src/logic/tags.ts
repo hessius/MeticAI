@@ -152,8 +152,8 @@ export const AI_TAGS_PROMPT =
 // A single combined character class (whitespace + markdown markers) is used for
 // each optional run so there is no ambiguous adjacency between two whitespace
 // quantifiers (which would make the regex vulnerable to polynomial backtracking).
-const TAGS_LINE_RE = /^[ \t>*+#_-]*Tags[ \t*_]*:[ \t]*(.*)$/im
-const TAGS_LINE_STRIP_RE = /^[ \t>*+#_-]*Tags[ \t*_]*:[ \t]*.*$/gim
+const TAGS_LINE_RE = /^[ \t>*+#_-]*Tags[ \t*_]*:(.*)$/im
+const TAGS_LINE_STRIP_RE = /^[ \t>*+#_-]*Tags[ \t*_]*:.*$/gim
 
 export function parseAiTags(text: string | null | undefined): string[] {
   if (!text) return []

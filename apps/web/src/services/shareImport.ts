@@ -89,14 +89,13 @@ export async function registerShareTargetListener(
 ): Promise<() => void> {
   if (!Capacitor.isNativePlatform()) return () => {}
   const { CapacitorShareTarget } = await import('@capgo/capacitor-share-target')
-  const handle = await CapacitorShareTarget.addListener('shareReceived', (event) => {
-    extractShareSource(event as SharedContent)
-      .then((source) => {
-        if (source) onSource(source)
-      })
-      .catch(() => {
-        /* ignore malformed / unparseable share payloads */
-      })
+  const handle = await CapacitorShareTarget.addListener('shareReceived', async (event) => {
+    try {
+      const source = await extractShareSource(event as SharedContent)
+      if (source) onSource(source)
+    } catch {
+      /* ignore malformed / unparseable share payloads */
+    }
   })
   return () => {
     void handle.remove()
