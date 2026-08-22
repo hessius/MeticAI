@@ -668,7 +668,7 @@
       }
     },
     "widgets": {
-      "sectionTitle": "Widgets de l'écran d'accueil",
+      "sectionTitle": "Widgets",
       "openAppOnStart": "Ouvrir Metic au démarrage d'une extraction depuis un widget",
       "openAppOnStartHint": "Lorsque désactivé, démarrer un profil depuis un widget s'exécute en arrière-plan sans ouvrir l'application."
     },

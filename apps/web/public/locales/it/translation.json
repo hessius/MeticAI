@@ -668,7 +668,7 @@
       }
     },
     "widgets": {
-      "sectionTitle": "Widget della schermata Home",
+      "sectionTitle": "Widget",
       "openAppOnStart": "Apri Metic quando avvii un'erogazione da un widget",
       "openAppOnStartHint": "Quando disattivato, avviare un profilo da un widget viene eseguito in background senza aprire l'app."
     },
