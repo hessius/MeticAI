@@ -8,20 +8,27 @@ func shotDynamicIsland(_ context: ActivityViewContext<ShotActivityAttributes>) -
     let state = context.state
     let attr = context.attributes
     return DynamicIsland {
-        // Keep the regions flanking the camera compact so long profile names
-        // can't overflow; the full layout lives in the bottom region.
+        // The expanded regions sit against the rounded corners / camera, so keep
+        // their content inset to avoid the system clipping a few pixels on each
+        // edge. Leading/trailing stay minimal; the full layout is in the bottom.
         DynamicIslandExpandedRegion(.leading) {
             Image(systemName: iconName(state.phase))
                 .foregroundStyle(islandBrandOrange)
+                .padding(.leading, 6)
+                .padding(.top, 4)
         }
         DynamicIslandExpandedRegion(.trailing) {
             Text(glanceableValue(attr, state))
                 .font(.caption.bold())
                 .monospacedDigit()
                 .lineLimit(1)
+                .padding(.trailing, 6)
+                .padding(.top, 4)
         }
         DynamicIslandExpandedRegion(.bottom) {
             ShotLockScreenView(attributes: attr, state: state)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 4)
         }
     } compactLeading: {
         Image(systemName: iconName(state.phase))

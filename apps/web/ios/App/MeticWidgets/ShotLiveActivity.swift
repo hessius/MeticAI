@@ -26,8 +26,8 @@ struct ShotLockScreenView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(attributes.profileName).font(.headline).lineLimit(1)
-                Spacer()
-                Circle().fill(brandOrange).frame(width: 8, height: 8)
+                Spacer(minLength: 8)
+                meticWordmark(baseSize: 11)
             }
             switch state.phase {
             case .heating: heating
