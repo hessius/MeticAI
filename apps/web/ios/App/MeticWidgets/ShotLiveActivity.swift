@@ -147,10 +147,3 @@ struct ShotSparkline: View {
         .stroke(color, lineWidth: 1.5)
     }
 }
-
-// TEMP stub — replaced in Task 12.
-func shotDynamicIsland(_ context: ActivityViewContext<ShotActivityAttributes>) -> DynamicIsland {
-    DynamicIsland {
-        DynamicIslandExpandedRegion(.center) { Text("Metic") }
-    } compactLeading: { Text("•") } compactTrailing: { Text("") } minimal: { Text("•") }
-}
