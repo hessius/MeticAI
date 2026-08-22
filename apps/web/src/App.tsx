@@ -50,6 +50,7 @@ import { isAIConfigured, apiKeyStorageKey, getActiveProviderId } from '@/service
 // Phase 3 — Control Center & live telemetry
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useShotTelemetryRecorder } from '@/hooks/useShotTelemetryRecorder'
+import { useLiveActivitySync } from '@/hooks/useLiveActivitySync'
 import { useOptionalMachineService } from '@/services/machine/MachineServiceContext'
 import { useWidgetSync } from '@/hooks/useWidgetSync'
 import { capacitorStorage } from '@/services/storage/CapacitorStorage'
@@ -153,6 +154,9 @@ function App() {
   // Continuously record heating + shot telemetry into a persistent buffer so the
   // live-shot graph can be back-filled whenever the view is opened (issue #582).
   useShotTelemetryRecorder(machineState)
+  // Mirror shots into an iOS Live Activity app-wide so it triggers the moment a
+  // shot is detected/started, regardless of the current view (native-only).
+  useLiveActivitySync(machineState)
   const lastShotHook = useLastShot(mqttEnabled)
   const smartGreeting = useSmartGreeting(mqttEnabled && viewState === 'start')
   const prevBrewingRef = useRef(false)

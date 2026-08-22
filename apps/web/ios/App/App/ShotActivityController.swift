@@ -23,6 +23,7 @@ final class ShotActivityController {
     private var lastHead: Double?
     private var lastWeightG: Double?
     private var lastElapsedSec: Double?
+    private var lastStatusFrame: ShotFrame?
 
     func start(
         profileName: String,
@@ -44,6 +45,7 @@ final class ShotActivityController {
         lastHead = nil
         lastWeightG = nil
         lastElapsedSec = nil
+        lastStatusFrame = nil
 
         let attributes = ShotActivityAttributes(
             profileName: profileName,
@@ -114,8 +116,23 @@ final class ShotActivityController {
         guard let activity else { return }
         switch frame {
         case .temperatures(let temps):
-            if let chamber = (temps["t_bar_down"] as? NSNumber)?.doubleValue { lastChamber = chamber }
-            if let head = (temps["t_bar_up"] as? NSNumber)?.doubleValue { lastHead = head }
+            // Field mapping matches the in-app live view: t_bar_up = boiler /
+            // "Brew Chamber", t_bar_down = "Brew Head".
+            if let chamber = (temps["t_bar_up"] as? NSNumber)?.doubleValue { lastChamber = chamber }
+            if let head = (temps["t_bar_down"] as? NSNumber)?.doubleValue { lastHead = head }
+            // Reflect the new heating temps immediately. During heating there may
+            // be no `status` frames carrying temps, so merge them into the last
+            // known frame (or a bare heating frame) and push an update.
+            var merged = lastStatusFrame ?? ShotFrame(phase: .heating)
+            merged.chamberTempC = lastChamber
+            merged.headTempC = lastHead
+            let tempState = ShotContentBuilder.state(
+                from: merged,
+                graph: graph,
+                doseG: doseG,
+                tempSamples: tempSamples
+            )
+            await activity.update(.init(state: tempState, staleDate: nil))
         case .status(let status):
             guard var shotFrame = ShotFrame(status: status) else { return }
             shotFrame.chamberTempC = lastChamber
@@ -131,6 +148,7 @@ final class ShotActivityController {
                 if let w = shotFrame.weightG { lastWeightG = w }
                 lastElapsedSec = elapsedSec
             }
+            lastStatusFrame = shotFrame
             let newState = ShotContentBuilder.state(
                 from: shotFrame,
                 graph: graph,

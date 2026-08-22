@@ -45,8 +45,9 @@ extension ShotContentMapperTests {
     func testTemperaturesMergeChamberAndHead() {
         var frame = ShotFrame(status: ["name": "heating", "extracting": false])!
         frame.applyTemperatures(["t_bar_down": 84.0, "t_bar_up": 88.5])
-        XCTAssertEqual(frame.chamberTempC, 84.0)
-        XCTAssertEqual(frame.headTempC, 88.5)
+        // t_bar_up = boiler / "Brew Chamber"; t_bar_down = "Brew Head" (matches app).
+        XCTAssertEqual(frame.chamberTempC, 88.5)
+        XCTAssertEqual(frame.headTempC, 84.0)
     }
 }
 

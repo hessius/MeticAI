@@ -13,6 +13,13 @@ final class ShotStreamerTests: XCTestCase {
         XCTAssertEqual(dict["t_bar_up"] as? Double, 88.5)
     }
 
+    func testParseSensorsFrameAsTemperatures() {
+        // The machine emits heating thermocouples on the `sensors` event.
+        let event = ShotStreamer.parseFrame(#"42["sensors",{"t_bar_up":88.5,"t_bar_down":84}]"#)
+        guard case let .temperatures(dict)? = event else { return XCTFail("expected temps") }
+        XCTAssertEqual(dict["t_bar_down"] as? Double, 84)
+    }
+
     func testParseIgnoresOtherEvents() {
         XCTAssertNil(ShotStreamer.parseFrame(#"42["actuators",{"m_pos":1}]"#))
     }

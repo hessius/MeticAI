@@ -12,6 +12,12 @@ public struct ShotFrame {
     public var headTempC: Double?
     public var elapsedSec: Double?
 
+    /// Build a bare frame for a known phase (used to render heating temps before
+    /// any `status` frame has arrived).
+    public init(phase: ShotPhase) {
+        self.phase = phase
+    }
+
     public init?(status: [String: Any]) {
         let rawState = (status["name"] as? String) ?? (status["state"] as? String)
         let extracting = (status["extracting"] as? NSNumber)?.boolValue
@@ -28,10 +34,12 @@ public struct ShotFrame {
         }
     }
 
-    /// Merge a machine `temperatures` frame (heating two-stage bars).
+    /// Merge a machine `sensors`/`temperatures` frame (heating two-stage bars).
+    /// Field mapping matches the in-app live view: `t_bar_up` is the boiler /
+    /// "Brew Chamber" and `t_bar_down` is the "Brew Head" thermocouple.
     public mutating func applyTemperatures(_ temps: [String: Any]) {
-        if let d = (temps["t_bar_down"] as? NSNumber)?.doubleValue { chamberTempC = d }
-        if let u = (temps["t_bar_up"] as? NSNumber)?.doubleValue { headTempC = u }
+        if let u = (temps["t_bar_up"] as? NSNumber)?.doubleValue { chamberTempC = u }
+        if let d = (temps["t_bar_down"] as? NSNumber)?.doubleValue { headTempC = d }
     }
 
     static func phase(for state: MachineState) -> ShotPhase {

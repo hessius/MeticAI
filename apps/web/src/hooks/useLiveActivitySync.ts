@@ -16,7 +16,7 @@ const TEMP_ON_TARGET_THRESHOLD = 1.5
  * live telemetry updates; this hook only starts/stops the activity in step with
  * the machine's lifecycle. No-op on web/Android.
  */
-export function useLiveActivitySync(ms: MachineState, hasChartData: boolean) {
+export function useLiveActivitySync(ms: MachineState, hasChartData = false) {
   const lifecycle = useRef<LiveActivityLifecycle>({ active: false })
   const machineUrl = useRef<string | null>(null)
 

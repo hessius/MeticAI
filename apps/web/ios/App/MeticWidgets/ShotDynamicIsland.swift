@@ -2,23 +2,26 @@ import ActivityKit
 import WidgetKit
 import SwiftUI
 
+private let islandBrandOrange = Color(red: 0.843, green: 0.443, blue: 0)
+
 func shotDynamicIsland(_ context: ActivityViewContext<ShotActivityAttributes>) -> DynamicIsland {
     let state = context.state
     let attr = context.attributes
     return DynamicIsland {
+        // Keep the regions flanking the camera compact so long profile names
+        // can't overflow; the full layout lives in the bottom region.
         DynamicIslandExpandedRegion(.leading) {
-            Text(attr.profileName).font(.caption).lineLimit(1)
+            Image(systemName: iconName(state.phase))
+                .foregroundStyle(islandBrandOrange)
         }
         DynamicIslandExpandedRegion(.trailing) {
-            Text(glanceableValue(attr, state)).font(.caption.bold()).monospacedDigit()
+            Text(glanceableValue(attr, state))
+                .font(.caption.bold())
+                .monospacedDigit()
+                .lineLimit(1)
         }
         DynamicIslandExpandedRegion(.bottom) {
-            if state.phase == .ready {
-                Button(intent: StartShotIntent()) { Text("Start") }
-                    .tint(Color(red: 0.843, green: 0.443, blue: 0))
-            } else if state.phase == .extracting {
-                ShotSparkline(samples: state.graph).frame(height: 28)
-            }
+            ShotLockScreenView(attributes: attr, state: state)
         }
     } compactLeading: {
         Image(systemName: iconName(state.phase))

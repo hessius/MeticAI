@@ -77,7 +77,9 @@ public final class ShotStreamer {
               let obj = arr[1] as? [String: Any] else { return nil }
         switch name {
         case "status": return .status(obj)
-        case "temperatures": return .temperatures(obj)
+        // The machine emits heating thermocouples on the `sensors` event
+        // (t_bar_up/t_bar_down); older/other firmware may use `temperatures`.
+        case "sensors", "temperatures": return .temperatures(obj)
         default: return nil
         }
     }
