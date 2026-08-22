@@ -49,3 +49,35 @@ extension ShotContentMapperTests {
         XCTAssertEqual(frame.headTempC, 88.5)
     }
 }
+
+extension ShotContentMapperTests {
+    func testBuildExtractingContentState() {
+        var frame = ShotFrame(status: [
+            "name": "Extraction", "extracting": true,
+            "sensors": ["p": 9.0, "f": 2.2, "w": 18.0, "t": 92.0], "time": 20000
+        ])!
+        var buf = ShotGraphBuffer()
+        buf.append(t: 20, p: 9, f: 2.2, w: 18)
+        let state = ShotContentBuilder.state(from: frame, graph: buf,
+                                             doseG: 18, tempSamples: [92, 93])
+        XCTAssertEqual(state.phase, .extracting)
+        XCTAssertEqual(state.currentWeightG, 18.0)
+        XCTAssertEqual(state.graph.count, 1)
+    }
+
+    func testSummaryComputesRatioAndAvgTemp() {
+        let summary = ShotContentBuilder.summary(
+            finalWeightG: 36.0, finalTimeSec: 28.0, doseG: 18.0, tempSamples: [92, 94]
+        )
+        XCTAssertEqual(summary.ratio!, 2.0, accuracy: 0.001)
+        XCTAssertEqual(summary.avgTempC!, 93.0, accuracy: 0.001)
+    }
+
+    func testSummaryNilRatioWithoutDose() {
+        let summary = ShotContentBuilder.summary(
+            finalWeightG: 36.0, finalTimeSec: 28.0, doseG: nil, tempSamples: []
+        )
+        XCTAssertNil(summary.ratio)
+        XCTAssertNil(summary.avgTempC)
+    }
+}

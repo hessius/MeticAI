@@ -42,3 +42,49 @@ public struct ShotFrame {
         }
     }
 }
+
+public enum ShotContentBuilder {
+    public struct Summary {
+        public let finalWeightG: Double?
+        public let finalTimeSec: Double?
+        public let ratio: Double?
+        public let avgTempC: Double?
+    }
+
+    /// Build a live `ContentState` for the current phase.
+    public static func state(
+        from frame: ShotFrame,
+        graph: ShotGraphBuffer,
+        doseG: Double?,
+        tempSamples: [Double]
+    ) -> ShotActivityAttributes.ContentState {
+        ShotActivityAttributes.ContentState(
+            phase: frame.phase,
+            chamberTempC: frame.chamberTempC,
+            headTempC: frame.headTempC,
+            brewTempC: frame.brewTempC,
+            currentWeightG: frame.weightG,
+            pressureBar: frame.pressureBar,
+            flowGs: frame.flowGs,
+            elapsedSec: frame.elapsedSec,
+            graph: graph.downsampled()
+        )
+    }
+
+    /// Compute the terminal summary. Ratio/avg omitted when inputs are missing.
+    public static func summary(
+        finalWeightG: Double?,
+        finalTimeSec: Double?,
+        doseG: Double?,
+        tempSamples: [Double]
+    ) -> Summary {
+        var ratio: Double?
+        if let w = finalWeightG, let d = doseG, d > 0 { ratio = w / d }
+        var avg: Double?
+        if !tempSamples.isEmpty {
+            avg = tempSamples.reduce(0, +) / Double(tempSamples.count)
+        }
+        return Summary(finalWeightG: finalWeightG, finalTimeSec: finalTimeSec,
+                       ratio: ratio, avgTempC: avg)
+    }
+}
