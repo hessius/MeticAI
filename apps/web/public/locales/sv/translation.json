@@ -671,6 +671,19 @@
       "sectionTitle": "Widgetar på hemskärmen",
       "openAppOnStart": "Öppna Metic när en shot startas från en widget",
       "openAppOnStartHint": "När detta är av startas en profil från en widget i bakgrunden utan att appen öppnas."
+    },
+    "liveActivity": {
+      "title": "Live Activity",
+      "hint": "Välj vilket värde som visas snabbt på låsskärmen och Dynamic Island.",
+      "shotStat": "Värde vid uttag",
+      "heatingStat": "Värde vid uppvärmning",
+      "stat": {
+        "weight": "Vikt",
+        "pressure": "Tryck",
+        "flow": "Flöde",
+        "temp": "Temperatur",
+        "estimatedTime": "Uppskattad tid till klar"
+      }
     }
   },
   "profileBreakdown": {

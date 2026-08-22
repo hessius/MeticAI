@@ -671,6 +671,19 @@
       "sectionTitle": "Home-screen widgets",
       "openAppOnStart": "Open Metic when starting a shot from a widget",
       "openAppOnStartHint": "When off, starting a profile from a widget runs in the background without opening the app."
+    },
+    "liveActivity": {
+      "title": "Live Activity",
+      "hint": "Choose which stat shows at a glance on the Lock Screen and Dynamic Island.",
+      "shotStat": "Shot stat",
+      "heatingStat": "Heating stat",
+      "stat": {
+        "weight": "Weight",
+        "pressure": "Pressure",
+        "flow": "Flow",
+        "temp": "Temperature",
+        "estimatedTime": "Estimated time to ready"
+      }
     }
   },
   "profileBreakdown": {

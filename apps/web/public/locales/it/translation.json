@@ -671,6 +671,19 @@
       "sectionTitle": "Widget della schermata Home",
       "openAppOnStart": "Apri Metic quando avvii un'erogazione da un widget",
       "openAppOnStartHint": "Quando disattivato, avviare un profilo da un widget viene eseguito in background senza aprire l'app."
+    },
+    "liveActivity": {
+      "title": "Live Activity",
+      "hint": "Scegli quale dato mostrare a colpo d’occhio nella schermata di blocco e nella Dynamic Island.",
+      "shotStat": "Dato di estrazione",
+      "heatingStat": "Dato di riscaldamento",
+      "stat": {
+        "weight": "Peso",
+        "pressure": "Pressione",
+        "flow": "Flusso",
+        "temp": "Temperatura",
+        "estimatedTime": "Tempo stimato al pronto"
+      }
     }
   },
   "profileBreakdown": {

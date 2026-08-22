@@ -671,6 +671,19 @@
       "sectionTitle": "Home-Bildschirm-Widgets",
       "openAppOnStart": "Metic öffnen, wenn ein Bezug über ein Widget gestartet wird",
       "openAppOnStartHint": "Wenn deaktiviert, wird ein Profil über ein Widget im Hintergrund gestartet, ohne die App zu öffnen."
+    },
+    "liveActivity": {
+      "title": "Live-Aktivität",
+      "hint": "Wähle, welcher Wert auf dem Sperrbildschirm und der Dynamic Island angezeigt wird.",
+      "shotStat": "Bezugswert",
+      "heatingStat": "Aufheizwert",
+      "stat": {
+        "weight": "Gewicht",
+        "pressure": "Druck",
+        "flow": "Fluss",
+        "temp": "Temperatur",
+        "estimatedTime": "Geschätzte Zeit bis bereit"
+      }
     }
   },
   "profileBreakdown": {

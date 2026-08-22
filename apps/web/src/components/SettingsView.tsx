@@ -9,6 +9,23 @@ import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  loadLiveActivitySettings,
+  saveLiveActivitySettings,
+  type LiveActivitySettings,
+} from '@/services/liveActivity/liveActivitySettings'
+import { LiveActivity } from '@/services/liveActivity/liveActivityBridge'
+import type {
+  ShotGlanceableStat,
+  HeatingGlanceableStat,
+} from '@/services/liveActivity/liveActivityBridge'
 import { Capacitor } from '@capacitor/core'
 import { WidgetBridge } from '@/services/widgets/widgetBridge'
 import { capacitorStorage } from '@/services/storage/CapacitorStorage'
@@ -172,6 +189,7 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   const [isRestarting, setIsRestarting] = useState(false)
   const isIOS = Capacitor.getPlatform() === 'ios'
   const [openAppOnStart, setOpenAppOnStart] = useState(false)
+  const [laSettings, setLaSettings] = useState<LiveActivitySettings>(loadLiveActivitySettings)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
   const [restartStatus, setRestartStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
@@ -287,6 +305,12 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     await capacitorStorage.set(STORAGE_KEYS.OPEN_APP_ON_START, String(enabled))
     try { await WidgetBridge.setOpenAppOnStart({ enabled }) } catch { /* non-iOS */ }
     if (enabled) playToggleOn(); else playToggleOff()
+  }
+
+  const handleLaChange = (next: LiveActivitySettings) => {
+    setLaSettings(next)
+    saveLiveActivitySettings(next)
+    void LiveActivity.updateConfig(next).catch(() => {})
   }
 
   // Load current settings on mount
@@ -1524,6 +1548,59 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                     checked={openAppOnStart}
                     onCheckedChange={(checked) => { void handleOpenAppOnStart(checked as boolean) }}
                   />
+                </div>
+
+                <div className="mt-4 space-y-4 border-t border-border/50 pt-4">
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium">
+                      {t('settings.liveActivity.title')}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {t('settings.liveActivity.hint')}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <Label htmlFor="la-shot-glanceable" className="text-sm">
+                      {t('settings.liveActivity.shotStat')}
+                    </Label>
+                    <Select
+                      value={laSettings.shotGlanceable}
+                      onValueChange={(v) =>
+                        handleLaChange({ ...laSettings, shotGlanceable: v as ShotGlanceableStat })
+                      }
+                    >
+                      <SelectTrigger id="la-shot-glanceable" className="w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weight">{t('settings.liveActivity.stat.weight')}</SelectItem>
+                        <SelectItem value="pressure">{t('settings.liveActivity.stat.pressure')}</SelectItem>
+                        <SelectItem value="flow">{t('settings.liveActivity.stat.flow')}</SelectItem>
+                        <SelectItem value="temp">{t('settings.liveActivity.stat.temp')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <Label htmlFor="la-heating-glanceable" className="text-sm">
+                      {t('settings.liveActivity.heatingStat')}
+                    </Label>
+                    <Select
+                      value={laSettings.heatingGlanceable}
+                      onValueChange={(v) =>
+                        handleLaChange({ ...laSettings, heatingGlanceable: v as HeatingGlanceableStat })
+                      }
+                    >
+                      <SelectTrigger id="la-heating-glanceable" className="w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="temp">{t('settings.liveActivity.stat.temp')}</SelectItem>
+                        <SelectItem value="estimatedTime">{t('settings.liveActivity.stat.estimatedTime')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CollapsibleSection>
             )}
