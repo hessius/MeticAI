@@ -18,3 +18,34 @@ final class ShotContentMapperTests: XCTestCase {
         XCTAssertEqual(back.pressureBar, 8.9)
     }
 }
+
+extension ShotContentMapperTests {
+    func testPhaseFromExtractingFrame() {
+        let frame = ShotFrame(status: [
+            "name": "Extraction", "extracting": true,
+            "sensors": ["p": 8.5, "f": 2.0, "w": 12.3, "t": 92.1],
+            "time": 9000
+        ])
+        XCTAssertEqual(frame?.phase, .extracting)
+        XCTAssertEqual(frame?.pressureBar, 8.5)
+        XCTAssertEqual(frame?.weightG, 12.3)
+        XCTAssertEqual(frame?.elapsedSec ?? 0, 9.0, accuracy: 0.001)
+    }
+
+    func testPhaseReadyFromClickToStart() {
+        let frame = ShotFrame(status: ["name": "click to start", "extracting": false])
+        XCTAssertEqual(frame?.phase, .ready)
+    }
+
+    func testPhaseHeatingFromHeating() {
+        let frame = ShotFrame(status: ["name": "heating", "extracting": false])
+        XCTAssertEqual(frame?.phase, .heating)
+    }
+
+    func testTemperaturesMergeChamberAndHead() {
+        var frame = ShotFrame(status: ["name": "heating", "extracting": false])!
+        frame.applyTemperatures(["t_bar_down": 84.0, "t_bar_up": 88.5])
+        XCTAssertEqual(frame.chamberTempC, 84.0)
+        XCTAssertEqual(frame.headTempC, 88.5)
+    }
+}

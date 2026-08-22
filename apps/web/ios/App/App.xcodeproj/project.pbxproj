@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		036064346DF6C3F5A5EB73B9 /* FavouriteProfilesWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F3395C02F8FC13BD3CA6B3 /* FavouriteProfilesWidget.swift */; };
+		09598367A0C0F86F7E490825 /* ShotContentMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 666EDE04426FCCA3D9BB5BA5 /* ShotContentMapper.swift */; };
 		17AAABDE269198C9EC0B0561 /* MeticWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D9002DEDBB5C5EDE9E11D01 /* MeticWidgetsBundle.swift */; };
 		1FDC454A924855BC797F55C4 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBB498CAAA26EB7EF8CB0DE /* AppGroup.swift */; };
 		2293E69E244EE3D32F2E02E8 /* ControlIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F022BB0FF7FC634C03D214B7 /* ControlIntents.swift */; };
@@ -33,6 +34,7 @@
 		783A4DD39BBD428FEDC16DB6 /* WidgetBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B58ED938C16A4703AD994F0B /* WidgetBridgePlugin.swift */; };
 		796C6014B15243111FE568AA /* WidgetSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E9DDC937E6A2575325A680E /* WidgetSupport.swift */; };
 		84339E407D2F51CE255759C5 /* StartProfileIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E90915895B55F6358F61E0C /* StartProfileIntent.swift */; };
+		8B8303C832067999C06C7072 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7774BC9E16930145EAD6BEE2 /* Models.swift */; };
 		98C315FF459F8E85A3AB4020 /* ShotActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE3F46964C8408DFA12F8C42 /* ShotActivityAttributes.swift */; };
 		9E222C543009E322009A1738 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9E222C4A3009E322009A1738 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B00E51FAE7D40B45484ED159 /* AppGroupStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C12D88D74CA0B1E0086FA54 /* AppGroupStoreTests.swift */; };
@@ -40,8 +42,10 @@
 		C598517EFF03BF0763C589DF /* HeroWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB98958FAB39748EF18BB70 /* HeroWidgets.swift */; };
 		C8D5562BF1D9944C0D50E616 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 540C6065DA8AAD71A4478B0D /* Foundation.framework */; };
 		D6F22B46082F74D44E7BE98D /* MachineClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A094DF44F18C8DE4DEF9A6 /* MachineClient.swift */; };
+		DCB55EE4CB324A263689051A /* ShotContentMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 666EDE04426FCCA3D9BB5BA5 /* ShotContentMapper.swift */; };
 		E64D6B91A1F81257F95C7BA7 /* ShotActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE3F46964C8408DFA12F8C42 /* ShotActivityAttributes.swift */; };
 		F4FE02EF844F8BE14A4582D7 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7774BC9E16930145EAD6BEE2 /* Models.swift */; };
+		FA3030CF41A84231A94CD2C1 /* ShotContentMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 666EDE04426FCCA3D9BB5BA5 /* ShotContentMapper.swift */; };
 		FC10AB353E36C04B1217772D /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 540C6065DA8AAD71A4478B0D /* Foundation.framework */; };
 /* End PBXBuildFile section */
 
@@ -95,6 +99,7 @@
 		59C3ACB4200397393E8FEF69 /* MachineClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MachineClientTests.swift; sourceTree = "<group>"; };
 		5DB98958FAB39748EF18BB70 /* HeroWidgets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HeroWidgets.swift; sourceTree = "<group>"; };
 		65D946B06CB363F431631450 /* MeticWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MeticWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		666EDE04426FCCA3D9BB5BA5 /* ShotContentMapper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShotContentMapper.swift; sourceTree = "<group>"; };
 		7774BC9E16930145EAD6BEE2 /* Models.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		8C12D88D74CA0B1E0086FA54 /* AppGroupStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppGroupStoreTests.swift; sourceTree = "<group>"; };
 		8D9002DEDBB5C5EDE9E11D01 /* MeticWidgetsBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeticWidgetsBundle.swift; sourceTree = "<group>"; };
@@ -252,6 +257,7 @@
 				7774BC9E16930145EAD6BEE2 /* Models.swift */,
 				C6EDF8C30FE3910E7C2D0D58 /* SocketIOStatusReader.swift */,
 				BE3F46964C8408DFA12F8C42 /* ShotActivityAttributes.swift */,
+				666EDE04426FCCA3D9BB5BA5 /* ShotContentMapper.swift */,
 			);
 			path = MeticKit;
 			sourceTree = "<group>";
@@ -473,6 +479,8 @@
 				504ED0032C0000000016851F /* MeticulousViewController.swift in Sources */,
 				783A4DD39BBD428FEDC16DB6 /* WidgetBridgePlugin.swift in Sources */,
 				E64D6B91A1F81257F95C7BA7 /* ShotActivityAttributes.swift in Sources */,
+				FA3030CF41A84231A94CD2C1 /* ShotContentMapper.swift in Sources */,
+				8B8303C832067999C06C7072 /* Models.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -492,6 +500,7 @@
 				84339E407D2F51CE255759C5 /* StartProfileIntent.swift in Sources */,
 				C598517EFF03BF0763C589DF /* HeroWidgets.swift in Sources */,
 				98C315FF459F8E85A3AB4020 /* ShotActivityAttributes.swift in Sources */,
+				09598367A0C0F86F7E490825 /* ShotContentMapper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -514,6 +523,7 @@
 				3E71555296CB72726A2D9284 /* MachineClientTests.swift in Sources */,
 				67C760925EE76C9C5BCB613B /* ShotActivityAttributes.swift in Sources */,
 				55D7ED31487EB217B58FA202 /* ShotContentMapperTests.swift in Sources */,
+				DCB55EE4CB324A263689051A /* ShotContentMapper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
