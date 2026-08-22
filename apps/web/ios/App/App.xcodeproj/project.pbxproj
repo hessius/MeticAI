@@ -12,8 +12,10 @@
 		0FDD8F08EBB0643DF10384B7 /* ShotGraphBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E2F64F1D8D8AA67BC42E0D4 /* ShotGraphBuffer.swift */; };
 		17AAABDE269198C9EC0B0561 /* MeticWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D9002DEDBB5C5EDE9E11D01 /* MeticWidgetsBundle.swift */; };
 		1FDC454A924855BC797F55C4 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBB498CAAA26EB7EF8CB0DE /* AppGroup.swift */; };
+		2207F6E137EA339FD2C09930 /* ShotGlanceable.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80FD34DC498D748822CFC10 /* ShotGlanceable.swift */; };
 		226A9C18E8CAAD6AEBBB2810 /* ShotGraphBufferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6E3C4B1E108ACC057FB819 /* ShotGraphBufferTests.swift */; };
 		2293E69E244EE3D32F2E02E8 /* ControlIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F022BB0FF7FC634C03D214B7 /* ControlIntents.swift */; };
+		229B7B2E2B0562147CB399FD /* ShotGlanceableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AEC17A099323A471C131E0B /* ShotGlanceableTests.swift */; };
 		2B601A498CC824426923F37A /* ShotGraphBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E2F64F1D8D8AA67BC42E0D4 /* ShotGraphBuffer.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		3E71555296CB72726A2D9284 /* MachineClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C3ACB4200397393E8FEF69 /* MachineClientTests.swift */; };
@@ -29,6 +31,8 @@
 		504ED0032C0000000016851F /* MeticulousViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504ED0022C0000000016851F /* MeticulousViewController.swift */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		55D7ED31487EB217B58FA202 /* ShotContentMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24588123C419E4F20CABF95 /* ShotContentMapperTests.swift */; };
+		56CE82BEC4AD0258C52AD0D7 /* ShotGlanceable.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80FD34DC498D748822CFC10 /* ShotGlanceable.swift */; };
+		5F08916E83D38CFF3F30660A /* ShotGlanceable.swift in Sources */ = {isa = PBXBuildFile; fileRef = E80FD34DC498D748822CFC10 /* ShotGlanceable.swift */; };
 		67C760925EE76C9C5BCB613B /* ShotActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE3F46964C8408DFA12F8C42 /* ShotActivityAttributes.swift */; };
 		6869E828D35C6DB29A4B9E1C /* MachineClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A094DF44F18C8DE4DEF9A6 /* MachineClient.swift */; };
 		6BF3E75A13ECDFFD53CA0859 /* SocketIOStatusReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6EDF8C30FE3910E7C2D0D58 /* SocketIOStatusReader.swift */; };
@@ -90,6 +94,7 @@
 		1F200D3B013C5266601DC206 /* ControlCenterWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ControlCenterWidget.swift; sourceTree = "<group>"; };
 		2E9DDC937E6A2575325A680E /* WidgetSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetSupport.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		3AEC17A099323A471C131E0B /* ShotGlanceableTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShotGlanceableTests.swift; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* Metic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Metic.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -121,6 +126,7 @@
 		C6EDF8C30FE3910E7C2D0D58 /* SocketIOStatusReader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocketIOStatusReader.swift; sourceTree = "<group>"; };
 		DDBB498CAAA26EB7EF8CB0DE /* AppGroup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppGroup.swift; sourceTree = "<group>"; };
 		E24588123C419E4F20CABF95 /* ShotContentMapperTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShotContentMapperTests.swift; sourceTree = "<group>"; };
+		E80FD34DC498D748822CFC10 /* ShotGlanceable.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShotGlanceable.swift; sourceTree = "<group>"; };
 		F022BB0FF7FC634C03D214B7 /* ControlIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ControlIntents.swift; sourceTree = "<group>"; };
 		FA6E72224DAC431BC2A03E2D /* MeticWidgets.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = MeticWidgets.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -201,6 +207,7 @@
 				59C3ACB4200397393E8FEF69 /* MachineClientTests.swift */,
 				E24588123C419E4F20CABF95 /* ShotContentMapperTests.swift */,
 				AE6E3C4B1E108ACC057FB819 /* ShotGraphBufferTests.swift */,
+				3AEC17A099323A471C131E0B /* ShotGlanceableTests.swift */,
 			);
 			path = MeticWidgetsTests;
 			sourceTree = "<group>";
@@ -266,6 +273,7 @@
 				BE3F46964C8408DFA12F8C42 /* ShotActivityAttributes.swift */,
 				666EDE04426FCCA3D9BB5BA5 /* ShotContentMapper.swift */,
 				0E2F64F1D8D8AA67BC42E0D4 /* ShotGraphBuffer.swift */,
+				E80FD34DC498D748822CFC10 /* ShotGlanceable.swift */,
 			);
 			path = MeticKit;
 			sourceTree = "<group>";
@@ -490,6 +498,7 @@
 				FA3030CF41A84231A94CD2C1 /* ShotContentMapper.swift in Sources */,
 				8B8303C832067999C06C7072 /* Models.swift in Sources */,
 				0FDD8F08EBB0643DF10384B7 /* ShotGraphBuffer.swift in Sources */,
+				5F08916E83D38CFF3F30660A /* ShotGlanceable.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -511,6 +520,7 @@
 				98C315FF459F8E85A3AB4020 /* ShotActivityAttributes.swift in Sources */,
 				09598367A0C0F86F7E490825 /* ShotContentMapper.swift in Sources */,
 				2B601A498CC824426923F37A /* ShotGraphBuffer.swift in Sources */,
+				56CE82BEC4AD0258C52AD0D7 /* ShotGlanceable.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -536,6 +546,8 @@
 				DCB55EE4CB324A263689051A /* ShotContentMapper.swift in Sources */,
 				226A9C18E8CAAD6AEBBB2810 /* ShotGraphBufferTests.swift in Sources */,
 				A5598D2D64C62733FAEAC379 /* ShotGraphBuffer.swift in Sources */,
+				229B7B2E2B0562147CB399FD /* ShotGlanceableTests.swift in Sources */,
+				2207F6E137EA339FD2C09930 /* ShotGlanceable.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
