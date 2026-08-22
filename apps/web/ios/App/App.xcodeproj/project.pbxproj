@@ -20,6 +20,7 @@
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		3E71555296CB72726A2D9284 /* MachineClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C3ACB4200397393E8FEF69 /* MachineClientTests.swift */; };
 		4045D280FC6E252252B7B9BA /* ControlCenterWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F200D3B013C5266601DC206 /* ControlCenterWidget.swift */; };
+		4574AD9D26DC60A3D05ED22A /* StartShotIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4546CA7AA0E6E376F4C4A6 /* StartShotIntent.swift */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		4D7EDF44F6B79EC189EC0BEE /* MeticWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 65D946B06CB363F431631450 /* MeticWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -118,6 +119,7 @@
 		7C1763E1B60560CE2E0EE640 /* ShotStreamerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShotStreamerTests.swift; sourceTree = "<group>"; };
 		8C12D88D74CA0B1E0086FA54 /* AppGroupStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppGroupStoreTests.swift; sourceTree = "<group>"; };
 		8D9002DEDBB5C5EDE9E11D01 /* MeticWidgetsBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeticWidgetsBundle.swift; sourceTree = "<group>"; };
+		8E4546CA7AA0E6E376F4C4A6 /* StartShotIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StartShotIntent.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		9E222C4A3009E322009A1738 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9E90915895B55F6358F61E0C /* StartProfileIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StartProfileIntent.swift; sourceTree = "<group>"; };
@@ -202,6 +204,7 @@
 			children = (
 				F022BB0FF7FC634C03D214B7 /* ControlIntents.swift */,
 				9E90915895B55F6358F61E0C /* StartProfileIntent.swift */,
+				8E4546CA7AA0E6E376F4C4A6 /* StartShotIntent.swift */,
 			);
 			path = Intents;
 			sourceTree = "<group>";
@@ -531,6 +534,7 @@
 				2B601A498CC824426923F37A /* ShotGraphBuffer.swift in Sources */,
 				56CE82BEC4AD0258C52AD0D7 /* ShotGlanceable.swift in Sources */,
 				A4D05594401E7A5FECC5DCF5 /* ShotStreamer.swift in Sources */,
+				4574AD9D26DC60A3D05ED22A /* StartShotIntent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
