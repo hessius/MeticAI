@@ -11,6 +11,11 @@ import UIKit
 final class ShotActivityController {
     static let shared = ShotActivityController()
 
+    /// If no update arrives within this window (e.g. iOS suspended the app in
+    /// the background and the local socket can't run), the system marks the
+    /// activity stale and dims it, rather than showing frozen values as live.
+    private static let staleAfter: TimeInterval = 12
+
     private var activity: Activity<ShotActivityAttributes>?
     private var streamer: ShotStreamer?
     private var streamTask: Task<Void, Never>?
@@ -36,6 +41,11 @@ final class ShotActivityController {
     ) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         stop()
+        // End any activity orphaned by a previous app termination so a new shot
+        // doesn't stack a duplicate on the Lock Screen / Dynamic Island.
+        for dangling in Activity<ShotActivityAttributes>.activities {
+            Task { await dangling.end(nil, dismissalPolicy: .immediate) }
+        }
 
         self.doseG = doseG
         self.targetWeightG = targetWeightG
@@ -59,7 +69,7 @@ final class ShotActivityController {
         do {
             activity = try Activity.request(
                 attributes: attributes,
-                content: .init(state: initial, staleDate: nil)
+                content: .init(state: initial, staleDate: Date().addingTimeInterval(Self.staleAfter))
             )
         } catch {
             return
@@ -132,7 +142,7 @@ final class ShotActivityController {
                 doseG: doseG,
                 tempSamples: tempSamples
             )
-            await activity.update(.init(state: tempState, staleDate: nil))
+            await activity.update(.init(state: tempState, staleDate: Date().addingTimeInterval(Self.staleAfter)))
         case .status(let status):
             guard var shotFrame = ShotFrame(status: status) else { return }
             shotFrame.chamberTempC = lastChamber
@@ -155,7 +165,7 @@ final class ShotActivityController {
                 doseG: doseG,
                 tempSamples: tempSamples
             )
-            await activity.update(.init(state: newState, staleDate: nil))
+            await activity.update(.init(state: newState, staleDate: Date().addingTimeInterval(Self.staleAfter)))
         }
     }
 

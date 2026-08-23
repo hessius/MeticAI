@@ -28,4 +28,38 @@ final class ShotStreamerTests: XCTestCase {
         XCTAssertNil(ShotStreamer.parseFrame("2"))
         XCTAssertNil(ShotStreamer.parseFrame("40"))
     }
+
+    /// An unreachable machine should make the streamer retry with backoff and
+    /// then finish cleanly at the max-duration cap, rather than dying on the
+    /// first drop (permanent freeze) or spinning forever.
+    func testStreamFinishesAtMaxDurationWhenUnreachable() async {
+        // Port 1 on loopback is closed, so connects are refused immediately.
+        let url = URL(string: "http://127.0.0.1:1")!
+        let streamer = ShotStreamer(baseURL: url, session: Self.fastFailSession(), maxDuration: 1.0)
+        let start = Date()
+        var frameCount = 0
+        for await _ in streamer.frames() { frameCount += 1 }
+        let elapsed = Date().timeIntervalSince(start)
+        XCTAssertEqual(frameCount, 0, "unreachable host should yield no frames")
+        XCTAssertLessThan(elapsed, 10.0, "stream must finish near the max-duration cap")
+    }
+
+    func testStopEndsStreamPromptly() async {
+        let url = URL(string: "http://127.0.0.1:1")!
+        let streamer = ShotStreamer(baseURL: url, session: Self.fastFailSession(), maxDuration: 60)
+        let task = Task {
+            for await _ in streamer.frames() {}
+        }
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        streamer.stop()
+        // Awaiting the consuming task confirms the stream terminates on stop().
+        _ = await task.value
+    }
+
+    private static func fastFailSession() -> URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 2
+        config.waitsForConnectivity = false
+        return URLSession(configuration: config)
+    }
 }
