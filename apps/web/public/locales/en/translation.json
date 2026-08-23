@@ -683,6 +683,21 @@
         "flow": "Flow",
         "temp": "Temperature",
         "estimatedTime": "Estimated time to ready"
+      },
+      "widget": {
+        "brewChamber": "Brew Chamber",
+        "brewHead": "Brew Head",
+        "ready": "Ready",
+        "start": "Start",
+        "weight": "Weight",
+        "pressure": "Pressure",
+        "flow": "Flow",
+        "time": "Time",
+        "shotComplete": "Shot complete",
+        "ratio": "Ratio",
+        "avgTemp": "Avg Temp",
+        "done": "Done",
+        "resumeHint": "Open Metic to resume live updates"
       }
     }
   },

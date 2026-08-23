@@ -37,7 +37,8 @@ final class ShotActivityController {
         doseG: Double?,
         setTempC: Double?,
         readyCutoffC: Double?,
-        config: GlanceableConfig
+        config: GlanceableConfig,
+        strings: ShotLocalizedStrings = ShotLocalizedStrings()
     ) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         stop()
@@ -63,7 +64,8 @@ final class ShotActivityController {
             setTempC: setTempC,
             readyCutoffC: readyCutoffC,
             shotGlanceable: config.shot,
-            heatingGlanceable: config.heating
+            heatingGlanceable: config.heating,
+            strings: strings
         )
         let initial = ShotActivityAttributes.ContentState(phase: .heating)
         do {

@@ -16,6 +16,55 @@ public enum ShotPhase: String, Codable {
     case heating, ready, extracting, done
 }
 
+/// User-facing widget labels, localised in the web layer (react-i18next) and
+/// passed in at start so the native widget matches the app's language. Defaults
+/// are English fallbacks for safety / decoding older activities.
+public struct ShotLocalizedStrings: Codable, Hashable {
+    public var brewChamber: String
+    public var brewHead: String
+    public var ready: String
+    public var start: String
+    public var weight: String
+    public var pressure: String
+    public var flow: String
+    public var time: String
+    public var shotComplete: String
+    public var ratio: String
+    public var avgTemp: String
+    public var done: String
+    public var resumeHint: String
+
+    public init(
+        brewChamber: String = "Brew Chamber",
+        brewHead: String = "Brew Head",
+        ready: String = "Ready",
+        start: String = "Start",
+        weight: String = "Weight",
+        pressure: String = "Pressure",
+        flow: String = "Flow",
+        time: String = "Time",
+        shotComplete: String = "Shot complete",
+        ratio: String = "Ratio",
+        avgTemp: String = "Avg Temp",
+        done: String = "Done",
+        resumeHint: String = "Open Metic to resume live updates"
+    ) {
+        self.brewChamber = brewChamber
+        self.brewHead = brewHead
+        self.ready = ready
+        self.start = start
+        self.weight = weight
+        self.pressure = pressure
+        self.flow = flow
+        self.time = time
+        self.shotComplete = shotComplete
+        self.ratio = ratio
+        self.avgTemp = avgTemp
+        self.done = done
+        self.resumeHint = resumeHint
+    }
+}
+
 /// A single downsampled graph sample (pressure/flow/weight) at an elapsed time.
 public struct ShotGraphSample: Codable, Hashable {
     public let t: Double   // seconds since extraction start
@@ -85,6 +134,7 @@ public struct ShotActivityAttributes: ActivityAttributes {
     public let readyCutoffC: Double?
     public let shotGlanceable: ShotGlanceableStat
     public let heatingGlanceable: HeatingGlanceableStat
+    public let strings: ShotLocalizedStrings
 
     public init(
         profileName: String,
@@ -92,7 +142,8 @@ public struct ShotActivityAttributes: ActivityAttributes {
         setTempC: Double?,
         readyCutoffC: Double?,
         shotGlanceable: ShotGlanceableStat,
-        heatingGlanceable: HeatingGlanceableStat
+        heatingGlanceable: HeatingGlanceableStat,
+        strings: ShotLocalizedStrings = ShotLocalizedStrings()
     ) {
         self.profileName = profileName
         self.targetWeightG = targetWeightG
@@ -100,5 +151,6 @@ public struct ShotActivityAttributes: ActivityAttributes {
         self.readyCutoffC = readyCutoffC
         self.shotGlanceable = shotGlanceable
         self.heatingGlanceable = heatingGlanceable
+        self.strings = strings
     }
 }

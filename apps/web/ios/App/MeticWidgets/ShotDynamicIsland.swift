@@ -26,7 +26,7 @@ func shotDynamicIsland(_ context: ActivityViewContext<ShotActivityAttributes>) -
                 .padding(.top, 4)
         }
         DynamicIslandExpandedRegion(.bottom) {
-            ShotLockScreenView(attributes: attr, state: state)
+            ShotLockScreenView(attributes: attr, state: state, isStale: context.isStale)
                 .padding(.horizontal, 8)
                 .padding(.bottom, 4)
         }
@@ -63,7 +63,7 @@ private func glanceableValue(_ attr: ShotActivityAttributes,
         }
         return String(format: "%.0f°", state.headTempC ?? 0)
     case .ready:
-        return "Ready"
+        return attr.strings.ready
     case .extracting:
         switch attr.shotGlanceable {
         case .weight: return ShotGlanceable.text(.weight, current: state.currentWeightG, target: attr.targetWeightG)
@@ -72,6 +72,6 @@ private func glanceableValue(_ attr: ShotActivityAttributes,
         case .temp: return ShotGlanceable.text(.temp, current: state.brewTempC, target: nil)
         }
     case .done:
-        return state.finalWeightG.map { String(format: "%.0fg", $0) } ?? "Done"
+        return state.finalWeightG.map { String(format: "%.0fg", $0) } ?? attr.strings.done
     }
 }

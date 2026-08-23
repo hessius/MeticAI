@@ -683,6 +683,21 @@
         "flow": "Débit",
         "temp": "Température",
         "estimatedTime": "Temps estimé avant prêt"
+      },
+      "widget": {
+        "brewChamber": "Chambre d'infusion",
+        "brewHead": "Tête d'infusion",
+        "ready": "Prêt",
+        "start": "Démarrer",
+        "weight": "Poids",
+        "pressure": "Pression",
+        "flow": "Débit",
+        "time": "Temps",
+        "shotComplete": "Extraction terminée",
+        "ratio": "Ratio",
+        "avgTemp": "Temp moy",
+        "done": "Terminé",
+        "resumeHint": "Ouvrez Metic pour reprendre les mises à jour en direct"
       }
     }
   },

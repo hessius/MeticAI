@@ -38,6 +38,22 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         let config = GlanceableConfig(
             shot: ShotGlanceableStat(rawValue: call.getString("shotGlanceable") ?? "weight") ?? .weight,
             heating: HeatingGlanceableStat(rawValue: call.getString("heatingGlanceable") ?? "temp") ?? .temp)
+        let s = call.getObject("strings") ?? [:]
+        let d = ShotLocalizedStrings()  // English fallbacks
+        let strings = ShotLocalizedStrings(
+            brewChamber: s["brewChamber"] as? String ?? d.brewChamber,
+            brewHead: s["brewHead"] as? String ?? d.brewHead,
+            ready: s["ready"] as? String ?? d.ready,
+            start: s["start"] as? String ?? d.start,
+            weight: s["weight"] as? String ?? d.weight,
+            pressure: s["pressure"] as? String ?? d.pressure,
+            flow: s["flow"] as? String ?? d.flow,
+            time: s["time"] as? String ?? d.time,
+            shotComplete: s["shotComplete"] as? String ?? d.shotComplete,
+            ratio: s["ratio"] as? String ?? d.ratio,
+            avgTemp: s["avgTemp"] as? String ?? d.avgTemp,
+            done: s["done"] as? String ?? d.done,
+            resumeHint: s["resumeHint"] as? String ?? d.resumeHint)
         DispatchQueue.main.async {
             ShotActivityController.shared.start(
                 profileName: call.getString("profileName") ?? "Shot",
@@ -46,7 +62,8 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 doseG: call.getDouble("doseG"),
                 setTempC: call.getDouble("setTempC"),
                 readyCutoffC: call.getDouble("readyCutoffC"),
-                config: config)
+                config: config,
+                strings: strings)
             call.resolve()
         }
     }

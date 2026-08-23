@@ -683,6 +683,21 @@
         "flow": "Flusso",
         "temp": "Temperatura",
         "estimatedTime": "Tempo stimato al pronto"
+      },
+      "widget": {
+        "brewChamber": "Camera di infusione",
+        "brewHead": "Testa di infusione",
+        "ready": "Pronto",
+        "start": "Avvia",
+        "weight": "Peso",
+        "pressure": "Pressione",
+        "flow": "Flusso",
+        "time": "Tempo",
+        "shotComplete": "Estrazione completata",
+        "ratio": "Rapporto",
+        "avgTemp": "Temp media",
+        "done": "Fatto",
+        "resumeHint": "Apri Metic per riprendere gli aggiornamenti live"
       }
     }
   },

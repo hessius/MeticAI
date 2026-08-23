@@ -683,6 +683,21 @@
         "flow": "Flöde",
         "temp": "Temperatur",
         "estimatedTime": "Uppskattad tid till klar"
+      },
+      "widget": {
+        "brewChamber": "Bryggkammare",
+        "brewHead": "Brygghuvud",
+        "ready": "Klar",
+        "start": "Starta",
+        "weight": "Vikt",
+        "pressure": "Tryck",
+        "flow": "Flöde",
+        "time": "Tid",
+        "shotComplete": "Shot klar",
+        "ratio": "Ratio",
+        "avgTemp": "Snitttemp",
+        "done": "Klar",
+        "resumeHint": "Öppna Metic för att återuppta liveuppdateringar"
       }
     }
   },

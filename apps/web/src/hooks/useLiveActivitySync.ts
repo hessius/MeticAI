@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Capacitor } from '@capacitor/core'
 import type { MachineState } from '@/hooks/useWebSocket'
 import { LiveActivity } from '@/services/liveActivity/liveActivityBridge'
@@ -17,6 +18,7 @@ const TEMP_ON_TARGET_THRESHOLD = 1.5
  * the machine's lifecycle. No-op on web/Android.
  */
 export function useLiveActivitySync(ms: MachineState, hasChartData = false) {
+  const { t } = useTranslation()
   const lifecycle = useRef<LiveActivityLifecycle>({ active: false })
   const machineUrl = useRef<string | null>(null)
 
@@ -62,6 +64,21 @@ export function useLiveActivitySync(ms: MachineState, hasChartData = false) {
         readyCutoffC: target != null ? target - TEMP_ON_TARGET_THRESHOLD : undefined,
         shotGlanceable: settings.shotGlanceable,
         heatingGlanceable: settings.heatingGlanceable,
+        strings: {
+          brewChamber: t('settings.liveActivity.widget.brewChamber'),
+          brewHead: t('settings.liveActivity.widget.brewHead'),
+          ready: t('settings.liveActivity.widget.ready'),
+          start: t('settings.liveActivity.widget.start'),
+          weight: t('settings.liveActivity.widget.weight'),
+          pressure: t('settings.liveActivity.widget.pressure'),
+          flow: t('settings.liveActivity.widget.flow'),
+          time: t('settings.liveActivity.widget.time'),
+          shotComplete: t('settings.liveActivity.widget.shotComplete'),
+          ratio: t('settings.liveActivity.widget.ratio'),
+          avgTemp: t('settings.liveActivity.widget.avgTemp'),
+          done: t('settings.liveActivity.widget.done'),
+          resumeHint: t('settings.liveActivity.widget.resumeHint'),
+        },
       }).catch(() => {
         lifecycle.current = { active: false }
       })
@@ -69,5 +86,5 @@ export function useLiveActivitySync(ms: MachineState, hasChartData = false) {
       lifecycle.current = next
       void LiveActivity.stop().catch(() => {})
     }
-  }, [ms, hasChartData])
+  }, [ms, hasChartData, t])
 }

@@ -8,7 +8,7 @@ private let brandOrange = Color(red: 0.843, green: 0.443, blue: 0)
 struct ShotLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ShotActivityAttributes.self) { context in
-            ShotLockScreenView(attributes: context.attributes, state: context.state)
+            ShotLockScreenView(attributes: context.attributes, state: context.state, isStale: context.isStale)
                 .padding(14)
                 .activityBackgroundTint(Color.black.opacity(0.55))
                 .activitySystemActionForegroundColor(.white)
@@ -21,6 +21,7 @@ struct ShotLiveActivity: Widget {
 struct ShotLockScreenView: View {
     let attributes: ShotActivityAttributes
     let state: ShotActivityAttributes.ContentState
+    var isStale: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -35,14 +36,21 @@ struct ShotLockScreenView: View {
             case .extracting: extracting
             case .done: done
             }
+            if isStale {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.clockwise").font(.caption2)
+                    Text(attributes.strings.resumeHint).font(.caption2)
+                }
+                .foregroundStyle(.white.opacity(0.6))
+            }
         }
         .foregroundStyle(.white)
     }
 
     private var heating: some View {
         VStack(alignment: .leading, spacing: 8) {
-            heatBar(label: "Brew Chamber", temp: state.chamberTempC)
-            heatBar(label: "Brew Head", temp: state.headTempC)
+            heatBar(label: attributes.strings.brewChamber, temp: state.chamberTempC)
+            heatBar(label: attributes.strings.brewHead, temp: state.headTempC)
         }
     }
 
@@ -71,13 +79,13 @@ struct ShotLockScreenView: View {
     private var ready: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Ready").font(.title3.bold()).foregroundStyle(readyGreen)
+                Text(attributes.strings.ready).font(.title3.bold()).foregroundStyle(readyGreen)
                 Text(String(format: "%.0f°C", state.headTempC ?? attributes.setTempC ?? 0))
                     .font(.caption).monospacedDigit()
             }
             Spacer()
             Button(intent: StartShotIntent()) {
-                Text("Start").font(.subheadline.bold())
+                Text(attributes.strings.start).font(.subheadline.bold())
             }
             .tint(brandOrange)
             .buttonStyle(.borderedProminent)
@@ -88,23 +96,23 @@ struct ShotLockScreenView: View {
         VStack(alignment: .leading, spacing: 8) {
             ShotSparkline(samples: state.graph).frame(height: 42)
             HStack(spacing: 14) {
-                tile("Weight", ShotGlanceable.text(.weight,
+                tile(attributes.strings.weight, ShotGlanceable.text(.weight,
                     current: state.currentWeightG, target: attributes.targetWeightG))
-                tile("Pressure", String(format: "%.1f", state.pressureBar ?? 0))
-                tile("Flow", String(format: "%.1f", state.flowGs ?? 0))
-                if let e = state.elapsedSec { tile("Time", String(format: "%.0fs", e)) }
+                tile(attributes.strings.pressure, String(format: "%.1f", state.pressureBar ?? 0))
+                tile(attributes.strings.flow, String(format: "%.1f", state.flowGs ?? 0))
+                if let e = state.elapsedSec { tile(attributes.strings.time, String(format: "%.0fs", e)) }
             }
         }
     }
 
     private var done: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Shot complete").font(.subheadline.bold())
+            Text(attributes.strings.shotComplete).font(.subheadline.bold())
             HStack(spacing: 14) {
-                if let w = state.finalWeightG { tile("Weight", String(format: "%.1fg", w)) }
-                if let t = state.finalTimeSec { tile("Time", String(format: "%.0fs", t)) }
-                if let r = state.ratio { tile("Ratio", String(format: "1:%.1f", r)) }
-                if let a = state.avgTempC { tile("Avg Temp", String(format: "%.0f°", a)) }
+                if let w = state.finalWeightG { tile(attributes.strings.weight, String(format: "%.1fg", w)) }
+                if let t = state.finalTimeSec { tile(attributes.strings.time, String(format: "%.0fs", t)) }
+                if let r = state.ratio { tile(attributes.strings.ratio, String(format: "1:%.1f", r)) }
+                if let a = state.avgTempC { tile(attributes.strings.avgTemp, String(format: "%.0f°", a)) }
             }
         }
     }

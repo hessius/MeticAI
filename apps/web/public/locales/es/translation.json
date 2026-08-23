@@ -683,6 +683,21 @@
         "flow": "Flujo",
         "temp": "Temperatura",
         "estimatedTime": "Tiempo estimado hasta listo"
+      },
+      "widget": {
+        "brewChamber": "Cámara de preparación",
+        "brewHead": "Cabezal",
+        "ready": "Listo",
+        "start": "Iniciar",
+        "weight": "Peso",
+        "pressure": "Presión",
+        "flow": "Flujo",
+        "time": "Tiempo",
+        "shotComplete": "Extracción completa",
+        "ratio": "Ratio",
+        "avgTemp": "Temp media",
+        "done": "Hecho",
+        "resumeHint": "Abre Metic para reanudar las actualizaciones en vivo"
       }
     }
   },

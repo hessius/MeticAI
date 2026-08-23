@@ -8,6 +8,22 @@ export interface GlanceableConfig {
   heatingGlanceable: HeatingGlanceableStat
 }
 
+export interface ShotWidgetStrings {
+  brewChamber: string
+  brewHead: string
+  ready: string
+  start: string
+  weight: string
+  pressure: string
+  flow: string
+  time: string
+  shotComplete: string
+  ratio: string
+  avgTemp: string
+  done: string
+  resumeHint: string
+}
+
 export interface StartLiveActivityOptions extends GlanceableConfig {
   profileName: string
   machineUrl: string
@@ -15,6 +31,7 @@ export interface StartLiveActivityOptions extends GlanceableConfig {
   doseG?: number
   setTempC?: number
   readyCutoffC?: number
+  strings?: ShotWidgetStrings
 }
 
 export interface LiveActivityPlugin {
