@@ -6,8 +6,8 @@
 http://<SERVER_IP>:3550/api
 ```
 
-All endpoints are served via nginx on port **3550**. The `/api` prefix is required.
-Container name: `meticai`. Interactive docs: `http://<SERVER_IP>:3550/docs`
+All endpoints are served by the Bun server on port **3550**. The `/api` prefix is required.
+Container name: `meticai`.
 
 ---
 
@@ -95,58 +95,38 @@ curl -X POST http://<SERVER_IP>:3550/api/machine/run-profile/my-profile-id
 
 ---
 
-## MQTT Bridge & Control Center
-
-### Bridge Status
-`GET /api/bridge/status`
-
-Returns MQTT broker and bridge service health.
-
-```bash
-curl http://<SERVER_IP>:3550/api/bridge/status
-```
-
-### Restart Bridge
-`POST /api/bridge/restart`
-
-Restarts the meticulous-bridge s6 service.
-
-```bash
-curl -X POST http://<SERVER_IP>:3550/api/bridge/restart
-```
+## Live Telemetry & Machine Control
 
 ### Live Telemetry WebSocket
 `WS /api/ws/live`
 
-WebSocket endpoint for real-time machine telemetry. Subscribes to MQTT topics and forwards sensor updates (pressure, flow, weight, temperature, machine state) to the browser.
+WebSocket endpoint for real-time machine telemetry. The Bun server connects to the
+machine over its native Socket.IO stream and forwards sensor updates (pressure,
+flow, weight, temperature, machine state) to the browser. There is no MQTT broker
+or bridge — the telemetry socket is built into the server.
 
 ```javascript
 const ws = new WebSocket('ws://<SERVER_IP>:3550/api/ws/live')
 ws.onmessage = (event) => console.log(JSON.parse(event.data))
 ```
 
-### Machine Commands (via MQTT)
+### Machine Commands
 
-All commands are fire-and-forget — they publish to the MQTT broker which forwards to the machine.
+Command endpoints proxy the machine's own action API (`/api/v1/action/*`) and
+return `{ "success": true }` on success. For actions not listed below, call the
+machine's proxied API directly (any `/api/v1/*` path is forwarded to the machine).
 
 | Method | Endpoint | Description | Precondition |
 |--------|----------|-------------|--------------|
 | POST | `/api/machine/command/start` | Start a shot | Machine idle |
-| POST | `/api/machine/command/stop` | Gracefully stop current shot | Shot running |
-| POST | `/api/machine/command/abort` | Immediately abort shot (retracts plunger) | Shot running |
-| POST | `/api/machine/command/continue` | Resume a paused shot | — |
-| POST | `/api/machine/command/preheat` | Start machine preheat | Machine idle |
-| POST | `/api/machine/command/tare` | Tare (zero) the scale | Machine connected |
-| POST | `/api/machine/command/home-plunger` | Home the plunger | Machine idle |
-| POST | `/api/machine/command/purge` | Run a purge cycle | Machine idle |
+| POST | `/api/machine/command/stop` | Stop the current shot | Shot running |
 | POST | `/api/machine/command/load-profile` | Load a profile (`{ "name": "..." }`) | Machine connected |
-| POST | `/api/machine/command/brightness` | Set display brightness (`{ "value": 0-100 }`) | Machine connected |
-| POST | `/api/machine/command/sounds` | Enable/disable sounds (`{ "enabled": true }`) | Machine connected |
+| POST | `/api/machine/preheat` | Start machine preheat | Machine idle |
 
 **Error responses:**
-- `409 Conflict` — precondition not met (machine offline, brewing, or idle depending on command)
-- `422 Unprocessable Entity` — invalid request body (e.g. brightness > 100, empty profile name)
-- `503 Service Unavailable` — MQTT publish failed
+- `400 Bad Request` — missing/invalid body (e.g. empty profile name)
+- `404 Not Found` — profile name not found on the machine
+- `502 Bad Gateway` — the machine rejected the action or is unreachable
 
 ---
 
@@ -214,25 +194,12 @@ curl -X DELETE http://<SERVER_IP>:3550/api/machine/schedule-shot/<schedule_id>
 | GET | `/api/settings` | Current settings |
 | POST | `/api/settings` | Save settings (triggers hot-reload) |
 | POST | `/api/restart` | Restart container (via SIGTERM to PID 1) |
-| GET | `/api/logs` | Retrieve log entries |
 | GET | `/api/changelog` | Changelog |
 | GET | `/api/network-ip` | Server network IP |
 | GET | `/api/update-method` | Current update method (watchtower or manual) |
 | GET | `/api/tailscale-status` | Tailscale connection info |
 | POST | `/api/check-updates` | Trigger update check |
-| GET | `/health` | Health check (no `/api` prefix) |
-
-### Logs Query Parameters
-
-| Param | Default | Description |
-|-------|---------|-------------|
-| `lines` | 100 | Number of entries (max 1000) |
-| `level` | all | `DEBUG` `INFO` `WARNING` `ERROR` `CRITICAL` |
-| `log_type` | `all` | `all` or `errors` |
-
-```bash
-curl "http://<SERVER_IP>:3550/api/logs?lines=200&level=ERROR"
-```
+| GET | `/api/health` | Health check (also served at `/health`) |
 
 ---
 
@@ -242,12 +209,12 @@ curl "http://<SERVER_IP>:3550/api/logs?lines=200&level=ERROR"
 # Check container is running
 docker ps | grep meticai
 
-# View logs
+# View logs (the single Bun process logs to stdout)
 docker logs meticai -f
 
-# Test connectivity
-curl http://<SERVER_IP>:3550/health
+# Filter logs for errors
+docker logs meticai 2>&1 | grep -i error
 
-# API errors via logs endpoint
-curl "http://<SERVER_IP>:3550/api/logs?level=ERROR&lines=50"
+# Test connectivity
+curl http://<SERVER_IP>:3550/api/health
 ```

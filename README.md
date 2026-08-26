@@ -212,13 +212,6 @@ cd ~/Metic
 bash scripts/addons.sh
 ```
 
-Windows PowerShell:
-
-```powershell
-cd $HOME/Metic
-powershell -ExecutionPolicy Bypass -File .\scripts\addons.ps1
-```
-
 Remote one-liner (Linux/macOS):
 
 ```bash
@@ -292,15 +285,11 @@ sensor data (pressure, flow, weight, temperature) to the web UI over the built-i
 ### Viewing Logs
 
 ```bash
-# Container logs (stdout)
+# Container logs (stdout) — the single Bun process logs here
 docker logs meticai -f
 
-# Structured logs via API (last 100 entries, filterable by level)
-curl http://<SERVER_IP>:3550/api/logs
-curl "http://<SERVER_IP>:3550/api/logs?level=ERROR&lines=200"
-
-# Restart a single service
-docker exec meticai s6-svc -r /run/service/server
+# Restart the container (e.g. after editing .env)
+docker compose restart meticai
 ```
 
 ### Container won't start
@@ -322,7 +311,7 @@ docker compose ps
 ### API returns errors
 
 ```bash
-# Check relay logs specifically
+# Filter the container logs for errors
 docker compose logs meticai | grep -i error
 ```
 

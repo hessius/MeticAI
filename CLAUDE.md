@@ -1,7 +1,7 @@
 # Metic — Project Memory
 
 Metic is an AI-powered controller for the Meticulous Espresso Machine.
-Stack: Python 3.13 (FastAPI) · React/TypeScript (Vite/Bun) · Google Gemini · Docker + s6-overlay.
+Stack: Bun single-binary server (`apps/bun-server`, `@metic/server`) + shared TypeScript core (`packages/core`, `@metic/core`) · React/TypeScript (Vite/Bun) · Google Gemini · Docker distroless single container.
 
 ## Conventions
 

@@ -169,6 +169,12 @@ docker compose up -d
 | MQTT/Telemetry | Not included | Built-in bridge + live dashboard |
 | Home Assistant | Not supported | MQTT auto-discovery |
 
+> **Note:** The table above describes v2.0. Several of these changed again in
+> **3.0.0**: s6-overlay was dropped in favour of a single Bun binary, and the
+> built-in MQTT bridge and Home Assistant MQTT auto-discovery were removed (live
+> telemetry still streams to the Metic dashboard over `/api/ws/live`). See
+> [Removed in 3.0.0](README.md#-removed-in-300-server-version).
+
 ## Troubleshooting Updates
 
 ### Container won't start after update

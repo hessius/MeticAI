@@ -20,7 +20,7 @@ Read `tasks.md` top to bottom. Find the first unchecked `[ ]` item. If items lac
 1. **Commit early** using Conventional Commits. Do not push during development.
 2. **Verify locally:** Load the `testing.md` skill to find the right test commands.
 3. **Verify live (UI/API):** Open `http://localhost:3550` and confirm 0 console errors. Run Playwright E2E tests against the running container.
-4. **Machine Integration:** For anything touching MQTT or live telemetry, use MCP tools to test live machine communication. 
+4. **Machine Integration:** For anything touching machine API behavior or live telemetry, test the affected flow against the running Bun container; live telemetry is exposed at `/api/ws/live` and connects upstream to the machine over Socket.IO. 
 5. **Log assumptions** in the `tasks.md` Notes section.
 
 ### Phase 3 — Cleanup

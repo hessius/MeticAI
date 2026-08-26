@@ -1,8 +1,9 @@
 # Metic — Android (Capacitor)
 
 The Android app is a [Capacitor](https://capacitorjs.com/) wrapper around the same
-web app that powers iOS, built in **DirectMode** (no Python backend — the
-`DirectModeInterceptor` reproduces the server contract client-side). It is
+web app that powers iOS, built in **DirectMode** (no backend server — the app
+routes `/api/*` calls through the shared `@metic/core` handler in-process, the
+same code the Bun server runs). It is
 distributed as a **signed APK on [GitHub Releases](https://github.com/hessius/MeticAI/releases)**,
 installable outside the Play Store.
 

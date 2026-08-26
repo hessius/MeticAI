@@ -18,7 +18,11 @@ bun install
 bun run dev        # → http://localhost:5173
 ```
 
-The dev server proxies `/api` requests to the backend at `http://localhost:8000`.
+`bun run dev` serves the frontend only. To exercise the `/api` endpoints, run the
+Bun server alongside it (`cd apps/bun-server && bun run start`, which serves the
+API on `http://localhost:3550`), or run the full unified container. In native
+direct mode, `/api/*` requests are handled in-process by the shared `@metic/core`
+handler (no backend server required).
 
 ### Build
 

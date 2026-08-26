@@ -1,21 +1,23 @@
 # Metic — Agent Instructions
 
-Metic is an AI-powered controller for the Meticulous Espresso Machine. Stack: Python 3.13 (FastAPI), React + TypeScript (Vite/Bun), Google Gemini Python SDK, Docker + s6-overlay. Repository: https://github.com/hessius/MeticAI. The `VERSION` file triggers the auto-release workflow.
+Metic is an AI-powered controller for the Meticulous Espresso Machine. Stack: Bun single-binary server (`apps/bun-server`, `@metic/server`) + shared TypeScript core (`packages/core`, `@metic/core`), React + TypeScript (Vite/Bun), Google Gemini, Docker distroless single container. Repository: https://github.com/hessius/MeticAI. The `VERSION` file triggers the auto-release workflow.
 
 ## Core Architecture
 
-- **Unified Container:** Single container (`meticai`) via s6-overlay. Port 3550 exposed (nginx proxy).
-- **Settings Hot-Reload:** Changing `METICULOUS_IP` or `GEMINI_API_KEY` restarts services (`s6-svc -r`) without full container restart.
-- **Environment:** Requires `.env` with `GEMINI_API_KEY` and `METICULOUS_IP`.
+- **Unified Container:** Single container (`meticai`) with one self-contained Bun binary at `/app/metic`. Port 3550 is exposed directly by the Bun server.
+- **Bun Server:** `apps/bun-server` serves the built React SPA, delegates REST API handling under `/api/*` to `@metic/core`, transparently proxies machine API calls (`/api/v1/*` → the Meticulous machine), and streams live telemetry on `/api/ws/live` via native WebSocket while connecting upstream to the machine over Socket.IO.
+- **Shared Core:** Business logic for AI analysis, profile generation, target-curve math, recommendations, dial-in, and machine I/O lives once in `packages/core` (`@metic/core`).
+- **Storage & Environment:** Persistent data lives in `/data`; `STORAGE_BACKEND` is `json` (default) or `sqlite`. Common env: `GEMINI_API_KEY`, `GEMINI_MODEL`, `METICULOUS_IP`, `DATA_DIR=/data`.
+- **Settings Changes:** `METICULOUS_IP` and `GEMINI_API_KEY` are applied by the running Bun process or by restarting the container (`docker compose restart meticai` / `docker restart meticai`).
 
-## Dual Runtime — Feature Parity (read before any logic change)
+## Dual Runtime — Shared Core (read before any logic change)
 
-Metic ships in **two runtimes** that implement the same behavior twice:
+Metic ships in **two runtimes** that consume the same `@metic/core` behavior:
 
-- **Server mode:** React web app + Python FastAPI backend (`apps/server/`) for AI analysis, profile generation, target-curve math, recommendations, machine I/O.
-- **Native/Capacitor mode:** iOS app with **no Python server** — that logic is reimplemented client-side in `apps/web/src/services/interceptor/DirectModeInterceptor.ts`, `apps/web/src/services/ai/`, `apps/web/src/lib/directModeAI.ts`, and `apps/web/src/lib/profileAnalysis.ts`.
+- **Server mode:** React web app served by the Bun server, which calls the shared `@metic/core` `handle()` function.
+- **Native/Capacitor mode:** iOS/Android (Capacitor) or PWA on-machine with no server; the web app installs the core interceptor (`installCoreInterceptor`) and routes `/api/*` calls through the same `@metic/core` `handle()` in-process.
 
-**Guardrail (do this automatically, without being asked):** any change to analysis / profile / curve / recommendation / dial-in / machine-API logic in one runtime **must** be mirrored in the other within the same change, with tests on both sides. After fixing one side, always grep the other runtime for the parallel implementation. Mismatched behavior between runtimes is a release-blocking bug. See `.github/CONVENTIONS.md` → Quality Gate #7 and *Architecture Patterns → Dual runtime*.
+**Guardrail (do this automatically, without being asked):** business logic belongs in `@metic/core`; changes there apply to both runtimes. Do not duplicate logic in runtime-specific adapters. What still differs per runtime is the thin platform adapter (server platform vs browser/native platform) and native-only UI (Live Activity, widgets). Test both server mode and native/direct mode for analysis / profile / curve / recommendation / dial-in / machine-API behavior. See `.github/CONVENTIONS.md` → Quality Gate #7 and *Architecture Patterns → Dual runtime*.
 
 ## Conventions
 
