@@ -16,6 +16,10 @@ final class ShotActivityController {
     /// activity stale and dims it, rather than showing frozen values as live.
     private static let staleAfter: TimeInterval = 12
 
+    /// How long the terminal shot summary lingers on the Lock Screen / Dynamic
+    /// Island after the shot finishes before the system dismisses it.
+    private static let summaryLinger: TimeInterval = 5 * 60
+
     private var activity: Activity<ShotActivityAttributes>?
     private var streamer: ShotStreamer?
     private var streamTask: Task<Void, Never>?
@@ -29,6 +33,11 @@ final class ShotActivityController {
     private var lastWeightG: Double?
     private var lastElapsedSec: Double?
     private var lastStatusFrame: ShotFrame?
+    /// True once the shot has entered extraction — gates completion detection and
+    /// causes post-shot idle temperatures to be ignored.
+    private var hasExtracted = false
+    /// Guards against finishing (ending the activity) more than once.
+    private var isFinishing = false
 
     func start(
         profileName: String,
@@ -57,6 +66,8 @@ final class ShotActivityController {
         lastWeightG = nil
         lastElapsedSec = nil
         lastStatusFrame = nil
+        hasExtracted = false
+        isFinishing = false
 
         let attributes = ShotActivityAttributes(
             profileName: profileName,
@@ -93,12 +104,27 @@ final class ShotActivityController {
     }
 
     func stop() {
+        // JS-driven stop (user left the shot flow). Show the terminal summary
+        // only if a shot actually happened; otherwise just clear the activity.
+        finish(showSummary: hasExtracted)
+    }
+
+    /// Tear down the stream and end the activity. When `showSummary` is true the
+    /// activity ends on a `.done` summary that lingers for `summaryLinger`;
+    /// otherwise it is dismissed immediately.
+    private func finish(showSummary: Bool) {
+        guard !isFinishing else { return }
+        isFinishing = true
         streamTask?.cancel()
         streamTask = nil
         streamer?.stop()
         streamer = nil
         endBackground()
-        if let activity {
+        guard let activity else {
+            self.activity = nil
+            return
+        }
+        if showSummary {
             let summary = ShotContentBuilder.summary(
                 finalWeightG: lastWeightG,
                 finalTimeSec: lastElapsedSec,
@@ -117,17 +143,23 @@ final class ShotActivityController {
             Task {
                 await activity.end(
                     .init(state: doneState, staleDate: nil),
-                    dismissalPolicy: .after(.now + 30)
+                    dismissalPolicy: .after(.now + Self.summaryLinger)
                 )
             }
+        } else {
+            Task { await activity.end(nil, dismissalPolicy: .immediate) }
         }
-        activity = nil
+        self.activity = nil
     }
 
     private func handle(_ frame: ShotStreamer.Frame) async {
-        guard let activity else { return }
+        guard let activity, !isFinishing else { return }
         switch frame {
         case .temperatures(let temps):
+            // Once the shot is underway (or over), the heating two-stage bars are
+            // no longer relevant — ignore idle temperatures so a finished shot
+            // never reverts to a misleading live temperature readout.
+            if hasExtracted { return }
             // Field mapping matches the in-app live view: t_bar_up = boiler /
             // "Brew Chamber", t_bar_down = "Brew Head".
             if let chamber = (temps["t_bar_up"] as? NSNumber)?.doubleValue { lastChamber = chamber }
@@ -149,16 +181,24 @@ final class ShotActivityController {
             guard var shotFrame = ShotFrame(status: status) else { return }
             shotFrame.chamberTempC = lastChamber
             shotFrame.headTempC = lastHead
-            if shotFrame.phase == .extracting, let elapsedSec = shotFrame.elapsedSec {
-                graph.append(
-                    t: elapsedSec,
-                    p: shotFrame.pressureBar ?? 0,
-                    f: shotFrame.flowGs ?? 0,
-                    w: shotFrame.weightG ?? 0
-                )
-                if let brewTempC = shotFrame.brewTempC { tempSamples.append(brewTempC) }
-                if let w = shotFrame.weightG { lastWeightG = w }
-                lastElapsedSec = elapsedSec
+            if shotFrame.phase == .extracting {
+                hasExtracted = true
+                if let elapsedSec = shotFrame.elapsedSec {
+                    graph.append(
+                        t: elapsedSec,
+                        p: shotFrame.pressureBar ?? 0,
+                        f: shotFrame.flowGs ?? 0,
+                        w: shotFrame.weightG ?? 0
+                    )
+                    if let brewTempC = shotFrame.brewTempC { tempSamples.append(brewTempC) }
+                    if let w = shotFrame.weightG { lastWeightG = w }
+                    lastElapsedSec = elapsedSec
+                }
+            } else if ShotContentBuilder.shotDidComplete(hasExtracted: hasExtracted, phase: shotFrame.phase) {
+                // Shot just finished (machine left extraction) — freeze into the
+                // lingering summary instead of showing post-shot idle state.
+                finish(showSummary: true)
+                return
             }
             lastStatusFrame = shotFrame
             let newState = ShotContentBuilder.state(

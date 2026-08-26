@@ -79,6 +79,14 @@ public enum ShotContentBuilder {
         )
     }
 
+    /// Whether the shot has finished: it entered extraction at some point and
+    /// the machine has now left the extracting state (post-shot purge / idle).
+    /// This is the cue to freeze the Live Activity into its terminal summary
+    /// instead of falling back to showing live, useless idle temperatures.
+    public static func shotDidComplete(hasExtracted: Bool, phase: ShotPhase) -> Bool {
+        hasExtracted && phase != .extracting
+    }
+
     /// Compute the terminal summary. Ratio/avg omitted when inputs are missing.
     public static func summary(
         finalWeightG: Double?,

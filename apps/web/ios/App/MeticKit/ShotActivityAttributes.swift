@@ -76,6 +76,44 @@ public struct ShotGraphSample: Codable, Hashable {
     }
 }
 
+/// Fixed-scale mapping for the extraction mini-chart. Pressure and flow share a
+/// single "nice" y-axis (both are single-digit espresso values) so their plotted
+/// heights are directly comparable and the axis labels are meaningful; weight
+/// rides its own 0…max scale (it climbs to tens of grams) and is read purely as
+/// a trend line. Pure value type so it can be unit-tested without a view.
+public struct ShotChartScale {
+    /// Shared maximum for the pressure/flow axis (bar · g/s), a friendly even number.
+    public let axisMax: Double
+    /// Maximum for the weight trend line (grams).
+    public let weightMax: Double
+
+    public init(samples: [ShotGraphSample], targetWeightG: Double?) {
+        let maxPF = samples.reduce(0.0) { Swift.max($0, Swift.max($1.p, $1.f)) }
+        self.axisMax = ShotChartScale.niceCeil(maxPF)
+        let maxW = samples.reduce(0.0) { Swift.max($0, $1.w) }
+        self.weightMax = Swift.max(targetWeightG ?? 0, maxW, 1)
+    }
+
+    /// Round up to a friendly even number (minimum 2): 8.9 → 10, 2.5 → 4, 11.2 → 12.
+    public static func niceCeil(_ v: Double) -> Double {
+        guard v > 0 else { return 2 }
+        return (v / 2).rounded(.up) * 2
+    }
+
+    public func normP(_ v: Double) -> Double { axisMax > 0 ? min(1, max(0, v / axisMax)) : 0 }
+    public func normF(_ v: Double) -> Double { axisMax > 0 ? min(1, max(0, v / axisMax)) : 0 }
+    public func normW(_ v: Double) -> Double { weightMax > 0 ? min(1, max(0, v / weightMax)) : 0 }
+
+    /// Top gridline label (the axis maximum).
+    public var axisTop: String { ShotChartScale.label(axisMax) }
+    /// Middle gridline label (half the axis maximum).
+    public var axisMid: String { ShotChartScale.label(axisMax / 2) }
+
+    static func label(_ v: Double) -> String {
+        v == v.rounded() ? String(format: "%.0f", v) : String(format: "%.1f", v)
+    }
+}
+
 public struct ShotActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         public var phase: ShotPhase

@@ -9,26 +9,28 @@ func shotDynamicIsland(_ context: ActivityViewContext<ShotActivityAttributes>) -
     let attr = context.attributes
     return DynamicIsland {
         // The expanded regions sit against the rounded corners / camera, so keep
-        // their content inset to avoid the system clipping a few pixels on each
-        // edge. Leading/trailing stay minimal; the full layout is in the bottom.
+        // their content well inset to avoid the system clipping content on each
+        // edge (more aggressive rounding here than on the Lock Screen).
         DynamicIslandExpandedRegion(.leading) {
             Image(systemName: iconName(state.phase))
                 .foregroundStyle(islandBrandOrange)
-                .padding(.leading, 6)
-                .padding(.top, 4)
+                .padding(.leading, 12)
+                .padding(.top, 8)
         }
         DynamicIslandExpandedRegion(.trailing) {
             Text(glanceableValue(attr, state))
                 .font(.caption.bold())
                 .monospacedDigit()
                 .lineLimit(1)
-                .padding(.trailing, 6)
-                .padding(.top, 4)
+                .minimumScaleFactor(0.8)
+                .padding(.trailing, 12)
+                .padding(.top, 8)
         }
         DynamicIslandExpandedRegion(.bottom) {
             ShotLockScreenView(attributes: attr, state: state, isStale: context.isStale)
-                .padding(.horizontal, 8)
-                .padding(.bottom, 4)
+                .padding(.horizontal, 16)
+                .padding(.top, 2)
+                .padding(.bottom, 10)
         }
     } compactLeading: {
         Image(systemName: iconName(state.phase))
