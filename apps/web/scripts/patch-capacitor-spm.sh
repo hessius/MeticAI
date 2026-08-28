@@ -396,6 +396,10 @@ else:
         with open(path, 'w') as f:
             f.write(content)
         print("  Patched: @capgo/capacitor-llm (LiteRT-LM CPU-first)")
+    elif "configs = [try makeConfig(.cpu()), try makeConfig(.gpu)]" in content:
+        # Upstream >= 8.1.3 already defaults to CPU-first (CPU then GPU fallback),
+        # which is exactly what this patch enforced. Nothing to do.
+        print("  OK: @capgo/capacitor-llm already CPU-first upstream (>= 8.1.3)")
     else:
         print("  WARNING: @capgo/capacitor-llm config block not found; upstream may have changed")
 PYEOF
@@ -443,11 +447,16 @@ fi
 # capacitor-llm). Xcode cannot generate a dSYM for a prebuilt binary, so the
 # archive's dSYMs folder is missing it and App Store Connect rejects the upload:
 #   "The archive did not include a dSYM for the CLiteRTLM.framework ..."
-# We add a Run Script build phase that runs dsymutil on every embedded dynamic
-# framework that lacks a dSYM and writes it into DWARF_DSYM_FOLDER_PATH (which
-# points at the archive's dSYMs folder during Archive). dsymutil emits a valid
-# DWARF file carrying the framework's UUID even for a stripped binary, which is
-# all the validator requires. Idempotent: skipped if the phase already exists.
+# We add a Run Script build phase that runs dsymutil and writes the result into
+# DWARF_DSYM_FOLDER_PATH (which points at the archive's dSYMs folder during
+# Archive). dsymutil emits a valid DWARF file carrying the framework's LC_UUID
+# even for a binary with no debug info, which is all the validator requires.
+# IMPORTANT: SPM binaryTarget xcframeworks are embedded into the .app bundle by
+# Xcode *after* this phase runs, so scanning the app's Frameworks folder alone
+# misses them (this was the original bug). We therefore also scan the always-
+# present SourcePackages/artifacts checkout and synthesize dSYMs from the device
+# (non-simulator) slice — the embedded copy keeps the same LC_UUID, so the
+# generated dSYM matches. Idempotent: skipped if the phase already exists.
 if [ -f "$PBXPROJ" ] && ! grep -q 'Generate framework dSYMs' "$PBXPROJ" 2>/dev/null; then
     python3 - "$PBXPROJ" << 'PYEOF'
 import re, sys
@@ -466,20 +475,47 @@ script_lines = [
     'set -u',
     'if [ "${DEBUG_INFORMATION_FORMAT:-}" != "dwarf-with-dsym" ]; then exit 0; fi',
     '[ -n "${DWARF_DSYM_FOLDER_PATH:-}" ] || exit 0',
-    'FW_DIR="${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}"',
-    '[ -d "$FW_DIR" ] || exit 0',
     'mkdir -p "$DWARF_DSYM_FOLDER_PATH"',
-    'for FW in "$FW_DIR"/*.framework; do',
-    '  [ -d "$FW" ] || continue',
-    '  NAME=$(basename "$FW" .framework)',
-    '  BIN="$FW/$NAME"',
-    '  [ -f "$BIN" ] || continue',
-    '  file -b "$BIN" | grep -q "dynamically linked shared library" || continue',
+    'gen_dsym() {',
+    '  BIN="$1"; NAME="$2"',
+    '  [ -f "$BIN" ] || return 0',
+    '  file -b "$BIN" | grep -q "dynamically linked shared library" || return 0',
     '  DSYM="$DWARF_DSYM_FOLDER_PATH/$NAME.framework.dSYM"',
-    '  [ -e "$DSYM" ] && continue',
+    '  [ -e "$DSYM" ] && return 0',
     '  echo "note: generating missing dSYM for $NAME.framework"',
     '  xcrun dsymutil "$BIN" -o "$DSYM" || true',
+    '}',
+    '# 1) Frameworks already embedded in the .app bundle (CocoaPods-style embeds).',
+    'FW_DIR="${TARGET_BUILD_DIR:-}/${FRAMEWORKS_FOLDER_PATH:-}"',
+    'if [ -d "$FW_DIR" ]; then',
+    '  for FW in "$FW_DIR"/*.framework; do',
+    '    [ -d "$FW" ] || continue',
+    '    NAME=$(basename "$FW" .framework)',
+    '    gen_dsym "$FW/$NAME" "$NAME"',
+    '  done',
+    'fi',
+    '# 2) SPM binaryTarget xcframeworks (e.g. CLiteRTLM) are embedded AFTER this',
+    '#    phase, so scan the always-present SourcePackages artifacts and use the',
+    '#    device (non-simulator) slice. The embedded copy keeps the same LC_UUID.',
+    'ARTIFACTS=""',
+    'for ANCHOR in "${BUILD_DIR:-}" "${BUILT_PRODUCTS_DIR:-}" "${SYMROOT:-}" "${OBJROOT:-}"; do',
+    '  [ -n "$ANCHOR" ] || continue',
+    '  ROOT="${ANCHOR%%/Build/*}"',
+    '  if [ -d "$ROOT/SourcePackages/artifacts" ]; then ARTIFACTS="$ROOT/SourcePackages/artifacts"; break; fi',
     'done',
+    'if [ -n "$ARTIFACTS" ]; then',
+    '  find "$ARTIFACTS" -type d -name "*.xcframework" | while IFS= read -r XCF; do',
+    '    for SLICE in "$XCF"/ios-arm64 "$XCF"/ios-arm64_*; do',
+    '      case "$SLICE" in *simulator*) continue ;; esac',
+    '      [ -d "$SLICE" ] || continue',
+    '      for FW in "$SLICE"/*.framework; do',
+    '        [ -d "$FW" ] || continue',
+    '        NAME=$(basename "$FW" .framework)',
+    '        gen_dsym "$FW/$NAME" "$NAME"',
+    '      done',
+    '    done',
+    '  done',
+    'fi',
 ]
 
 def esc(line):
@@ -540,6 +576,19 @@ if changed:
 else:
     print("  WARNING: could not add dSYM build phase (structure changed?)")
 PYEOF
+fi
+
+# ─── Disable Run Script sandbox so the dSYM phase can write the archive ──
+# The 'Generate framework dSYMs' phase must read SPM artifacts and write into
+# DWARF_DSYM_FOLDER_PATH (the archive dSYMs folder) — both outside the script
+# sandbox's declared I/O. With ENABLE_USER_SCRIPT_SANDBOXING = YES the phase
+# fails with "cannot create bundle: Operation not permitted". Flip it to NO for
+# the App target (idempotent; only the App target sets this key).
+if [ -f "$PBXPROJ" ] && grep -q 'ENABLE_USER_SCRIPT_SANDBOXING = YES;' "$PBXPROJ" 2>/dev/null; then
+    tmp=$(mktemp)
+    sed 's/ENABLE_USER_SCRIPT_SANDBOXING = YES;/ENABLE_USER_SCRIPT_SANDBOXING = NO;/g' \
+        "$PBXPROJ" > "$tmp" && mv "$tmp" "$PBXPROJ"
+    echo "  Set ENABLE_USER_SCRIPT_SANDBOXING = NO (App target) for dSYM generation"
 fi
 
 echo "Capacitor SPM patching complete."

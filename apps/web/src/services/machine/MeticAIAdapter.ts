@@ -121,6 +121,11 @@ export function createMeticAIAdapter(): MachineService {
       const resp = await apiFetch<{ profile: Profile }>(`${base}/api/machine/profile/${encodeURIComponent(id)}`)
       return resp.profile
     },
+    getLastProfile: async () => {
+      const base = await getServerUrl()
+      const resp = await apiFetch<{ profile: Profile | null }>(`${base}/api/machine/profile/last`)
+      return resp.profile ?? null
+    },
     saveProfile: async (profile: Profile) => {
       const base = await getServerUrl()
       return apiFetch<ProfileIdent>(`${base}/api/profile/import`, {

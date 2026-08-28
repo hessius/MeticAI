@@ -23,10 +23,10 @@ describe('HeatingNumbers', () => {
     expect(screen.getByText('88.4°C')).toBeInTheDocument()
   })
 
-  it('renders a red target marker per sensor', () => {
+  it('renders no target marker (plain progress bars)', () => {
     render(<HeatingNumbers chamberTemp={91.2} headTemp={88.4} setTemp={93} lanceReadyCutoff={92} />)
 
-    expect(screen.getAllByTestId('target-marker')).toHaveLength(2)
+    expect(screen.queryAllByTestId('target-marker')).toHaveLength(0)
   })
 
   it('renders a per-sensor "to target" readout without inline 6-digit hex colors', () => {

@@ -70,6 +70,18 @@ describe('MarkdownText utilities', () => {
       expect(result).toBe('This should be cleaned')
     })
 
+    it('should not strip a valid trailing bold (no space before **)', () => {
+      const input = 'This is **bold**'
+      const result = cleanMalformedMarkdown(input)
+      expect(result).toBe('This is **bold**')
+    })
+
+    it('should preserve the character before a stripped trailing **', () => {
+      const input = 'Line one **\nLine two'
+      const result = cleanMalformedMarkdown(input)
+      expect(result).toBe('Line one\nLine two')
+    })
+
     it('should handle complex malformed markdown', () => {
       const input = '** Profile description\n**\nMore text\n###'
       const result = cleanMalformedMarkdown(input)

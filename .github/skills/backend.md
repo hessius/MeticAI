@@ -1,32 +1,35 @@
 # Agent Skill: Backend Standards
 
-This skill defines the rules for modifying the Python 3.13 FastAPI backend located in `apps/server/`.
+This skill defines the rules for modifying the current TypeScript backend: shared `@metic/core` in `packages/core` plus the Bun server in `apps/bun-server`.
 
-## 1. Python Coding Standards
-- **Style:** Strictly follow PEP 8.
-- **Typing:** Use extensive type hints throughout the codebase.
-- **Structure:** Keep functions focused and single-purpose. 
-- **Documentation:** Write clear docstrings for all public APIs.
+## 1. Backend Architecture
+- **Business logic lives in `@metic/core`:** AI analysis, profile generation, target-curve math, recommendations, dial-in, route behavior, and machine I/O belong in `packages/core` so server and native/direct mode share one implementation.
+- **Routes:** Add or update route modules in `packages/core/src/routes/` and wire them through `packages/core/src/handler.ts`.
+- **Platform seam:** Keep runtime-specific I/O behind `packages/core/src/platform.ts` abstractions. Server-specific behavior belongs in `apps/bun-server`; browser/native-specific behavior belongs in the web platform adapter/interceptor.
+- **Bun server:** `apps/bun-server` (`@metic/server`) serves the built React SPA, delegates `/api/*` to `@metic/core`, proxies `/api/v1/*` to the Meticulous machine, and hosts `/api/ws/live` telemetry.
 
-## 2. Testing Requirements
-- All new code must be accompanied by tests in `test_main.py`.
-- Aim for full coverage on critical paths.
-- You must explicitly test both success and failure/edge-case paths.
+## 2. TypeScript Standards
+- Use strict TypeScript with explicit types at public seams.
+- Keep functions focused and single-purpose.
+- Prefer platform-agnostic helpers in `packages/core/src/logic/` over runtime-specific duplication.
+- Do not add duplicate server/native implementations for shared business rules.
 
-## 3. Workflow for Backend Changes
-- **Adding Dependencies:** Add to `apps/server/requirements.txt` with a pinned version. Rebuild the container using the dev overlay, and run the full test suite.
-- **Adding API Routes:**
-  1. Create the module in `apps/server/api/routes/`.
-  2. Register the router in `apps/server/main.py`.
-  3. Add corresponding tests in `apps/server/test_main.py`.
+## 3. Testing Requirements
+- Add or update `packages/core/test/**` tests for shared route/logic behavior.
+- Add `apps/bun-server/test/**` coverage for server-only concerns such as static serving, machine proxying, storage wiring, config, and telemetry.
+- Also test native/direct mode when behavior is visible in Capacitor/PWA direct mode.
+- Explicitly cover success and failure/edge-case paths.
 
-## 4. Native (Capacitor) Parity — MANDATORY
-The iOS/Capacitor build has **no Python server**: analysis, profile generation, target-curve math, recommendations, dial-in, and machine routes are reimplemented client-side in `apps/web/src/services/interceptor/DirectModeInterceptor.ts` (plus `apps/web/src/services/ai/`, `apps/web/src/lib/directModeAI.ts`, `apps/web/src/lib/profileAnalysis.ts`).
+## 4. Workflow for Backend Changes
+- **Adding dependencies:** Use `bun add` in the affected package (`packages/core`, `apps/bun-server`, or `apps/web`) and commit the corresponding `bun.lock` with `package.json`.
+- **Adding API routes:**
+  1. Create or update the module in `packages/core/src/routes/`.
+  2. Register behavior in `packages/core/src/handler.ts`.
+  3. Add shared tests in `packages/core/test/` and server adapter tests in `apps/bun-server/test/` if server behavior changes.
 
-- Any change to `apps/server/services/` (or any backend behavior a client observes) **must** be mirrored in the DirectMode layer **in the same PR**, with tests on both sides — even when the request only mentions the server.
-- Before marking a backend change complete, grep the DirectMode files for the parallel implementation (e.g. target-curve generation lives in both `analysis_service.py` and `DirectModeInterceptor.ts`) and update it. This is Quality Gate #7 in `.github/CONVENTIONS.md`.
-
-## 5. Gemini CLI Configuration
-- If modifying Gemini settings, edit `docker/gemini-settings.json`.
-- Use the `"httpUrl"` key (not `"uri"`) for streamable-http transport.
-- Ensure `"trust": true` is included to skip MCP tool approval prompts.
+## 5. Gemini Configuration
+- The Gemini provider is configured via the `GEMINI_API_KEY` and `GEMINI_MODEL`
+  environment variables (there is no MCP server or `gemini-settings.json` file).
+- Model selection and the AI provider seam live in `packages/core/src/ai/`
+  (e.g. `modelResolver.ts`); the default model is defined in
+  `packages/core/src/routes/system.ts`.

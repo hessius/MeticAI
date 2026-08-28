@@ -68,6 +68,18 @@
     -webkit-tap-highlight-color: transparent;
   }
   
+  /* Radix dialogs, Sonner toasts and popovers mount in body-level portals,
+     outside #root, so the guards above never reach them. Apply the same
+     no-select / no-callout / no-tap-highlight guards at the body level so
+     overlay content keeps the native-app feel (no inadvertent text selection,
+     no selection magnifier stealing taps from buttons). */
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   /* Allow text selection in form inputs and readable content */
   input, textarea, [contenteditable], pre, code, .selectable {
     -webkit-user-select: text;

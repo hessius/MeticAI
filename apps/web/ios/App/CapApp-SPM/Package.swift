@@ -4,14 +4,14 @@ import PackageDescription
 // DO NOT MODIFY THIS FILE - managed by Capacitor CLI commands
 let package = Package(
     name: "CapApp-SPM",
-    platforms: [.iOS(.v15)],
+    platforms: [.iOS(.v17)],
     products: [
         .library(
             name: "CapApp-SPM",
             targets: ["CapApp-SPM"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.4.1"),
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.5.0"),
         .package(name: "AparajitaCapacitorBiometricAuth", path: "../../../node_modules/@aparajita/capacitor-biometric-auth"),
         .package(name: "AparajitaCapacitorSecureStorage", path: "../../../node_modules/@aparajita/capacitor-secure-storage"),
         .package(name: "CapacitorCommunityKeepAwake", path: "../../../node_modules/@capacitor-community/keep-awake"),
@@ -27,6 +27,7 @@ let package = Package(
         .package(name: "CapacitorPreferences", path: "../../../node_modules/@capacitor/preferences"),
         .package(name: "CapacitorShare", path: "../../../node_modules/@capacitor/share"),
         .package(name: "CapgoCapacitorLlm", path: "../../../node_modules/@capgo/capacitor-llm"),
+        .package(name: "CapgoCapacitorShareTarget", path: "../../../node_modules/@capgo/capacitor-share-target"),
         .package(name: "CapacitorZeroconf", path: "../../../node_modules/capacitor-zeroconf")
     ],
     targets: [
@@ -50,6 +51,7 @@ let package = Package(
                 .product(name: "CapacitorPreferences", package: "CapacitorPreferences"),
                 .product(name: "CapacitorShare", package: "CapacitorShare"),
                 .product(name: "CapgoCapacitorLlm", package: "CapgoCapacitorLlm"),
+                .product(name: "CapgoCapacitorShareTarget", package: "CapgoCapacitorShareTarget"),
                 .product(name: "CapacitorZeroconf", package: "CapacitorZeroconf")
             ]
         )

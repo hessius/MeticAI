@@ -1,70 +1,77 @@
-Agent Skill: Testing, Build & Debugging
+# Agent Skill: Testing, Build & Debugging
 
 > **Full conventions:** See `.github/CONVENTIONS.md` for all project rules.
 
 This skill defines the commands and workflows required to verify code changes, run tests, and manage the local Docker environment.
 
-# 1. Complete Local Test Workflow (The Gate)
+## 1. Complete Local Test Workflow (The Gate)
 
-Run this sequence before pushing any code to trigger CI:
+Run the smallest targeted command that covers the change first. Before pushing, run the full local gate:
 
-1. Python unit tests
+1. Shared core tests and typecheck
 
-cd apps/server && TEST_MODE=true .venv/bin/python -m pytest test_main.py -x -q
+```bash
+cd packages/core && bun test && bun run typecheck
+```
 
-Expected: 750+ tests passing.
+2. Bun server tests and typecheck
 
-2. Python logging tests
-
-TEST_MODE=true .venv/bin/python -m pytest test_logging.py -x -q
+```bash
+cd apps/bun-server && bun test && bun run typecheck
+```
 
 3. Web unit tests + linter (0 errors required; warnings are OK)
 
-cd ../web && bun run lint && bun run test:run
+```bash
+cd apps/web && bun run lint && bun run test:run
+```
 
-Expected: 277+ tests passing. 0 lint errors (warnings OK per issue #256).
+4. Web build
 
-4. Build container from local source and start
+```bash
+cd apps/web && bun run build
+```
 
-cd ../.. && docker compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache && docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+5. Build container from local source and start
 
-5. Health check
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache   && docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+```
 
-docker exec meticai curl -sf http://localhost:3550/health
+6. Health check
 
-6. E2E integration tests against the running container (CI Gate)
+```bash
+docker exec meticai /app/metic healthcheck
+curl -sf http://localhost:3550/health
+```
 
-cd apps/web && BASE_URL=http://localhost:3550 npx playwright test e2e/verify-tasks.spec.ts
+7. E2E integration tests against the running container
 
-7. API integration tests
+```bash
+cd apps/web && BASE_URL=http://localhost:3550 npx playwright test e2e/verify-tasks.spec.ts e2e/api-integration.spec.ts
+```
 
-BASE_URL=http://localhost:3550 npx playwright test e2e/api-integration.spec.ts
+## 2. Live Machine Integration (Optional)
 
-# 2. Live Machine Integration (Optional)
+If the physical machine is reachable, verify affected machine API behavior against the running container. Live telemetry uses `/api/ws/live`; the Bun server connects upstream to the Meticulous machine over Socket.IO.
 
-If the physical machine is reachable, run the live integration tests.
-  bash cd apps/server && METICULOUS_IP=$METICULOUS_IP TEST_INTEGRATION=true .venv/bin/python -m pytest test_integration_machine.py -v   
-
-3. Raspberry Pi Test Device Access
+## 3. Raspberry Pi Test Device Access
 
 To test directly on the Pi 4B (hallon):
-  bash ssh pi@hallon   # Requires SSH key auth configured (see ~/.ssh/config)
 
-4. Debugging Quick Reference
+```bash
+ssh pi@hallon   # Requires SSH key auth configured (see ~/.ssh/config)
+```
 
-Task - Command
+## 4. Debugging Quick Reference
 
-- Container logs
-docker logs meticai -f
+| Task | Command |
+|---|---|
+| Container logs | `docker logs meticai -f` |
+| Restart container | `docker compose restart meticai` or `docker restart meticai` |
+| Health endpoint | `curl -sf http://localhost:3550/health` |
+| Binary healthcheck | `docker exec meticai /app/metic healthcheck` |
 
-- s6 service status
-docker exec meticai s6-rc -a list
+## 5. Quick Full Gate (Extension Tool)
 
-- Restart single service
-docker exec meticai s6-svc -r /run/service/server
-
-- MCP server logs
-docker exec meticai cat /var/log/mcp-server.log
-
-# 5. Quick Full Gate (Extension Tool)
-If the `meticai-guardrails` extension is loaded, you can run `meticai_run_tests` with scope "all" to execute the full gate in one command.
+If the `meticai-guardrails` extension is loaded, you can run `meticai_run_tests` to execute the full gate in one command.

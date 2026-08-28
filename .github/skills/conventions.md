@@ -15,7 +15,7 @@ This is the **single source of truth**. When in doubt, read it.
 - **VERSION + apps/web/package.json** always bumped together
 - **Conventional Commits** with `Co-authored-by: Copilot` trailer
 - **i18n** all user-facing strings via `t()`, all 6 locales
-- **Tests** before pushing: backend pytest + frontend bun + lint + build
+- **Tests** before pushing: core + Bun server tests, frontend bun tests, lint, and build
 
 ## 3. Adding New Conventions
 

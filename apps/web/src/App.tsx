@@ -49,6 +49,11 @@ import { isAIConfigured, apiKeyStorageKey, getActiveProviderId } from '@/service
 
 // Phase 3 — Control Center & live telemetry
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
+import { useShotTelemetryRecorder } from '@/hooks/useShotTelemetryRecorder'
+import { useLiveActivitySync } from '@/hooks/useLiveActivitySync'
+import { useOptionalMachineService } from '@/services/machine/MachineServiceContext'
+import { useWidgetSync } from '@/hooks/useWidgetSync'
+import { capacitorStorage } from '@/services/storage/CapacitorStorage'
 import { useLastShot } from '@/hooks/useLastShot'
 import { useSmartGreeting } from '@/hooks/useSmartGreeting'
 import { useProfileImageSrc, getProfileImageValue, resolveDisplayImage } from '@/hooks/useProfileImageSrc'
@@ -58,6 +63,7 @@ import { BetaBanner } from '@/components/BetaBanner'
 import { DemoModeBanner } from '@/components/DemoModeBanner'
 import { FeatureErrorBoundary } from '@/components/FeatureErrorBoundary'
 import { ProfileImportDialog } from '@/components/ProfileImportDialog'
+import { ShareImportResultDialog, type ShareImportState } from '@/components/ShareImportResultDialog'
 import type { ProfileData } from '@/components/ProfileBreakdown'
 
 const LiveShotView = lazy(() => import('./components/LiveShotView').then(m => ({ default: m.LiveShotView })))
@@ -71,6 +77,8 @@ const OnboardingWizard = lazy(() => import('./components/OnboardingWizard').then
 
 // Storage migration — initialises IndexedDB in direct/PWA mode
 import { useStorageMigration } from '@/services/storage'
+import { registerShareTargetListener } from '@/services/shareImport'
+import { importProfileFromSource } from '@/services/importProfile'
 
 // Capacitor plugin hooks
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
@@ -115,10 +123,14 @@ function App() {
   const [createdProfileId, setCreatedProfileId] = useState<string | null>(null)
   const [runShotProfileId, setRunShotProfileId] = useState<string | undefined>(undefined)
   const [runShotProfileName, setRunShotProfileName] = useState<string | undefined>(undefined)
+  // Auto-start on stable temperature (#588). Shared between the Run Shot menu
+  // and the Live View warm-up so the toggle carries across navigation. Not
+  // persisted — defaults off for every fresh shot.
+  const [autoStartEnabled, setAutoStartEnabled] = useState(false)
   const [shotHistoryProfileName, setShotHistoryProfileName] = useState<string | undefined>(undefined)
   const [shotHistoryInitialDate, setShotHistoryInitialDate] = useState<string | undefined>(undefined)
   const [shotHistoryInitialFilename, setShotHistoryInitialFilename] = useState<string | undefined>(undefined)
-  const [pendingImportUrl, setPendingImportUrl] = useState<string | null>(null)
+  const [shareImportState, setShareImportState] = useState<ShareImportState | null>(null)
   const [showAddProfileDialog, setShowAddProfileDialog] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const resultsCardRef = useRef<HTMLDivElement>(null)
@@ -137,6 +149,14 @@ function App() {
   const [aiEnabled, setAiEnabled] = useState(true)
   const [hideAiWhenUnavailable, setHideAiWhenUnavailable] = useState(false)
   const machineState = useMachineTelemetry(mqttEnabled)
+  const machine = useOptionalMachineService()
+  const [openAppOnStart, setOpenAppOnStart] = useState(false)
+  // Continuously record heating + shot telemetry into a persistent buffer so the
+  // live-shot graph can be back-filled whenever the view is opened (issue #582).
+  useShotTelemetryRecorder(machineState)
+  // Mirror shots into an iOS Live Activity app-wide so it triggers the moment a
+  // shot is detected/started, regardless of the current view (native-only).
+  useLiveActivitySync(machineState)
   const lastShotHook = useLastShot(mqttEnabled)
   const smartGreeting = useSmartGreeting(mqttEnabled && viewState === 'start')
   const prevBrewingRef = useRef(false)
@@ -147,6 +167,44 @@ function App() {
   const { notifyPreheatComplete } = useBrewNotifications()
   const { machineReady: playMachineReady, brewingStarted: playBrewingStarted, generationComplete: playGenerationComplete, islandExpand: playIslandExpand, islandContract: playIslandContract } = useSoundEffects()
   useGlobalSoundDelegation()
+
+  // Load persisted openAppOnStart setting (drives widget "Start" behaviour).
+  useEffect(() => {
+    capacitorStorage.get(STORAGE_KEYS.OPEN_APP_ON_START)
+      .then(v => setOpenAppOnStart(v === 'true'))
+      .catch(() => {})
+  }, [])
+
+  // Mirror favourites / machine URL / settings into iOS widgets (no-op elsewhere).
+  useWidgetSync({ openAppOnStart })
+
+    // Handle metic:// deep links fired by iOS widgets.
+  useEffect(() => {
+    if (!machine) return
+    let remove: (() => void) | undefined
+    void import('@capacitor/app').then(({ App: CapApp }) => {
+      CapApp.addListener('appUrlOpen', async ({ url }) => {
+        const { handleMeticDeepLink } = await import('@/services/widgets/deepLinkHandler')
+        await handleMeticDeepLink(url, {
+          machine,
+          lookupName: async (id) => {
+            try {
+              const listRes = await fetch('/api/v1/profile/list')
+              if (!listRes.ok) return null
+              const profiles = await listRes.json()
+              const match = Array.isArray(profiles) && profiles.find(
+                (p: { id?: string; name?: string }) => p.id === id,
+              )
+              return match?.name ?? null
+            } catch {
+              return null
+            }
+          },
+        })
+      }).then((handle) => { remove = () => { void handle.remove() } })
+    })
+    return () => { remove?.() }
+  }, [machine])
 
   // Live profile breakdown data (fetched when in live-shot view)
   const [liveProfileData, setLiveProfileData] = useState<ProfileData | null>(null)
@@ -494,8 +552,19 @@ function App() {
     }
   }, [islandNote])
 
-  // Check for existing profiles on mount
+  // Check for existing profiles on mount.
+  //
+  // In proxy/server mode the `/api/history` endpoint is backed by the espresso
+  // machine's shot log, which can take 10s+ to respond (and much longer under
+  // concurrent load). Init must never hard-block on it, otherwise the whole app
+  // is stuck on the loading screen until the machine replies. Clear the
+  // initializing gate immediately and let the profile count populate in the
+  // background, guarded by a timeout so a slow or hanging machine never leaves
+  // the request pending indefinitely.
   useEffect(() => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
+
     const checkProfiles = async () => {
       // In direct or demo mode, skip proxy API — default to form view
       if (isDemoMode() || isDirectMode()) {
@@ -503,37 +572,34 @@ function App() {
         setIsInitializing(false)
         return
       }
+
+      // Never block the UI on the (potentially slow) machine-backed history call.
+      setIsInitializing(false)
+
       try {
         const serverUrl = await getServerUrl()
-        const response = await fetch(`${serverUrl}/api/history?limit=1&offset=0`)
+        const response = await fetch(`${serverUrl}/api/history?limit=1&offset=0`, {
+          signal: controller.signal,
+        })
         if (response.ok) {
           const data = await response.json()
           setProfileCount(data.total || 0)
         }
       } catch (err) {
-        console.error('Failed to check profiles:', err)
-        // On error, default to form view
-        setProfileCount(0)
+        // Ignore aborts (timeout/unmount); default to form view otherwise
+        if (!(err instanceof DOMException && err.name === 'AbortError')) {
+          console.error('Failed to check profiles:', err)
+          setProfileCount(0)
+        }
       } finally {
-        setIsInitializing(false)
+        clearTimeout(timeout)
       }
     }
     checkProfiles()
-  }, [])
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const importParam = params.get('import')
-    if (importParam) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time URL param init on mount
-      setPendingImportUrl(importParam)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setShowAddProfileDialog(true)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setViewState('profile-catalogue')
-      const url = new URL(window.location.href)
-      url.searchParams.delete('import')
-      window.history.replaceState({}, '', url.toString())
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
     }
   }, [])
 
@@ -551,6 +617,49 @@ function App() {
       console.error('Failed to refresh profile count:', err)
     }
   }, [])
+
+  // Automatic profile import used by the share sheet and the `?import=` deep
+  // link. The profile is added without any dialog interaction; a central
+  // popover then reports success (with the profile name) or failure (with a
+  // reason when the server provides one).
+  const runAutoImport = useCallback(async (source: string) => {
+    const trimmed = source.trim()
+    if (!trimmed) return
+    setShareImportState({ status: 'importing' })
+    const result = await importProfileFromSource(trimmed)
+    setShareImportState(result)
+    if (result.status === 'success' || result.status === 'exists') {
+      refreshProfileCount()
+      setViewState('profile-catalogue')
+    }
+  }, [refreshProfileCount])
+
+  // The share sheet and the `?import=` deep link both import automatically and
+  // then surface the central result popover. Both run once on mount because
+  // runAutoImport is stable.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const importParam = params.get('import')
+    if (importParam) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('import')
+      window.history.replaceState({}, '', url.toString())
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time deep-link import on mount
+      runAutoImport(importParam)
+    }
+  }, [runAutoImport])
+
+  useEffect(() => {
+    let cleanup: (() => void) | undefined
+    void registerShareTargetListener((source) => {
+      runAutoImport(source)
+    }).then((fn) => {
+      cleanup = fn
+    })
+    return () => {
+      cleanup?.()
+    }
+  }, [runAutoImport])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -868,6 +977,7 @@ function App() {
 
   const handleBackToStart = useCallback(() => {
     refreshProfileCount()
+    setAutoStartEnabled(false)
     setViewState('start')
   }, [refreshProfileCount])
 
@@ -931,10 +1041,10 @@ function App() {
     if (closeTopmostOverlay()) return
     if (qrDialogOpen) { setQrDialogOpen(false); return }
     if (showAddProfileDialog) { setShowAddProfileDialog(false); return }
-    if (pendingImportUrl) { setPendingImportUrl(null); return }
+    if (shareImportState && shareImportState.status !== 'importing') { setShareImportState(null); return }
     if (hasUnsavedChanges() && !window.confirm(t('profileEdit.unsavedChanges'))) return
     navigateBack()
-  }, [qrDialogOpen, showAddProfileDialog, pendingImportUrl, navigateBack, t])
+  }, [qrDialogOpen, showAddProfileDialog, shareImportState, navigateBack, t])
 
   useAndroidBackButton(handleAndroidBack)
 
@@ -1658,6 +1768,8 @@ function App() {
                     onNavigateToLive={() => setViewState('live-shot')}
                     initialProfileId={runShotProfileId}
                     initialProfileName={runShotProfileName}
+                    autoStartEnabled={autoStartEnabled}
+                    onAutoStartChange={setAutoStartEnabled}
                   />
                 </FeatureErrorBoundary>
               )}
@@ -1669,6 +1781,8 @@ function App() {
                     onBack={handleBackToStart}
                     profileData={liveProfileData}
                     profileDescription={liveProfileDescription}
+                    autoStartEnabled={autoStartEnabled}
+                    onAutoStartChange={setAutoStartEnabled}
                     onAnalyzeShot={(profileName) => {
                       setShotHistoryProfileName(profileName)
                       setShotHistoryInitialDate(undefined)
@@ -1853,21 +1967,21 @@ function App() {
           isOpen={showAddProfileDialog}
           aiConfigured={aiAvailable}
           hideAiWhenUnavailable={hideAiWhenUnavailable}
-          initialUrl={pendingImportUrl ?? undefined}
           onClose={() => {
             setShowAddProfileDialog(false)
-            setPendingImportUrl(null)
           }}
           onImported={() => {
             setShowAddProfileDialog(false)
-            setPendingImportUrl(null)
             setViewState('profile-catalogue')
           }}
           onGenerateNew={() => {
             setShowAddProfileDialog(false)
-            setPendingImportUrl(null)
             setViewState('form')
           }}
+        />
+        <ShareImportResultDialog
+          state={shareImportState}
+          onClose={() => setShareImportState(null)}
         />
       </div>
     </div>

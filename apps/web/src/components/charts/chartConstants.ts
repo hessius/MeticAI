@@ -11,6 +11,7 @@ export const CHART_COLORS = {
   pressure: '#4ade80',        // Green
   flow: '#67e8f9',            // Light cyan/blue
   weight: '#fbbf24',          // Amber/Yellow
+  temperature: '#34d399',     // Emerald (brew-head temperature)
   gravimetricFlow: '#c2855a', // Brown-orange
   power: '#f87171',           // Red (power / motor)
   targetPressure: '#86efac',  // Lighter green (dashed)
@@ -94,6 +95,7 @@ export interface ChartDataPoint {
   pressure?: number
   flow?: number
   weight?: number
+  temperature?: number
   gravimetricFlow?: number
   power?: number
   /** Power normalized to the left Y-axis scale (for chart rendering) */

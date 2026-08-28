@@ -5,8 +5,6 @@ import { progressPercent } from './heatingProgress'
 
 // Green applied to a sensor's bar + readout once it reaches the ready band.
 const REACHED_COLOR = 'var(--success)'
-// Red target marker, consistent with the chart's "Target" line.
-const TARGET_COLOR = 'var(--destructive)'
 
 interface HeatingNumbersProps {
   chamberTemp: number
@@ -51,12 +49,6 @@ function SensorCell({
           initial={false}
           animate={{ width: `${fillPercent}%` }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
-        />
-        {/* Red target marker at the right edge (set temperature). */}
-        <div
-          data-testid="target-marker"
-          className="absolute top-0 h-full w-0.5"
-          style={{ right: 0, backgroundColor: TARGET_COLOR }}
         />
       </div>
     </div>

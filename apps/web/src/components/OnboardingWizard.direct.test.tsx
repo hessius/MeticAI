@@ -22,6 +22,7 @@ const discoveryMocks = vi.hoisted(() => ({
   discoverMachines: vi.fn(),
   parseMachineInput: vi.fn(),
   testMachineConnection: vi.fn(),
+  resolveReachableMachineUrl: vi.fn(),
 }))
 
 const toastMocks = vi.hoisted(() => ({
@@ -102,6 +103,10 @@ describe('OnboardingWizard direct/native machine URL persistence', () => {
       url: 'http://192.168.1.50:8080',
     })
     discoveryMocks.testMachineConnection.mockResolvedValue(true)
+    // The resolver echoes the working URL back (given port is reachable).
+    discoveryMocks.resolveReachableMachineUrl.mockImplementation(
+      (url: string) => Promise.resolve(url),
+    )
   })
 
   afterEach(() => {
@@ -130,14 +135,14 @@ describe('OnboardingWizard direct/native machine URL persistence', () => {
   })
 
   it('auto-connects a single discovered native machine without cancelling persistence', async () => {
-    let resolveConnection!: (value: boolean) => void
+    let resolveConnection!: (value: string | null) => void
     discoveryMocks.discoverMachines.mockResolvedValue([{
       name: 'meticulous-a3f7',
       host: '192.168.1.42',
       port: 8080,
       url: 'http://192.168.1.42:8080',
     }])
-    discoveryMocks.testMachineConnection.mockReturnValue(new Promise<boolean>((resolve) => {
+    discoveryMocks.resolveReachableMachineUrl.mockReturnValue(new Promise<string | null>((resolve) => {
       resolveConnection = resolve
     }))
 
@@ -145,10 +150,10 @@ describe('OnboardingWizard direct/native machine URL persistence', () => {
 
     await waitFor(() => expect(discoveryMocks.discoverMachines).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('button', { name: 'onboarding.welcome.getStarted' }))
-    await waitFor(() => expect(discoveryMocks.testMachineConnection).toHaveBeenCalledWith('http://192.168.1.42:8080'))
+    await waitFor(() => expect(discoveryMocks.resolveReachableMachineUrl).toHaveBeenCalledWith('http://192.168.1.42:8080'))
 
     await act(async () => {
-      resolveConnection(true)
+      resolveConnection('http://192.168.1.42:8080')
     })
 
     await waitFor(() => expect(preferencesMock.set).toHaveBeenCalledWith({
@@ -173,7 +178,7 @@ describe('OnboardingWizard direct/native machine URL persistence', () => {
         url: 'http://192.168.1.43:8080',
       },
     ])
-    discoveryMocks.testMachineConnection.mockRejectedValue(new Error('network denied'))
+    discoveryMocks.resolveReachableMachineUrl.mockRejectedValue(new Error('network denied'))
 
     render(<OnboardingWizard onComplete={() => {}} />)
 

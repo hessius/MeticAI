@@ -24,6 +24,7 @@ import {
   FloppyDisk,
   FloppyDiskBack,
   Thermometer,
+  Timer,
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { hasFeature } from '@/lib/featureFlags'
@@ -84,11 +85,14 @@ interface RunShotViewProps {
   onNavigateToLive?: () => void
   initialProfileId?: string
   initialProfileName?: string
+  /** Auto-start on stable temperature (#588) — shared with Live View. */
+  autoStartEnabled?: boolean
+  onAutoStartChange?: (enabled: boolean) => void
 }
 
 const PREHEAT_DURATION_MINUTES = 10
 
-export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initialProfileName }: RunShotViewProps) {
+export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initialProfileName, autoStartEnabled = false, onAutoStartChange }: RunShotViewProps) {
   const { t } = useTranslation()
   const scheduledShotsEnabled = hasFeature('scheduledShots')
   const { getImageUrl, fetchImagesForProfiles } = useProfileImageCache()
@@ -981,6 +985,30 @@ export function RunShotView({ onBack, onNavigateToLive, initialProfileId, initia
               id="temperatureBoost"
               checked={temperatureBoost}
               onCheckedChange={setTemperatureBoost}
+            />
+          </div>
+        )}
+
+        {/* Auto-start on stable temperature (#588) — only for a real profile run,
+            not preheat-only or scheduled runs. */}
+        {selectedProfile && !preheat && !scheduleMode && (
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="autoStart" className="text-sm font-medium flex items-center gap-2">
+                <Timer size={18} className={autoStartEnabled ? 'text-primary' : 'text-muted-foreground'} weight="duotone" />
+                {t('runShot.autoStart')}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {t('runShot.autoStartDescription')}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t('runShot.autoStartAppOpenNote')}
+              </p>
+            </div>
+            <Switch
+              id="autoStart"
+              checked={autoStartEnabled}
+              onCheckedChange={onAutoStartChange}
             />
           </div>
         )}

@@ -9,7 +9,8 @@ import { AIServiceProvider } from '@/services/ai'
 import { ShotDataServiceProvider } from '@/services/shots'
 import { CatalogueServiceProvider } from '@/services/catalogue'
 import { isDirectMode, isDemoMode } from '@/lib/machineMode'
-import { installDirectModeInterceptor } from '@/services/interceptor/DirectModeInterceptor'
+import { installCoreInterceptor } from '@/services/interceptor/coreInterceptor'
+import { startDiagnostics, showBootDiagnosticsIfNeeded, isDiagnosticsEnabled } from '@/lib/diagnostics'
 
 // Initialize i18n
 import './i18n/config'
@@ -18,11 +19,32 @@ import "./main.css"
 import "./styles/theme.css"
 import "./index.css"
 
-// In direct mode (PWA on machine), intercept MeticAI proxy API calls and either
-// translate them to Meticulous-native /api/v1/ endpoints or return 501 for
-// unhandled routes. Skip in demo mode — DemoAdapter handles everything.
+// Start passive on-device diagnostics as early as possible so we capture
+// main-thread stalls (ANR/freeze) and errors from the very first frame. This
+// is our only window into field freezes on devices we cannot attach a debugger
+// to. Opt-in only (default OFF) so it never runs or nags unless the user
+// enables it in Settings. See src/lib/diagnostics.ts.
+if (isDiagnosticsEnabled()) {
+  startDiagnostics()
+}
+
+// Escape hatch for the "app freezes before I can ever reach Settings" case:
+// if the previous session recorded a freeze, surface a plain-DOM report overlay
+// now, before React mounts and before any native plugin work — so it stays
+// interactive even if this session deadlocks again. The automatic overlay is
+// gated on the opt-in flag internally; the `#diagnostics` URL always works so
+// support can reach it regardless. See src/lib/diagnostics.ts.
+showBootDiagnosticsIfNeeded()
+
+// In direct mode (native/PWA on the machine), route MeticAI proxy API calls
+// through the shared @metic/core handler (the same handler the Bun server uses
+// in proxy mode). Machine-native /api/v1/ calls and external URLs pass straight
+// through to the original fetch. Skip in demo mode — DemoAdapter handles it all.
 if (isDirectMode() && !isDemoMode()) {
-  installDirectModeInterceptor()
+  // Capture the true, unpatched fetch before we patch it, so the core Platform
+  // can reach the machine without re-entering the interceptor.
+  const originalFetch = window.fetch.bind(window)
+  installCoreInterceptor({ originalFetch })
 }
 
 createRoot(document.getElementById('root')!).render(

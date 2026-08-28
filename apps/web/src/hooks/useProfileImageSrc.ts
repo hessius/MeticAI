@@ -39,6 +39,43 @@ export function resolveDisplayImage(
   return joinMachineUrl(machineBaseUrl, displayImage)
 }
 
+/** Path segment identifying a Meticulous machine profile-image endpoint. */
+const MACHINE_IMAGE_PATH = '/api/v1/profile/image/'
+
+/**
+ * Re-host a stored profile image URL onto the current machine base.
+ *
+ * Favourites persist a fully-resolved absolute image URL (e.g. pinning
+ * `http://192.168.0.5:8080/...`). When the machine's address or API port
+ * changes (firmware moved the API from :8080 to :80, or DHCP reassigned the
+ * IP), that stored URL becomes unreachable and widget images silently fall
+ * back to a monogram. This rewrites the origin of machine profile-image URLs
+ * to `machineBaseUrl` so they follow the machine, while leaving data URIs and
+ * genuinely external URLs (e.g. Met Profiles CDN) untouched.
+ */
+export function rehostMachineImageUrl(
+  imageUrl: string | undefined | null,
+  machineBaseUrl: string,
+): string | undefined {
+  if (!imageUrl) return undefined
+  if (imageUrl.startsWith('data:')) return imageUrl
+  if (!/^https?:\/\//i.test(imageUrl)) {
+    // Relative machine path — resolve against the current base.
+    return resolveDisplayImage(imageUrl, machineBaseUrl) ?? imageUrl
+  }
+  try {
+    const url = new URL(imageUrl)
+    if (!url.pathname.includes(MACHINE_IMAGE_PATH)) return imageUrl
+    const base = new URL(machineBaseUrl)
+    url.protocol = base.protocol
+    url.hostname = base.hostname
+    url.port = base.port
+    return url.toString()
+  } catch {
+    return imageUrl
+  }
+}
+
 export async function resolveDisplayImageAsync(displayImage: string | undefined | null): Promise<string | null> {
   if (!displayImage) return null
   if (displayImage.startsWith('data:image/')) return displayImage

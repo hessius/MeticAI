@@ -34,6 +34,7 @@ const { preferenceValues, preferencesMock } = vi.hoisted(() => {
 const discoveryMocks = vi.hoisted(() => ({
   discoverMachines: vi.fn(),
   testMachineConnection: vi.fn(),
+  resolveReachableMachineUrl: vi.fn(),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -101,6 +102,7 @@ describe('SettingsView direct-mode backend guards', () => {
     mockedIsNativePlatform.mockReturnValue(false)
     discoveryMocks.discoverMachines.mockReset()
     discoveryMocks.testMachineConnection.mockReset()
+    discoveryMocks.resolveReachableMachineUrl.mockReset()
     mockedHasFeature.mockImplementation((feature: keyof FeatureFlags) => !disabledDirectFeatures.has(feature))
   })
 
@@ -149,6 +151,7 @@ describe('SettingsView direct-mode backend guards', () => {
       url: 'http://192.168.1.42:8080',
     }])
     discoveryMocks.testMachineConnection.mockResolvedValue(true)
+    discoveryMocks.resolveReachableMachineUrl.mockResolvedValue('http://192.168.1.42:8080')
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({}), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -166,7 +169,7 @@ describe('SettingsView direct-mode backend guards', () => {
     fireEvent.click(detectButton)
 
     await waitFor(() => expect(discoveryMocks.discoverMachines).toHaveBeenCalled())
-    await waitFor(() => expect(discoveryMocks.testMachineConnection).toHaveBeenCalledWith('http://192.168.1.42:8080'))
+    await waitFor(() => expect(discoveryMocks.resolveReachableMachineUrl).toHaveBeenCalledWith('http://192.168.1.42:8080'))
 
     await waitFor(() => expect(preferencesMock.set).toHaveBeenCalledWith({
       key: STORAGE_KEYS.MACHINE_URL,
@@ -207,7 +210,7 @@ describe('SettingsView direct-mode backend guards', () => {
 
     await waitFor(() => expect(discoveryMocks.discoverMachines).toHaveBeenCalled())
     expect(await screen.findByText('settings.discovery.networkError')).toBeInTheDocument()
-    expect(discoveryMocks.testMachineConnection).not.toHaveBeenCalled()
+    expect(discoveryMocks.resolveReachableMachineUrl).not.toHaveBeenCalled()
     const requestedUrls = (fetchMock.mock.calls as unknown[][]).map(args => String(args[0]))
     expect(requestedUrls).not.toEqual(
       expect.arrayContaining([

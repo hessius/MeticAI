@@ -40,6 +40,14 @@ export const STORAGE_KEYS = {
   // -- Machine connection --
   MACHINE_URL: 'meticai-machine-url',
 
+  // -- Favourites (#584 iOS widgets) --
+  FAVOURITES: 'meticai-favourites',
+
+  // -- iOS Live Activity glanceable configuration --
+  LA_SHOT_GLANCEABLE: 'meticai-la-shot-glanceable',
+  LA_HEATING_GLANCEABLE: 'meticai-la-heating-glanceable',
+  OPEN_APP_ON_START: 'meticai-open-app-on-start',
+
   // -- Onboarding --
   ONBOARDING_COMPLETE: 'meticai-onboarding-complete',
 
@@ -55,9 +63,23 @@ export const STORAGE_KEYS = {
   // -- Sound effects --
   SOUNDS_ENABLED: 'meticai-sounds-enabled',
 
+  // -- On-device diagnostics (opt-in). When 'true', passive freeze/error
+  //    capture runs and the boot overlay may auto-surface on native platforms.
+  //    Disabled by default so it never nags users who saw no problem. --
+  DIAGNOSTICS_ENABLED: 'meticai-diagnostics-enabled',
+
+  // -- Chart layout preference (#589): 'combined' | 'separated' --
+  CHART_LAYOUT: 'meticai-chart-layout',
+
   // -- Demo mode --
   DEMO_PREV_URL: 'meticai-demo-prev-url',
   DEMO_PROFILES: 'meticai-demo-profiles',
   DEMO_SHOTS: 'meticai-demo-shots',
   DEMO_ANNOTATIONS: 'meticai-demo-annotations',
 } as const
+
+/** Dispatched on window when the favourites list changes (#584). */
+export const FAVOURITES_CHANGED = 'favourites-changed'
+
+/** Maximum number of favourites (bounds App-Group storage for iOS widgets). */
+export const FAVOURITES_MAX = 12

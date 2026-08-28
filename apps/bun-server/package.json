@@ -1,0 +1,24 @@
+{
+  "name": "@metic/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bun single-binary server for MeticAI 3.0.0 (proxy mode). Consumes @metic/core and serves the built frontend, proxies the machine API, and streams live telemetry.",
+  "module": "src/main.ts",
+  "scripts": {
+    "start": "bun run src/main.ts serve",
+    "healthcheck": "bun run src/main.ts healthcheck",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "build": "bun build --compile --minify --sourcemap src/main.ts --outfile dist/metic-server"
+  },
+  "dependencies": {
+    "@google/genai": "^1.52.0",
+    "@metic/core": "file:../../packages/core",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "typescript": "^6.0.3"
+  }
+}

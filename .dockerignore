@@ -43,9 +43,12 @@ data/
 logs/
 *.log
 
-# Node modules (web builder stage installs fresh)
+# Node modules (builder stages install fresh)
 apps/web/node_modules/
 apps/web/dist/
+apps/bun-server/node_modules/
+apps/bun-server/dist/
+packages/core/node_modules/
 
 # Python cache
 __pycache__/

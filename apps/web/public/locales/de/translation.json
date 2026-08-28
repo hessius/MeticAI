@@ -1,4 +1,17 @@
 {
+  "charts": {
+    "layout": {
+      "label": "Diagrammlayout",
+      "combined": "Kombiniert",
+      "separated": "Getrennt"
+    },
+    "metric": {
+      "pressure": "Druck",
+      "flow": "Fluss",
+      "weight": "Gewicht",
+      "temperature": "Temperatur"
+    }
+  },
   "common": {
     "save": "Speichern",
     "cancel": "Abbrechen",
@@ -316,7 +329,10 @@
     "newProfileNamePlaceholder": "Neuer Profilname...",
     "titleRun": "Ausführen",
     "temperatureBoost": "Temperatur-Boost",
-    "temperatureBoostDescription": "Der erste Bezug nach dem Kaltstart kann ca. 3 °C kühler ausfallen. Der Boost erhöht die Brühtemperatur vorübergehend um 3 °C (max. 99 °C), damit auch der erste Bezug die gewünschte Temperatur erreicht."
+    "temperatureBoostDescription": "Der erste Bezug nach dem Kaltstart kann ca. 3 °C kühler ausfallen. Der Boost erhöht die Brühtemperatur vorübergehend um 3 °C (max. 99 °C), damit auch der erste Bezug die gewünschte Temperatur erreicht.",
+    "autoStart": "Autostart bei stabiler Temperatur",
+    "autoStartDescription": "Warten, bis sich die Temperatur stabilisiert hat, und den Bezug dann automatisch starten. Anders als der Meticulous-Autostart wartet dies, bis beide Temperaturen stabil auf dem Ziel liegen.",
+    "autoStartAppOpenNote": "Halte die Metic-App geöffnet, damit dies ausgelöst wird, sofern du nicht den Metic-Server (z. B. auf einem Raspberry Pi) im Hintergrund betreibst."
   },
   "shotHistory": {
     "duration": "Dauer",
@@ -512,8 +528,6 @@
     "geminiModelDescriptionDynamic": "Modelle von Google AI geladen. Wählen Sie das gewünschte Modell.",
     "modelsLoading": "Modelle werden geladen…",
     "modelDefault": "Standardmodell",
-    "mqttEnabled": "MQTT-Brücke",
-    "mqttEnabledDescription": "Echtzeit-Maschinentelemetrie über MQTT. Betreibt das Live-Dashboard.",
     "settingsSaved": "Einstellungen erfolgreich gespeichert!",
     "settingsSaveFailed": "Einstellungen konnten nicht gespeichert werden",
     "changelog": "Änderungsprotokoll",
@@ -614,9 +628,6 @@
     },
     "version": "Version",
     "footer": "Metic • Mit ❤️ für Kaffeeliebhaber entwickelt",
-    "addToHomeAssistant": "Add to Home Assistant",
-    "homeAssistantDescription": "Connect Home Assistant to Metic's MQTT broker to auto-discover your Meticulous machine (24 sensors + 11 commands). Point HA to this server's IP on port 1883.",
-    "homeAssistantGuide": "Home Assistant Anleitung",
     "poweredBy": "Powered by",
     "credits": {
       "pyMeticulous": "Official Python client for the Meticulous API",
@@ -636,9 +647,59 @@
     "geminiModel31FlashLite": "Gemini 3.1 Flash Lite",
     "aiSettings": "KI-Einstellungen",
     "versionAndChangelog": "Version & Änderungsprotokoll",
-    "mqttBridge": "MQTT-Bridge",
     "disclaimer": "Metic ist ein unabhängiges Open-Source-Projekt und ist nicht mit Meticulous Home, dem Hersteller der Meticulous Espressomaschine, verbunden, von diesem unterstützt oder autorisiert.",
-    "localModelDownloadKeepOpen": "Lass die App geöffnet und bleibe auf diesem Bildschirm, bis der Download abgeschlossen ist."
+    "localModelDownloadKeepOpen": "Lass die App geöffnet und bleibe auf diesem Bildschirm, bis der Download abgeschlossen ist.",
+    "diagnostics": {
+      "title": "Diagnose",
+      "description": "Wenn die App einfriert oder sich unerwartet verhält, erstelle einen Diagnosebericht und sende ihn an uns. Er erfasst Abstürze und Fehler auf deinem Gerät und enthält keine personenbezogenen Daten.",
+      "generate": "Bericht erstellen",
+      "copy": "Kopieren",
+      "clear": "Löschen",
+      "enable": "Diagnose aktivieren",
+      "enableHint": "Standardmäßig aus. Aktiviere sie, damit Metic Einfrierungen und Fehler aufzeichnet und du einen Bericht senden kannst. Es werden keine persönlichen Daten erfasst.",
+      "overlay": {
+        "title": "Metic-Diagnose",
+        "intro": "Metic hat ein Einfrieren erkannt. Kopiere oder teile diesen Bericht und sende ihn an die Entwickler, damit sie das Problem beheben können.",
+        "copy": "Bericht kopieren",
+        "share": "Teilen",
+        "copied": "Kopiert",
+        "copyFailed": "Kopieren fehlgeschlagen",
+        "dismiss": "Schließen"
+      }
+    },
+    "widgets": {
+      "sectionTitle": "Widgets",
+      "openAppOnStart": "Metic öffnen, wenn ein Bezug über ein Widget gestartet wird",
+      "openAppOnStartHint": "Wenn deaktiviert, wird ein Profil über ein Widget im Hintergrund gestartet, ohne die App zu öffnen."
+    },
+    "liveActivity": {
+      "title": "Live-Aktivität",
+      "hint": "Wähle, welcher Wert auf dem Sperrbildschirm und der Dynamic Island angezeigt wird.",
+      "shotStat": "Bezugswert",
+      "heatingStat": "Aufheizwert",
+      "stat": {
+        "weight": "Gewicht",
+        "pressure": "Druck",
+        "flow": "Fluss",
+        "temp": "Temperatur",
+        "estimatedTime": "Geschätzte Zeit bis bereit"
+      },
+      "widget": {
+        "brewChamber": "Brühkammer",
+        "brewHead": "Brühkopf",
+        "ready": "Bereit",
+        "start": "Start",
+        "weight": "Gewicht",
+        "pressure": "Druck",
+        "flow": "Fluss",
+        "time": "Zeit",
+        "shotComplete": "Shot fertig",
+        "ratio": "Verhältnis",
+        "avgTemp": "Ø-Temp",
+        "done": "Fertig",
+        "resumeHint": "Metic öffnen, um Live-Updates fortzusetzen"
+      }
+    }
   },
   "profileBreakdown": {
     "title": "Profildetails",
@@ -754,16 +815,10 @@
     "fetchDetailsFailed": "Fehler beim Abrufen der Profildetails",
     "noResponseStream": "Kein Antwortstream verfügbar",
     "bulkImportStartFailed": "Fehler beim Starten des Massenimports",
-    "fromUrl": "Von URL",
-    "jsonOrMet": ".json / .met",
-    "importFromUrl": "Von URL importieren",
-    "urlPlaceholder": "Profil-URL einfügen...",
-    "urlHint": "Unterstützt .json- und .met-Profil-URLs",
     "back": "Zurück",
     "importButton": "Importieren",
     "fetchingUrl": "Profil von URL abrufen...",
     "importUrlFailed": "Import von URL fehlgeschlagen",
-    "invalidUrl": "Bitte geben Sie eine gültige URL ein",
     "decentEspresso": "Decent",
     "decentDescription": "Konvertieren & importieren",
     "decentImportHint": "Laden Sie eine Decent Espresso-Profil-JSON hoch oder fügen Sie sie ein, um sie ins Meticulous-Format zu konvertieren.",
@@ -776,7 +831,24 @@
     "notDecentFormat": "Kein gültiges Decent Espresso-Profilformat",
     "profileName": "Name",
     "stages": "Stufen",
-    "triggers": "Auslöser"
+    "triggers": "Auslöser",
+    "fromLink": "Aus Link",
+    "linkOrJson": "Link oder JSON",
+    "importFromLink": "Aus Link oder JSON importieren",
+    "sourcePlaceholder": "Füge einen metprofiles-Link, eine Profil-URL oder Profil-JSON ein...",
+    "sourceHint": "Unterstützt metprofiles.link, direkte .json/.met-Links und eingefügtes Profil-JSON",
+    "invalidSource": "Gib einen gültigen Link oder Profil-JSON ein",
+    "shareResult": {
+      "importingTitle": "Profil wird importiert",
+      "importingBody": "Das geteilte Profil wird zu deiner Bibliothek hinzugefügt...",
+      "successTitle": "Profil importiert",
+      "successBody": "\"{{name}}\" wurde erfolgreich importiert.",
+      "existsTitle": "Bereits importiert",
+      "existsBody": "\"{{name}}\" ist bereits in deiner Bibliothek.",
+      "errorTitle": "Import fehlgeschlagen",
+      "errorBody": "Das Profil konnte nicht importiert werden.",
+      "errorBodyWithReason": "Das Profil konnte nicht importiert werden: {{reason}}"
+    }
   },
   "imageCrop": {
     "title": "Profilbild zuschneiden",
@@ -816,7 +888,11 @@
       "temperatureChart": "Temperatur",
       "deltaToTarget": "Bis Ziel",
       "target": "Ziel",
-      "stabilityReached": "Temperatur stabil"
+      "stabilityReached": "Temperatur stabil",
+      "autoStart": "Autostart bei stabiler Temperatur",
+      "autoStartDescription": "Den Bezug automatisch starten, sobald beide Temperaturen stabil auf dem Ziel liegen.",
+      "autoStartAppOpenNote": "Halte diese App geöffnet, damit der Autostart auslöst, sofern der Metic-Server nicht im Hintergrund läuft.",
+      "autoStartArmed": "Stabil · Autostart in {{seconds}} s"
     },
     "offline": "Maschine ist offline",
     "stale": "Veraltet",
@@ -1877,5 +1953,11 @@
       "skip": "Überspringen",
       "analyzeWithTaste": "Mit Geschmack analysieren"
     }
+  },
+  "favourites": {
+    "sectionTitle": "Favoriten",
+    "add": "Zu Favoriten hinzufügen",
+    "remove": "Aus Favoriten entfernen",
+    "empty": "Markiere ein Profil mit einem Stern, um es zu deinen Favoriten hinzuzufügen."
   }
 }

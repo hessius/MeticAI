@@ -40,7 +40,7 @@ Same as Photo workflow but use endpoint: `http://<SERVER_IP>:3550/api/analyze_co
 
 ## Troubleshooting
 
-- **Connection fails** — Ensure your phone is on the same network. Test `http://<SERVER_IP>:3550/docs` in Safari.
+- **Connection fails** — Ensure your phone is on the same network. Test `http://<SERVER_IP>:3550/api/health` in Safari.
 - **Invalid response** — Check field names are exactly `file` and/or `user_prefs` (case-sensitive).
 - **Photo won't upload** — Ensure the form field key is `file` and value comes from the Take Photo action.
 

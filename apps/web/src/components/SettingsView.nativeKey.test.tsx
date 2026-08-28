@@ -36,7 +36,8 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('@capacitor/core', () => ({
-  Capacitor: { isNativePlatform: () => true },
+  Capacitor: { isNativePlatform: () => true, getPlatform: () => 'ios' },
+  registerPlugin: () => ({}),
 }))
 
 vi.mock('@capacitor/preferences', () => ({

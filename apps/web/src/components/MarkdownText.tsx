@@ -20,8 +20,11 @@ export function cleanMalformedMarkdown(text: string): string {
     .replace(/^\s*###\s*$/gm, '')
     // Fix "** text" pattern at start of line -> just "text"
     .replace(/^\*\*\s+(?!\*)/gm, '')
-    // Fix "text **" pattern at end of line -> just "text"
-    .replace(/(?<!\*)\s+\*\*$/gm, '')
+    // Fix "text **" pattern at end of line -> just "text".
+    // Avoid a lookbehind (?<!\*) here: rolldown lowers lookbehind regex
+    // literals into runtime RegExp() calls that throw on Safari < 16.4.
+    // Capturing the preceding non-* char (or line start) is equivalent.
+    .replace(/(^|[^*])\s+\*\*$/gm, '$1')
     // Clean up multiple blank lines that result from removals
     .replace(/\n{3,}/g, '\n\n')
     .trim()

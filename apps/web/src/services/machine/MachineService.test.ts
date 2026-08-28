@@ -23,6 +23,7 @@ vi.mock('@meticulous-home/espresso-api', () => {
       listProfiles: vi.fn(() => ({ data: [] })),
       fetchAllProfiles: vi.fn(() => ({ data: [] })),
       getProfile: vi.fn(() => ({ data: {} })),
+      getLastProfile: vi.fn(() => ({ data: { profile: {} } })),
       saveProfile: vi.fn(() => ({ data: {} })),
       deleteProfile: vi.fn(),
       loadProfileByID: vi.fn(),
@@ -100,7 +101,7 @@ describe('MachineService adapter interface parity', () => {
       // Config
       'loadProfile', 'loadProfileFromJSON', 'setBrightness', 'enableSounds',
       // Profiles
-      'listProfiles', 'fetchAllProfiles', 'getProfile', 'saveProfile', 'deleteProfile',
+      'listProfiles', 'fetchAllProfiles', 'getProfile', 'getLastProfile', 'saveProfile', 'deleteProfile',
       // Telemetry
       'onStatus', 'onActuators', 'onTemperatures', 'onHeaterStatus', 'onNotification', 'onProfileUpdate',
       // History

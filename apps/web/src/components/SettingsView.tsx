@@ -9,6 +9,26 @@ import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  loadLiveActivitySettings,
+  saveLiveActivitySettings,
+  type LiveActivitySettings,
+} from '@/services/liveActivity/liveActivitySettings'
+import { LiveActivity } from '@/services/liveActivity/liveActivityBridge'
+import type {
+  ShotGlanceableStat,
+  HeatingGlanceableStat,
+} from '@/services/liveActivity/liveActivityBridge'
+import { Capacitor } from '@capacitor/core'
+import { WidgetBridge } from '@/services/widgets/widgetBridge'
+import { capacitorStorage } from '@/services/storage/CapacitorStorage'
 import { hasFeature } from '@/lib/featureFlags'
 import { 
   CaretLeft, 
@@ -23,7 +43,6 @@ import {
   Globe,
   WifiHigh,
   WifiSlash,
-  House,
   Key,
   Link as LinkIcon,
   Copy,
@@ -32,10 +51,12 @@ import {
   Info,
   Rocket,
   Heart,
-  HardDrives
+  HardDrives,
+  Bug
 } from '@phosphor-icons/react'
 import { getServerUrl } from '@/lib/config'
 import { isDirectMode, isDemoMode, isNativePlatform, getDefaultMachineUrl } from '@/lib/machineMode'
+import { getDiagnosticsReport, clearDiagnostics, isDiagnosticsEnabled, setDiagnosticsEnabled } from '@/lib/diagnostics'
 import { STORAGE_KEYS } from '@/lib/constants'
 import {
   PROVIDERS,
@@ -83,7 +104,6 @@ interface Settings {
   meticulousIp: string
   authorName: string
   geminiModel?: string
-  mqttEnabled?: boolean
   geminiApiKeyMasked?: boolean
   geminiApiKeyConfigured?: boolean
 }
@@ -124,8 +144,6 @@ interface TailscaleStatus {
 // Maximum expected update duration (3 minutes)
 const MAX_UPDATE_DURATION = 180000
 const PROGRESS_UPDATE_INTERVAL = 500
-const METICULOUS_ADDON_INSTALL_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && python3 -m pip install -r requirements.txt && python3 -m pip install ."'
-const METICULOUS_ADDON_UPDATE_SNIPPET = 'docker exec -it meticai bash -lc "cd /app/meticulous-addon && git pull --ff-only && python3 -m pip install ."'
 
 function normalizeMachineUrl(value: string): string | null {
   const trimmed = value.trim()
@@ -151,6 +169,12 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
   const { copyToClipboard } = useClipboard()
   const { toggleOn: playToggleOn, toggleOff: playToggleOff, confirmSoundToggle } = useSoundEffects()
 
+  // Diagnostics panel — passive on-device capture of freezes/errors, surfaced
+  // so users can copy and send a report when we cannot attach a debugger.
+  // Opt-in (default OFF) so it never nags users who noticed no problem.
+  const [diagReport, setDiagReport] = useState('')
+  const [diagnosticsEnabled, setDiagnosticsEnabledState] = useState(() => isDiagnosticsEnabled())
+
   // Direct and demo modes both use local storage for settings (no backend server)
   const isLocalMode = () => isDirectMode() || isDemoMode()
   
@@ -158,12 +182,14 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     geminiApiKey: '',
     meticulousIp: '',
     authorName: '',
-    geminiModel: 'gemini-2.5-flash',
-    mqttEnabled: true
+    geminiModel: 'gemini-2.5-flash'
   })
   const [aiProvider, setAiProviderState] = useState<ProviderId>(getActiveHostedProviderId())
   const [aiMode, setAiModeState] = useState<AIMode>(getAIMode())
   const [isRestarting, setIsRestarting] = useState(false)
+  const isIOS = Capacitor.getPlatform() === 'ios'
+  const [openAppOnStart, setOpenAppOnStart] = useState(false)
+  const [laSettings, setLaSettings] = useState<LiveActivitySettings>(loadLiveActivitySettings)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
   const [restartStatus, setRestartStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
@@ -265,6 +291,28 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     setSoundsEnabledState(getSoundsEnabled())
   }, [])
 
+  // Load the iOS widget "open app on start" setting.
+  useEffect(() => {
+    if (!isIOS) return
+    capacitorStorage.get(STORAGE_KEYS.OPEN_APP_ON_START)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- async storage read on mount
+      .then(v => setOpenAppOnStart(v === 'true'))
+      .catch(() => {})
+  }, [isIOS])
+
+  const handleOpenAppOnStart = async (enabled: boolean) => {
+    setOpenAppOnStart(enabled)
+    await capacitorStorage.set(STORAGE_KEYS.OPEN_APP_ON_START, String(enabled))
+    try { await WidgetBridge.setOpenAppOnStart({ enabled }) } catch { /* non-iOS */ }
+    if (enabled) playToggleOn(); else playToggleOff()
+  }
+
+  const handleLaChange = (next: LiveActivitySettings) => {
+    setLaSettings(next)
+    saveLiveActivitySettings(next)
+    void LiveActivity.updateConfig(next).catch(() => {})
+  }
+
   // Load current settings on mount
   useEffect(() => {
     let cancelled = false
@@ -294,7 +342,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             meticulousIp: new URL(getDefaultMachineUrl()).hostname,
             authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
             geminiModel: localStorage.getItem(modelKey) || defaultModel,
-            mqttEnabled: true,
             geminiApiKeyMasked: false,
             geminiApiKeyConfigured: Boolean(storedKey.trim()),
           })
@@ -307,7 +354,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             meticulousIp: new URL(getDefaultMachineUrl()).hostname,
             authorName: localStorage.getItem(STORAGE_KEYS.AUTHOR_NAME) || '',
             geminiModel: localStorage.getItem(modelKey) || defaultModel,
-            mqttEnabled: true,
             geminiApiKeyMasked: false,
             geminiApiKeyConfigured: Boolean(fallbackKey.trim()),
           })
@@ -326,7 +372,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             meticulousIp: data.meticulousIp || '',
             authorName: data.authorName || '',
             geminiModel: data.geminiModel || 'gemini-2.5-flash',
-            mqttEnabled: data.mqttEnabled !== false,
             geminiApiKeyMasked: data.geminiApiKeyMasked || false,
             geminiApiKeyConfigured: data.geminiApiKeyConfigured || false
           })
@@ -540,7 +585,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
           const payload: Record<string, string | boolean | undefined> = {
             authorName: nextSettings.authorName,
             meticulousIp: nextSettings.meticulousIp,
-            mqttEnabled: nextSettings.mqttEnabled,
             geminiModel: nextSettings.geminiModel,
             aiProvider,
           }
@@ -676,16 +720,16 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
     try {
       if (isLocalMode()) {
         // In direct/demo mode, use client-side discovery instead of server endpoint
-        const { discoverMachines, testMachineConnection } = await import('@/services/machine/discovery')
+        const { discoverMachines, resolveReachableMachineUrl } = await import('@/services/machine/discovery')
         const machines = await discoverMachines()
         if (machines.length > 0) {
           const machine = machines[0]
-          const verified = await testMachineConnection(machine.url)
-          if (verified) {
+          const resolved = await resolveReachableMachineUrl(machine.url)
+          if (resolved) {
             setDetectResult({ found: true, ip: machine.host, hostname: machine.name })
-            await persistMachineUrl(machine.url)
+            await persistMachineUrl(resolved)
             setMachineUrlError('')
-            setSettings(prev => ({ ...prev, meticulousIp: machine.url }))
+            setSettings(prev => ({ ...prev, meticulousIp: resolved }))
             if (isDemoMode()) window.location.reload()
           } else {
             setDetectResult({ found: false, guidance_key: 'notFound' })
@@ -711,14 +755,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
       })
     } finally {
       setIsDetecting(false)
-    }
-  }
-
-  const handleCopyText = async (value: string) => {
-    try {
-      await navigator.clipboard.writeText(value)
-    } catch (err) {
-      console.error('Failed to copy snippet:', err)
     }
   }
 
@@ -1441,104 +1477,6 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
               </div>
             </CollapsibleSection>
 
-            {/* MQTT Bridge */}
-            {hasFeature('bridgeStatus') && <CollapsibleSection
-              title={t('settings.mqttBridge')}
-              trailing={
-                <a
-                  href="https://github.com/hessius/MeticAI/blob/main/HOME_ASSISTANT.md"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-primary transition-colors"
-                  title={t('settings.homeAssistantGuide')}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Question size={14} weight="bold" />
-                </a>
-              }
-            >
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="mqtt-toggle" className="text-sm font-medium">
-                    {t('settings.mqttEnabled')}
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {t('settings.mqttEnabledDescription')}
-                  </p>
-                </div>
-                <Switch
-                  id="mqtt-toggle"
-                  checked={settings.mqttEnabled}
-                  onCheckedChange={(checked) => {
-                    setSettings(prev => {
-                      const next = { ...prev, mqttEnabled: checked as boolean }
-                      debouncedSave(next)
-                      return next
-                    })
-                    if (checked) playToggleOn(); else playToggleOff()
-                  }}
-                />
-              </div>
-              {settings.mqttEnabled && (
-                <div className="space-y-2 pt-1">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => window.open('https://my.home-assistant.io/redirect/config_flow_start?domain=mqtt', '_blank')}
-                  >
-                    <House size={18} className="mr-2" weight="bold" />
-                    {t('settings.addToHomeAssistant')}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    {t('settings.homeAssistantDescription')}
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-2 pt-1 border-t border-border/50">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium">Meticulous Add-on</h4>
-                  <a
-                    href="https://github.com/nickwilsonr/meticulous-addon"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline"
-                  >
-                    GitHub
-                  </a>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Copy these snippets to install or update the addon manually in the running container.
-                </p>
-                <div className="rounded-md border border-border/60 bg-muted/30 p-2 flex items-start gap-2">
-                  <Code size={14} className="mt-0.5 text-muted-foreground shrink-0" weight="bold" />
-                  <code className="text-[11px] leading-relaxed text-foreground break-all flex-1">{METICULOUS_ADDON_INSTALL_SNIPPET}</code>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0"
-                    onClick={() => handleCopyText(METICULOUS_ADDON_INSTALL_SNIPPET)}
-                    title="Copy install command"
-                  >
-                    <Copy size={13} />
-                  </Button>
-                </div>
-                <div className="rounded-md border border-border/60 bg-muted/30 p-2 flex items-start gap-2">
-                  <Code size={14} className="mt-0.5 text-muted-foreground shrink-0" weight="bold" />
-                  <code className="text-[11px] leading-relaxed text-foreground break-all flex-1">{METICULOUS_ADDON_UPDATE_SNIPPET}</code>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0"
-                    onClick={() => handleCopyText(METICULOUS_ADDON_UPDATE_SNIPPET)}
-                    title="Copy update command"
-                  >
-                    <Copy size={13} />
-                  </Button>
-                </div>
-              </div>
-            </CollapsibleSection>}
-
             {/* Appearance */}
             {(onToggleBlobs !== undefined || onToggleTheme !== undefined) && (
               <CollapsibleSection title={t('appearance.title')} defaultOpen={false}>
@@ -1590,6 +1528,80 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                   </div>
                 )}
 
+              </CollapsibleSection>
+            )}
+
+            {/* iOS home-screen widgets (#584) — native iOS only */}
+            {isIOS && (
+              <CollapsibleSection title={t('settings.widgets.sectionTitle')} defaultOpen={false}>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="open-app-on-start-toggle" className="text-sm font-medium">
+                      {t('settings.widgets.openAppOnStart')}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {t('settings.widgets.openAppOnStartHint')}
+                    </p>
+                  </div>
+                  <Switch
+                    id="open-app-on-start-toggle"
+                    checked={openAppOnStart}
+                    onCheckedChange={(checked) => { void handleOpenAppOnStart(checked as boolean) }}
+                  />
+                </div>
+
+                <div className="mt-4 space-y-4 border-t border-border/50 pt-4">
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium">
+                      {t('settings.liveActivity.title')}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {t('settings.liveActivity.hint')}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <Label htmlFor="la-shot-glanceable" className="text-sm">
+                      {t('settings.liveActivity.shotStat')}
+                    </Label>
+                    <Select
+                      value={laSettings.shotGlanceable}
+                      onValueChange={(v) =>
+                        handleLaChange({ ...laSettings, shotGlanceable: v as ShotGlanceableStat })
+                      }
+                    >
+                      <SelectTrigger id="la-shot-glanceable" className="w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weight">{t('settings.liveActivity.stat.weight')}</SelectItem>
+                        <SelectItem value="pressure">{t('settings.liveActivity.stat.pressure')}</SelectItem>
+                        <SelectItem value="flow">{t('settings.liveActivity.stat.flow')}</SelectItem>
+                        <SelectItem value="temp">{t('settings.liveActivity.stat.temp')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <Label htmlFor="la-heating-glanceable" className="text-sm">
+                      {t('settings.liveActivity.heatingStat')}
+                    </Label>
+                    <Select
+                      value={laSettings.heatingGlanceable}
+                      onValueChange={(v) =>
+                        handleLaChange({ ...laSettings, heatingGlanceable: v as HeatingGlanceableStat })
+                      }
+                    >
+                      <SelectTrigger id="la-heating-glanceable" className="w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="temp">{t('settings.liveActivity.stat.temp')}</SelectItem>
+                        <SelectItem value="estimatedTime">{t('settings.liveActivity.stat.estimatedTime')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </CollapsibleSection>
             )}
 
@@ -2222,6 +2234,71 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
             {t('settings.restartOnboardingDescription', 'Run the first-launch setup again to reconfigure machine IP, name, and preferences.')}
           </p>
         </Card>
+      )}
+
+      {/* Diagnostics — passive freeze/error capture for field debugging.
+          Native-only: the boot overlay and freeze heuristics only apply to the
+          native app; there's nothing useful to surface in a browser. */}
+      {isNativePlatform() && (
+      <CollapsibleSection title={t('settings.diagnostics.title')} defaultOpen={false}>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            {t('settings.diagnostics.description')}
+          </p>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5 pr-3">
+              <Label htmlFor="diagnostics-toggle" className="text-sm font-medium">{t('settings.diagnostics.enable')}</Label>
+              <p className="text-xs text-muted-foreground">{t('settings.diagnostics.enableHint')}</p>
+            </div>
+            <Switch
+              id="diagnostics-toggle"
+              checked={diagnosticsEnabled}
+              onCheckedChange={(checked) => {
+                const next = checked as boolean
+                setDiagnosticsEnabledState(next)
+                setDiagnosticsEnabled(next)
+                if (next) playToggleOn(); else playToggleOff()
+                if (!next) setDiagReport('')
+              }}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              disabled={!diagnosticsEnabled}
+              onClick={() => setDiagReport(getDiagnosticsReport())}
+            >
+              <Bug size={18} className="mr-2" weight="bold" />
+              {t('settings.diagnostics.generate')}
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              disabled={!diagReport}
+              onClick={() => copyToClipboard(diagReport)}
+            >
+              <Copy size={18} className="mr-2" weight="bold" />
+              {t('settings.diagnostics.copy')}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!diagnosticsEnabled}
+              onClick={() => {
+                clearDiagnostics()
+                setDiagReport(getDiagnosticsReport())
+              }}
+            >
+              {t('settings.diagnostics.clear')}
+            </Button>
+          </div>
+          {diagReport && (
+            <pre className="text-[10px] text-muted-foreground bg-muted/50 p-3 rounded border overflow-auto max-h-64 whitespace-pre-wrap">
+              {diagReport}
+            </pre>
+          )}
+        </div>
+      </CollapsibleSection>
       )}
 
       {/* Footer */}

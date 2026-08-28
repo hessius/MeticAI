@@ -1,5 +1,9 @@
 # .gitignore
 
+# Node
+node_modules/
+packages/*/dist/
+
 # Secrets
 .env
 tasks.md
@@ -39,6 +43,8 @@ htmlcov/
 data/
 !data/PourOverBase.json
 !data/recipes/
+!packages/core/src/data/
+!packages/core/src/data/**
 
 # Update tracking
 .versions.json
@@ -84,3 +90,18 @@ testflight.md
 
 # Brainstorming visual companion
 .superpowers/
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Bun compile temp artifacts
+*.bun-build
+
+# Internal planning/design docs (kept locally, not published to GitHub)
+docs/superpowers/
+
+# Copilot CLI session state (never commit)
+.copilot/
+
+# Transient beta release notes
+.release-notes-beta.md

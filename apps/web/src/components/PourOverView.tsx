@@ -23,6 +23,12 @@ import type { PourOverPreferences } from '@/lib/pourOverApi'
 import { getRecipes, prepareRecipe } from '@/lib/pourOverApi'
 import type { Recipe, RecipeStepTiming } from '@/types'
 import { RecipeBreakdown } from './RecipeBreakdown'
+import {
+  loadPourOverSession,
+  savePourOverSession,
+  clearPourOverSession,
+  type PourOverSessionSnapshot,
+} from '@/lib/pourOverSession'
 
 interface PourOverViewProps {
   machineState: MachineState
@@ -371,8 +377,11 @@ function WeightTrend({ points, targetWeight, mode, bloomDurationSeconds = 0, blo
 
 export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const { t } = useTranslation()
+  // Restore an in-progress run (if any) captured when this view last unmounted,
+  // so navigating out and back resumes the timer + weight-trend graph (#582).
+  const [restoredSession] = useState<PourOverSessionSnapshot | null>(() => loadPourOverSession())
   const [mode, setMode] = useState<'free' | 'ratio' | 'recipe'>('free')
-  const [isRunning, setIsRunning] = useState(false)
+  const [isRunning, setIsRunning] = useState(() => restoredSession?.isRunning ?? false)
 
   // Keep screen awake while pour over is active
   const { request: requestWakeLock, release: releaseWakeLock } = useWakeLock()
@@ -384,8 +393,8 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     if (isRunning) requestWakeLock()
     else releaseWakeLock()
   }, [isRunning, requestWakeLock, releaseWakeLock])
-  const [baseElapsedMs, setBaseElapsedMs] = useState(0)
-  const [startedAtMs, setStartedAtMs] = useState<number | null>(null)
+  const [baseElapsedMs, setBaseElapsedMs] = useState(() => restoredSession?.baseElapsedMs ?? 0)
+  const [startedAtMs, setStartedAtMs] = useState<number | null>(() => restoredSession?.startedAtMs ?? null)
   const [elapsedMs, setElapsedMs] = useState(baseElapsedMs)
   const [doseGrams, setDoseGrams] = useState('20')
   const [brewRatio, setBrewRatio] = useState('15')
@@ -393,19 +402,19 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   const [bloomEnabled, setBloomEnabled] = useState(true)
   const [bloomSeconds, setBloomSeconds] = useState('30')
   const [bloomWeightMultiplier, setBloomWeightMultiplier] = useState('2')
-  const [weightTrend, setWeightTrend] = useState<WeightPoint[]>([])
+  const [weightTrend, setWeightTrend] = useState<WeightPoint[]>(() => restoredSession?.weightTrend ?? [])
   const [flowRate, setFlowRate] = useState<number>(0)
 
   // Recipe mode state
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [recipesLoading, setRecipesLoading] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null)
-  const [recipeCurrentStep, setRecipeCurrentStep] = useState(0)
+  const [recipeCurrentStep, setRecipeCurrentStep] = useState(() => restoredSession?.recipeCurrentStep ?? 0)
   const [recipeShowBreakdown, setRecipeShowBreakdown] = useState(false)
   // 'weight': advance pour steps when scale reaches target; 'time': advance all steps by timer
   const [recipeProgressionMode, setRecipeProgressionMode] = useState<'weight' | 'time'>('weight')
   // Cumulative time offset from manually skipped step durations
-  const [stepTimeOffsetMs, setStepTimeOffsetMs] = useState(0)
+  const [stepTimeOffsetMs, setStepTimeOffsetMs] = useState(() => restoredSession?.stepTimeOffsetMs ?? 0)
 
   // Machine integration state
   const [meticulousIntegration, setMeticulousIntegration] = useState(false)
@@ -413,7 +422,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
   // "Set dose from scale" validation: warn when weight > 50g (likely forgot to tare)
   const [showDoseWarning, setShowDoseWarning] = useState(false)
   // Elapsed time at which the machine shot ended (for graph marker + timer annotation)
-  const [machineEndElapsedMs, setMachineEndElapsedMs] = useState<number | null>(null)
+  const [machineEndElapsedMs, setMachineEndElapsedMs] = useState<number | null>(() => restoredSession?.machineEndElapsedMs ?? null)
   // Track previous brewing state for transition detection
   const prevBrewingRef = useRef(false)
   // Always-current machine state string for async polling
@@ -550,15 +559,15 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     }
   }, [mode, persistPrefs])
 
-  const previousWeightRef = useRef<number | null>(null)
-  const previousWeightTimestampRef = useRef<number | null>(null)
-  const trendStartTimestampRef = useRef<number | null>(null)
+  const previousWeightRef = useRef<number | null>(restoredSession?.previousWeight ?? null)
+  const previousWeightTimestampRef = useRef<number | null>(restoredSession?.previousWeightTimestamp ?? null)
+  const trendStartTimestampRef = useRef<number | null>(restoredSession?.trendStartTimestamp ?? null)
   const justTaredRef = useRef(false)
   // EMA refs for graph smoothing — smooth weight before differentiating
   // to prevent noise amplification, then smooth the flow result too.
-  const emaWeightRef = useRef<number | null>(null)
-  const prevEmaWeightRef = useRef<number | null>(null)
-  const emaFlowRef = useRef<number>(0)
+  const emaWeightRef = useRef<number | null>(restoredSession?.emaWeight ?? null)
+  const prevEmaWeightRef = useRef<number | null>(restoredSession?.prevEmaWeight ?? null)
+  const emaFlowRef = useRef<number>(restoredSession?.emaFlow ?? 0)
   // Track continuous flow start time for auto-start confirmation
   const flowStartTimestampRef = useRef<number | null>(null)
   // Track weight when continuous flow started (for weight-based escape hatch)
@@ -682,6 +691,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     // Reset graph data when timer is reset
     setWeightTrend([])
     trendStartTimestampRef.current = null
+    clearPourOverSession()
   }
 
   const weight = Number(machineState.shot_weight) || 0
@@ -964,6 +974,7 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     // Tare the scale
     justTaredRef.current = true
     cmd(() => machine.tareScale(), 'tared')
+    clearPourOverSession()
   }, [cmd, machine])
 
   useEffect(() => {
@@ -1073,7 +1084,34 @@ export function PourOverView({ machineState, onBack }: PourOverViewProps) {
     previousWeightTimestampRef.current = now
   }, [autoStartEnabled, isRunning, machineState.shot_weight, startTimer])
 
-  // ── Load recipes when entering recipe mode ──
+  // ── Persist the in-progress run across navigation (#582) ──
+  // Mirror the current run-state slice into a ref every render, then flush it to
+  // the session store on unmount so re-entering PourOverView resumes the timer
+  // and weight-trend graph. Config inputs are excluded (server-persisted).
+  const sessionSnapshotRef = useRef<PourOverSessionSnapshot | null>(null)
+  useEffect(() => {
+    sessionSnapshotRef.current = {
+      isRunning,
+      baseElapsedMs,
+      startedAtMs,
+      weightTrend,
+      recipeCurrentStep,
+      stepTimeOffsetMs,
+      machineEndElapsedMs,
+      previousWeight: previousWeightRef.current,
+      previousWeightTimestamp: previousWeightTimestampRef.current,
+      trendStartTimestamp: trendStartTimestampRef.current,
+      emaWeight: emaWeightRef.current,
+      prevEmaWeight: prevEmaWeightRef.current,
+      emaFlow: emaFlowRef.current,
+    }
+  })
+  useEffect(() => {
+    return () => {
+      if (sessionSnapshotRef.current) savePourOverSession(sessionSnapshotRef.current)
+    }
+  }, [])
+
   useEffect(() => {
     if (mode !== 'recipe' || recipes.length > 0) return
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loading flag before async fetch

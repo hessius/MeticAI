@@ -1,24 +1,2 @@
-export type AIErrorCode =
-  | 'API_KEY_MISSING'
-  | 'QUOTA_EXCEEDED'
-  | 'API_KEY_INVALID'
-  | 'MODEL_NOT_FOUND'
-  | 'NETWORK_ERROR'
-  | 'SERVICE_UNAVAILABLE'
-  | 'IMAGE_GENERATION_FAILED'
-  | 'IMAGE_NO_DATA'
-  | 'LOCAL_UNAVAILABLE'
-  | 'LOCAL_VISION_UNSUPPORTED'
-  | 'LOCAL_TIMEOUT'
-  | 'LOCAL_MODEL_NOT_DOWNLOADED'
-  | 'LOCAL_OUT_OF_MEMORY'
-  | 'LOCAL_GENERATION_FAILED'
-  | 'UNKNOWN'
-
-export class AIServiceError extends Error {
-  constructor(public readonly code: AIErrorCode, cause?: unknown) {
-    super(code)
-    this.name = 'AIServiceError'
-    if (cause !== undefined) Object.defineProperty(this, 'cause', { value: cause })
-  }
-}
+/** Re-export from @metic/core (3.0.0 core extraction). */
+export * from "@metic/core/ai/aiErrors";

@@ -169,11 +169,9 @@ print_menu() {
 
     local wt="[ ]"
     local ts="[ ]"
-    local ha="[ ]"
 
     compose_has_file "$compose_string" "docker-compose.watchtower.yml" && wt="[x]"
     compose_has_file "$compose_string" "docker-compose.tailscale.yml" && ts="[x]"
-    compose_has_file "$compose_string" "docker-compose.homeassistant.yml" && ha="[x]"
 
     echo ""
     echo "Metic Addon Manager"
@@ -182,7 +180,6 @@ print_menu() {
     echo ""
     echo "1. $wt Watchtower (auto-updates)"
     echo "2. $ts Tailscale (remote access)"
-    echo "3. $ha Home Assistant MQTT"
     echo ""
     echo "r. Refresh status"
     echo "q. Quit"
@@ -215,16 +212,6 @@ toggle_tailscale() {
     fi
 }
 
-toggle_homeassistant() {
-    local compose_string="$1"
-    if compose_has_file "$compose_string" "docker-compose.homeassistant.yml"; then
-        echo "$(remove_compose_file "$compose_string" "docker-compose.homeassistant.yml")"
-    else
-        download_if_missing "docker-compose.homeassistant.yml"
-        echo "$(add_compose_file "$compose_string" "docker-compose.homeassistant.yml")"
-    fi
-}
-
 main() {
     ensure_tools
     find_install_dir
@@ -244,10 +231,6 @@ main() {
                 ;;
             2)
                 compose_string="$(toggle_tailscale "$compose_string")"
-                restart_stack "$compose_string"
-                ;;
-            3)
-                compose_string="$(toggle_homeassistant "$compose_string")"
                 restart_stack "$compose_string"
                 ;;
             r|R)

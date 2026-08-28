@@ -129,8 +129,8 @@ jobs:
           # Check container is running
           docker ps | grep test-container
           
-          # Check health endpoint
-          docker exec test-container curl -f http://localhost:3550/health || exit 1
+          # Check health endpoint (distroless image has no curl; use the binary's own healthcheck)
+          docker exec test-container /app/metic healthcheck || exit 1
 
       - name: Cleanup
         if: always()

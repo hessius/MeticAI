@@ -30,6 +30,8 @@ import {
   type TooltipPayloadItem
 } from '@/components/charts/chartConstants'
 import { pointAtTime } from '@/components/charts/pointAtTime'
+import { MetricPanels, ChartLayoutToggle, type MetricPanelDef } from '@/components/charts'
+import { useChartLayout } from '@/hooks/useChartLayout'
 
 // Custom tooltip for the chart
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipPayloadItem[]; label?: number }) {
@@ -125,6 +127,7 @@ interface ReplayChartProps {
   isPlaying: boolean
   playbackSpeed: number
   isDark: boolean
+  profileTargetCurves?: ProfileTargetPoint[]
   variant?: 'mobile' | 'desktop'
 }
 
@@ -142,6 +145,7 @@ export function ReplayChart({
   isPlaying,
   playbackSpeed,
   isDark,
+  profileTargetCurves,
   variant = 'mobile'
 }: ReplayChartProps) {
   const { t } = useTranslation()
@@ -151,6 +155,15 @@ export function ReplayChart({
   const rightMargin = isMobile ? 0 : 5
   const theme = getChartTheme(isDark)
 
+  // Chart layout preference (#589): combined single chart vs. per-metric panels.
+  const { canSeparate, pref, setPref, layout } = useChartLayout()
+  const replayPanels: MetricPanelDef[] = [
+    { key: 'pressure', labelKey: 'charts.metric.pressure', color: CHART_COLORS.pressure, targetKey: 'target_pressure' },
+    { key: 'flow', labelKey: 'charts.metric.flow', color: CHART_COLORS.flow, overlayKey: 'gravimetricFlow', targetKey: 'target_flow' },
+    { key: 'weight', labelKey: 'charts.metric.weight', color: CHART_COLORS.weight },
+    { key: 'temperature', labelKey: 'charts.metric.temperature', color: CHART_COLORS.temperature },
+  ]
+
   const content = (
     <>
       <div className="flex items-center justify-between">
@@ -158,13 +171,31 @@ export function ReplayChart({
           <ChartLine size={16} weight="bold" />
           {t('shotCharts.extractionGraph')}
         </Label>
-        {isPlaying && (
-          <Badge variant="secondary" className="animate-pulse">
-            <Play size={10} weight="fill" className="mr-1" />
-            {t('shotCharts.replaying', { speed: playbackSpeed })}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {isPlaying && (
+            <Badge variant="secondary" className="animate-pulse">
+              <Play size={10} weight="fill" className="mr-1" />
+              {t('shotCharts.replaying', { speed: playbackSpeed })}
+            </Badge>
+          )}
+          {canSeparate && (
+            <ChartLayoutToggle pref={pref} onChange={setPref} />
+          )}
+        </div>
       </div>
+      {layout !== 'combined' ? (
+        <div className="min-h-[300px] max-h-[60vh] h-[60vh]" role="img" aria-label={t('a11y.chart.extractionReplay')}>
+          <MetricPanels
+            data={displayData}
+            panels={replayPanels}
+            layout={layout}
+            heightClass="h-full"
+            xMax={dataMaxTime}
+            targetCurves={profileTargetCurves}
+            replayLineTime={isShowingReplay ? currentTime : undefined}
+          />
+        </div>
+      ) : (
       <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding} select-none [&_svg]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-reference-area_rect]:transition-opacity [&_.recharts-reference-area_rect]:duration-500`} role="img" aria-label={t('a11y.chart.extractionReplay')} style={{ WebkitTouchCallout: 'none', touchAction: 'pan-x pan-y' }}>
         <div className={chartHeight}>
           <ResponsiveContainer width="100%" height="100%">
@@ -186,6 +217,7 @@ export function ReplayChart({
           </ResponsiveContainer>
         </div>
       </div>
+      )}
       {/* Live values readout — always visible so the row never disappears at
           the start/end of a scrub (which caused the layout to jump). Follows
           the current scrub position; shows the resting shot values otherwise. */}
@@ -293,6 +325,7 @@ interface CompareChartProps {
   comparisonIsPlaying: boolean
   comparisonPlaybackSpeed: number
   isDark: boolean
+  profileTargetCurves?: ProfileTargetPoint[]
   variant?: 'mobile' | 'desktop'
 }
 
@@ -306,6 +339,7 @@ export function CompareChart({
   comparisonIsPlaying,
   comparisonPlaybackSpeed,
   isDark,
+  profileTargetCurves,
   variant = 'mobile'
 }: CompareChartProps) {
   const { t } = useTranslation()
@@ -316,7 +350,15 @@ export function CompareChart({
   const displayData = isShowingReplay ? combinedData.filter(d => d.time <= comparisonCurrentTime) : combinedData
   const readoutTime = Math.max(0, Math.min(comparisonCurrentTime, dataMaxTime))
   const readoutPoint = pointAtTime(combinedData, readoutTime)
-  
+
+  // Chart layout preference (#589): combined overlay vs. per-metric A/B panels.
+  const { canSeparate, pref, setPref, layout } = useChartLayout()
+  const comparePanels: MetricPanelDef[] = [
+    { key: 'pressureA', labelKey: 'charts.metric.pressure', color: COMPARISON_COLORS.pressure, compareKey: 'pressureB', targetKey: 'target_pressure' },
+    { key: 'flowA', labelKey: 'charts.metric.flow', color: COMPARISON_COLORS.flow, compareKey: 'flowB', targetKey: 'target_flow' },
+    { key: 'weightA', labelKey: 'charts.metric.weight', color: COMPARISON_COLORS.weight, compareKey: 'weightB' },
+  ]
+
   return (
     <>
       <div className="flex items-center justify-between">
@@ -324,13 +366,31 @@ export function CompareChart({
           <ChartLine size={16} weight="bold" />
           {t('shotCharts.extractionComparison')}
         </Label>
-        {comparisonIsPlaying && (
-          <Badge variant="secondary" className="animate-pulse text-[10px]">
-            <Play size={8} weight="fill" className="mr-1" />
-            {comparisonPlaybackSpeed}x
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {comparisonIsPlaying && (
+            <Badge variant="secondary" className="animate-pulse text-[10px]">
+              <Play size={8} weight="fill" className="mr-1" />
+              {comparisonPlaybackSpeed}x
+            </Badge>
+          )}
+          {canSeparate && (
+            <ChartLayoutToggle pref={pref} onChange={setPref} />
+          )}
+        </div>
       </div>
+      {layout !== 'combined' ? (
+        <div className="min-h-[300px] max-h-[60vh] h-[60vh]" role="img" aria-label={t('a11y.chart.extractionComparison')}>
+          <MetricPanels
+            data={displayData}
+            panels={comparePanels}
+            layout={layout}
+            heightClass="h-full"
+            xMax={dataMaxTime}
+            targetCurves={profileTargetCurves}
+            replayLineTime={isShowingReplay ? comparisonCurrentTime : undefined}
+          />
+        </div>
+      ) : (
       <div className={`bg-secondary/40 rounded-xl border border-border/20 ${padding} select-none [&_svg]:outline-none [&_.recharts-surface]:outline-none`} role="img" aria-label={t('a11y.chart.extractionComparison')} style={{ WebkitTouchCallout: 'none', touchAction: 'pan-x pan-y' }}>
         <div className={chartHeight}>
           <ResponsiveContainer width="100%" height="100%">
@@ -352,6 +412,7 @@ export function CompareChart({
           </ResponsiveContainer>
         </div>
       </div>
+      )}
       {/* Live A/B values readout — always visible so the row never disappears
           at the start/end of a scrub (which caused the layout to jump). */}
       <CompareValuesReadout

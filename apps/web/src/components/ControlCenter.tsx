@@ -89,11 +89,39 @@ function stateBadge(state: string | null, brewing: boolean, t: ReturnType<typeof
 }
 
 function connectionDot(machineState: MachineState) {
-  if (!machineState._wsConnected) return { dot: 'bg-gray-400', key: 'disconnected' }
-  if (machineState.availability === 'offline') return { dot: 'bg-red-500', key: 'offline' }
-  if (machineState._stale) return { dot: 'bg-amber-400', key: 'stale' }
-  if (machineState.connected) return { dot: 'bg-emerald-400', key: 'connected' }
-  return { dot: 'bg-gray-400', key: 'connecting' }
+  if (!machineState._wsConnected) return { dot: 'bg-gray-400' }
+  if (machineState.availability === 'offline') return { dot: 'bg-red-500' }
+  if (machineState._stale) return { dot: 'bg-amber-400' }
+  if (machineState.connected) return { dot: 'bg-emerald-400' }
+  return { dot: 'bg-gray-400' }
+}
+
+// ---------------------------------------------------------------------------
+// Scale readout helper
+// ---------------------------------------------------------------------------
+
+export interface ScaleReadout {
+  /** Current scale weight, fixed to 1 decimal (e.g. "12.3"). */
+  value: string
+  /** Target weight rounded to a whole number (e.g. "36"), or null when absent. */
+  target: string | null
+}
+
+/**
+ * Format the collapsed-state scale readout. Current weight is shown to 1 dp
+ * (0.0 at rest); the target — when the machine reports one — is a whole number.
+ * A target while idle is just a stale remnant of the last shot, not a goal
+ * being pursued, so it is suppressed.
+ */
+export function getScaleReadout(
+  shotWeight: number | null | undefined,
+  targetWeight: number | null | undefined,
+  isIdle = false,
+): ScaleReadout {
+  return {
+    value: (shotWeight ?? 0).toFixed(1),
+    target: !isIdle && targetWeight != null ? targetWeight.toFixed(0) : null,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -113,37 +141,50 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
   const directImageMode = isDirectMode() || isNativePlatformFn()
   const resolvedMachineUrl = useResolvedMachineUrl(directImageMode)
 
-  // Overflow detection for status row — progressively hide target temp, then connection label
+  // Overflow detection for status row — progressively hide secondary content
+  // (temp target, weight target, connection label) then, as a last resort on
+  // very narrow layouts, the weight readout — so the temperature value, state
+  // badge and connection dot are never clipped.
   const statusRowRef = useRef<HTMLDivElement>(null)
   const [hideTarget, setHideTarget] = useState(false)
-  const [hideConnLabel, setHideConnLabel] = useState(false)
+  const [hideWeightTarget, setHideWeightTarget] = useState(false)
+  const [hideWeight, setHideWeight] = useState(false)
 
   useEffect(() => {
     const el = statusRowRef.current
     if (!el) return
+    // Ordered hide cascade — each step is applied only while the row overflows.
+    const steps = [setHideTarget, setHideWeightTarget, setHideWeight]
     const check = () => {
-      // Reset to full content, measure, then hide as needed
+      // Reset to full content, then re-measure and hide step-by-step.
       setHideTarget(false)
-      setHideConnLabel(false)
-      requestAnimationFrame(() => {
-        if (!statusRowRef.current) return
-        const overflows = statusRowRef.current.scrollWidth > statusRowRef.current.clientWidth
-        if (overflows) {
-          setHideTarget(true)
-          requestAnimationFrame(() => {
-            if (!statusRowRef.current) return
-            if (statusRowRef.current.scrollWidth > statusRowRef.current.clientWidth) {
-              setHideConnLabel(true)
-            }
-          })
-        }
-      })
+      setHideWeightTarget(false)
+      setHideWeight(false)
+      let i = 0
+      const stepOnce = () => {
+        requestAnimationFrame(() => {
+          const node = statusRowRef.current
+          if (!node) return
+          if (node.scrollWidth > node.clientWidth && i < steps.length) {
+            steps[i++](true)
+            stepOnce()
+          }
+        })
+      }
+      stepOnce()
     }
     const ro = new ResizeObserver(check)
     ro.observe(el)
     check()
     return () => ro.disconnect()
-  }, [machineState.boiler_temperature, machineState.target_temperature, machineState.state, machineState.connected])
+  }, [
+    machineState.boiler_temperature,
+    machineState.target_temperature,
+    machineState.state,
+    machineState.connected,
+    machineState.shot_weight,
+    machineState.target_weight,
+  ])
 
   // Shared state derivation + command executor
   const {
@@ -327,8 +368,8 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
       {/* ── NOT-BREWING STATE ────────────────────────────── */}
       {!isBrewing && (
         <>
-          {/* Temperature + connection status — single row */}
-          <div ref={statusRowRef} className="flex items-end justify-between overflow-hidden">
+          {/* Temperature + scale weight + connection status — single row */}
+          <div ref={statusRowRef} className="flex items-end justify-between gap-2 overflow-hidden">
             <div className="flex items-baseline gap-1.5 shrink-0">
               <Thermometer size={16} className="text-muted-foreground self-center" weight="duotone" />
               <span className="text-2xl font-bold tabular-nums text-foreground">
@@ -343,16 +384,28 @@ export function ControlCenter({ machineState, onOpenLiveView }: ControlCenterPro
                 </span>
               )}
             </div>
+            {/* Live scale readout — visible even in the collapsed state (#583) */}
+            {!hideWeight && isConnected && machineState.shot_weight != null && (() => {
+              const { value, target } = getScaleReadout(machineState.shot_weight, machineState.target_weight, isIdle)
+              return (
+                <div
+                  className="flex items-baseline gap-1 shrink-0"
+                  aria-label={t('controlCenter.metrics.weight')}
+                >
+                  <Scales size={14} className="text-muted-foreground self-center" weight="duotone" />
+                  <span className="text-lg font-semibold tabular-nums text-foreground">{value}</span>
+                  {!hideWeightTarget && target != null && (
+                    <span className="text-xs text-muted-foreground">/{target}</span>
+                  )}
+                  <span className="text-xs text-muted-foreground">g</span>
+                </div>
+              )
+            })()}
             <div className="flex items-center gap-1.5 shrink min-w-0">
               {(() => {
-                const { dot, key } = connectionDot(machineState)
+                const { dot } = connectionDot(machineState)
                 return (
                   <>
-                    {!hideConnLabel && (
-                      <span className="text-[10px] text-muted-foreground truncate">
-                        {t(`controlCenter.connection.${key}`)}
-                      </span>
-                    )}
                     {machineState.state && machineState._wsConnected && (
                       stateBadge(machineState.state, false, t)
                     )}

@@ -1,4 +1,17 @@
 {
+  "charts": {
+    "layout": {
+      "label": "Diagramlayout",
+      "combined": "Kombinerat",
+      "separated": "Separerat"
+    },
+    "metric": {
+      "pressure": "Tryck",
+      "flow": "Flöde",
+      "weight": "Vikt",
+      "temperature": "Temperatur"
+    }
+  },
   "common": {
     "save": "Spara",
     "cancel": "Avbryt",
@@ -316,7 +329,10 @@
     "newProfileNamePlaceholder": "Nytt profilnamn...",
     "titleRun": "Kör",
     "temperatureBoost": "Temperaturboost",
-    "temperatureBoostDescription": "Första espressodraget från kall start kan vara ~3 °C kallare. Boost höjer brewtemperaturen tillfälligt med 3 °C (max 99 °C) så att även första draget når rätt temperatur."
+    "temperatureBoostDescription": "Första espressodraget från kall start kan vara ~3 °C kallare. Boost höjer brewtemperaturen tillfälligt med 3 °C (max 99 °C) så att även första draget når rätt temperatur.",
+    "autoStart": "Autostart vid stabil temperatur",
+    "autoStartDescription": "Vänta tills temperaturen stabiliserats och starta sedan draget automatiskt. Till skillnad från Meticulous autostart väntar den här tills båda temperaturerna ligger stadigt på målet.",
+    "autoStartAppOpenNote": "Håll Metic-appen öppen för att detta ska utlösas, om du inte kör Metic-servern (t.ex. på en Raspberry Pi) i bakgrunden."
   },
   "shotHistory": {
     "duration": "Varaktighet",
@@ -512,8 +528,6 @@
     "geminiModelDescriptionDynamic": "Modeller hämtade från Google AI. Välj vilken modell som ska användas.",
     "modelsLoading": "Läser in modeller…",
     "modelDefault": "Standardmodell",
-    "mqttEnabled": "MQTT-brygga",
-    "mqttEnabledDescription": "Realtidstelemetri från maskinen via MQTT. Driver den direkta kontrollpanelen.",
     "settingsSaved": "Inställningar sparade framgångsrikt!",
     "settingsSaveFailed": "Misslyckades spara inställningar",
     "changelog": "Ändringslogg",
@@ -614,9 +628,6 @@
     },
     "version": "Version",
     "footer": "Metic • Byggd med ❤️ för kaffeälskare",
-    "addToHomeAssistant": "Add to Home Assistant",
-    "homeAssistantDescription": "Connect Home Assistant to Metic's MQTT broker to auto-discover your Meticulous machine (24 sensors + 11 commands). Point HA to this server's IP on port 1883.",
-    "homeAssistantGuide": "Home Assistant-guide",
     "poweredBy": "Powered by",
     "credits": {
       "pyMeticulous": "Official Python client for the Meticulous API",
@@ -636,9 +647,59 @@
     "geminiModel31FlashLite": "Gemini 3.1 Flash Lite",
     "aiSettings": "AI-inställningar",
     "versionAndChangelog": "Version och ändringslogg",
-    "mqttBridge": "MQTT-brygga",
     "disclaimer": "Metic är ett oberoende open source-projekt och är inte anslutet till, godkänt av eller kopplat till Meticulous Home, tillverkaren av Meticulous espressomaskinen.",
-    "localModelDownloadKeepOpen": "Håll appen öppen och stanna på den här skärmen tills nedladdningen är klar."
+    "localModelDownloadKeepOpen": "Håll appen öppen och stanna på den här skärmen tills nedladdningen är klar.",
+    "diagnostics": {
+      "title": "Diagnostik",
+      "description": "Om appen fryser eller beter sig oväntat kan du skapa en diagnostikrapport och skicka den till oss. Den registrerar frysningar och fel på din enhet och innehåller inga personuppgifter.",
+      "generate": "Skapa rapport",
+      "copy": "Kopiera",
+      "clear": "Rensa",
+      "enable": "Aktivera diagnostik",
+      "enableHint": "Av som standard. Slå på för att låta Metic registrera frysningar och fel så att du kan skicka en rapport. Ingen personlig data samlas in.",
+      "overlay": {
+        "title": "Metic-diagnostik",
+        "intro": "Metic upptäckte en frysning. Kopiera eller dela rapporten och skicka den till utvecklarna så att de kan åtgärda felet.",
+        "copy": "Kopiera rapport",
+        "share": "Dela",
+        "copied": "Kopierad",
+        "copyFailed": "Kopiering misslyckades",
+        "dismiss": "Stäng"
+      }
+    },
+    "widgets": {
+      "sectionTitle": "Widgetar",
+      "openAppOnStart": "Öppna Metic när en shot startas från en widget",
+      "openAppOnStartHint": "När detta är av startas en profil från en widget i bakgrunden utan att appen öppnas."
+    },
+    "liveActivity": {
+      "title": "Live Activity",
+      "hint": "Välj vilket värde som visas snabbt på låsskärmen och Dynamic Island.",
+      "shotStat": "Värde vid uttag",
+      "heatingStat": "Värde vid uppvärmning",
+      "stat": {
+        "weight": "Vikt",
+        "pressure": "Tryck",
+        "flow": "Flöde",
+        "temp": "Temperatur",
+        "estimatedTime": "Uppskattad tid till klar"
+      },
+      "widget": {
+        "brewChamber": "Bryggkammare",
+        "brewHead": "Brygghuvud",
+        "ready": "Klar",
+        "start": "Starta",
+        "weight": "Vikt",
+        "pressure": "Tryck",
+        "flow": "Flöde",
+        "time": "Tid",
+        "shotComplete": "Shot klar",
+        "ratio": "Ratio",
+        "avgTemp": "Snitttemp",
+        "done": "Klar",
+        "resumeHint": "Öppna Metic för att återuppta liveuppdateringar"
+      }
+    }
   },
   "profileBreakdown": {
     "title": "Profildetaljer",
@@ -759,16 +820,10 @@
     "fetchDetailsFailed": "Kunde inte hämta profildetaljer",
     "noResponseStream": "Ingen svarsström tillgänglig",
     "bulkImportStartFailed": "Kunde inte starta bulkimport",
-    "fromUrl": "Från URL",
-    "jsonOrMet": ".json / .met",
-    "importFromUrl": "Importera från URL",
-    "urlPlaceholder": "Klistra in profil-URL...",
-    "urlHint": "Stöder .json- och .met-profil-URL:er",
     "back": "Tillbaka",
     "importButton": "Importera",
     "fetchingUrl": "Hämtar profil från URL...",
     "importUrlFailed": "Kunde inte importera från URL",
-    "invalidUrl": "Ange en giltig URL",
     "decentEspresso": "Decent",
     "decentDescription": "Konvertera & importera",
     "decentImportHint": "Ladda upp eller klistra in en Decent Espresso-profil-JSON för att konvertera den till Meticulous-format.",
@@ -781,7 +836,24 @@
     "notDecentFormat": "Inte ett giltigt Decent Espresso-profilformat",
     "profileName": "Namn",
     "stages": "steg",
-    "triggers": "utlösare"
+    "triggers": "utlösare",
+    "fromLink": "Från länk",
+    "linkOrJson": "Länk eller JSON",
+    "importFromLink": "Importera från länk eller JSON",
+    "sourcePlaceholder": "Klistra in en metprofiles-länk, en profil-URL eller profil-JSON...",
+    "sourceHint": "Stöder metprofiles.link, direkta .json/.met-länkar och inklistrad profil-JSON",
+    "invalidSource": "Ange en giltig länk eller profil-JSON",
+    "shareResult": {
+      "importingTitle": "Importerar profil",
+      "importingBody": "Lägger till den delade profilen i ditt bibliotek...",
+      "successTitle": "Profil importerad",
+      "successBody": "\"{{name}}\" importerades.",
+      "existsTitle": "Redan importerad",
+      "existsBody": "\"{{name}}\" finns redan i ditt bibliotek.",
+      "errorTitle": "Importen misslyckades",
+      "errorBody": "Profilen kunde inte importeras.",
+      "errorBodyWithReason": "Profilen kunde inte importeras: {{reason}}"
+    }
   },
   "imageCrop": {
     "title": "Beskär profilbild",
@@ -821,7 +893,11 @@
       "temperatureChart": "Temperatur",
       "deltaToTarget": "Till mål",
       "target": "Mål",
-      "stabilityReached": "Temperaturen stabil"
+      "stabilityReached": "Temperaturen stabil",
+      "autoStart": "Autostart vid stabil temperatur",
+      "autoStartDescription": "Starta draget automatiskt när båda temperaturerna ligger stadigt på målet.",
+      "autoStartAppOpenNote": "Håll appen öppen för att autostart ska utlösas, om inte Metic-servern körs i bakgrunden.",
+      "autoStartArmed": "Stabil · autostart om {{seconds}} s"
     },
     "offline": "Maskinen är offline",
     "stale": "Inaktuell",
@@ -1877,5 +1953,11 @@
       "skip": "Hoppa över",
       "analyzeWithTaste": "Analysera med smak"
     }
+  },
+  "favourites": {
+    "sectionTitle": "Favoriter",
+    "add": "Lägg till i favoriter",
+    "remove": "Ta bort från favoriter",
+    "empty": "Stjärnmärk en profil för att lägga till den bland dina favoriter."
   }
 }

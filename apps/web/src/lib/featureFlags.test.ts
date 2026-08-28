@@ -30,15 +30,15 @@ describe('featureFlags', () => {
   // Proxy mode
   // -------------------------------------------------------------------
   describe('proxy mode', () => {
-    it('should enable all backend-dependent features', () => {
+    it('should enable retained backend-dependent features and disable removed ones', () => {
       const flags = getFeatureFlags()
       expect(flags.machineDiscovery).toBe(true)
       expect(flags.scheduledShots).toBe(true)
       expect(flags.systemManagement).toBe(true)
       expect(flags.tailscaleConfig).toBe(true)
-      expect(flags.mcpServer).toBe(true)
+      expect(flags.mcpServer).toBe(false)
       expect(flags.cloudSync).toBe(true)
-      expect(flags.bridgeStatus).toBe(true)
+      expect(flags.bridgeStatus).toBe(false)
       expect(flags.watchtowerUpdate).toBe(true)
     })
 
@@ -241,12 +241,12 @@ describe('featureFlags', () => {
       expect(getFeatureFlags()).toMatchInlineSnapshot(`
         {
           "aiFeatures": true,
-          "bridgeStatus": true,
+          "bridgeStatus": false,
           "cloudSync": true,
           "dialIn": true,
           "liveTelemetry": true,
           "machineDiscovery": true,
-          "mcpServer": true,
+          "mcpServer": false,
           "pourOver": true,
           "profileManagement": true,
           "pwaInstall": false,

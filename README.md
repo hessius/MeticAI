@@ -44,8 +44,7 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 
 ### For Power Users
 - 🔌 **REST API** - Integrate with any automation system
-- 🏠 **Home Assistant** - MQTT bridge for HA automations and entities
-- 🐳 **Single Docker Container** - Simple deployment and updates
+- 🐳 **Single Docker Container** - Simple, distroless single-binary deployment
 - 🔓 **Open Source** - Customize and extend as you like
 - 🔄 **Auto Updates** - Optional Watchtower integration
 
@@ -156,29 +155,40 @@ server is required.
 
 ## 🎛️ Control Center
 
-Metic includes a real-time Control Center powered by the [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) MQTT bridge:
+Metic includes a real-time Control Center with live machine telemetry streamed
+straight from your Meticulous over the built-in `/api/ws/live` WebSocket:
 
 - **Live telemetry** — Real-time pressure, flow, weight, and temperature gauges
 - **Machine control** — Preheat, tare, purge, abort, brightness, sounds, and more
 - **Live Shot View** — Watch your extraction in real-time with live charts
 - **Auto-detection** — Automatically detects when a shot starts and prompts you to watch
 - **Last Shot Banner** — After a shot, offers one-tap analysis with AI coaching
-- **Home Assistant** — MQTT bridge enables auto-discovery of 24 sensors + 11 commands in HA
 
-The Control Center appears as a side panel on desktop and a full page on mobile. Enable it in Settings → Control Center → MQTT Bridge.
+The Control Center appears as a side panel on desktop and a full page on mobile,
+and works out of the box with no extra services.
 
-### Home Assistant Integration
+> **Changed in 3.0.0:** Home Assistant MQTT auto-discovery was removed, but live
+> telemetry and machine control are unaffected (served over the built-in
+> `/api/ws/live` WebSocket). See [Removed in 3.0.0](#-removed-in-300-server-version)
+> below for the full list.
 
-When the MQTT bridge is enabled, your Meticulous machine is automatically discoverable in Home Assistant.
+## 🗑️ Removed in 3.0.0 (server version)
 
-1. Start Metic with the Home Assistant overlay:
-   ```bash
-   docker compose -f docker-compose.yml -f docker-compose.homeassistant.yml up -d
-   ```
-2. In HA, add the **MQTT** integration and point it to your Metic server's IP on port 1883
-3. This enables automations like "notify me when my shot is done" or "preheat at 7am on weekdays"
+Metic 3.0.0 replaces the Python backend with a single unified image. As part of
+that cutover, a few **server-side** features were removed. On-device / native app
+functionality is unaffected.
 
-[→ Full Home Assistant integration guide](HOME_ASSISTANT.md)
+- **Home Assistant MQTT bridge**: the Mosquitto broker and
+  [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) MQTT
+  auto-discovery are gone, along with the in-app MQTT Bridge settings. Live
+  telemetry and machine control still work over the built-in `/api/ws/live`
+  WebSocket. See [HOME_ASSISTANT.md](HOME_ASSISTANT.md) for details.
+- **MCP server**: the bundled
+  [meticulous-mcp](https://github.com/twchad/meticulous-mcp) server and its
+  in-app settings were removed.
+- **In-app self-updater**: the in-UI update action (`/api/trigger-update`) was
+  removed. Update by pulling the new image (see below) or enable the optional
+  Watchtower addon for automatic updates.
 
 ## 🔄 Updating Metic
 
@@ -192,20 +202,14 @@ With Watchtower enabled, updates happen automatically every 6 hours.
 
 ### Manage Addons After Install
 
-You can enable or disable optional addons at any time (Watchtower, Tailscale, Home Assistant MQTT) without re-running the full installer.
+You can enable or disable optional addons at any time (Watchtower, Tailscale)
+without re-running the full installer.
 
 Linux/macOS:
 
 ```bash
 cd ~/Metic
 bash scripts/addons.sh
-```
-
-Windows PowerShell:
-
-```powershell
-cd $HOME/Metic
-powershell -ExecutionPolicy Bypass -File .\scripts\addons.ps1
 ```
 
 Remote one-liner (Linux/macOS):
@@ -243,34 +247,34 @@ docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d
 
 ## 🏗️ Architecture
 
-Metic v2.0 runs as a single unified container with five internal services managed by s6-overlay:
+Metic 3.0.0 runs as a single unified container: one distroless Bun process that
+serves the web UI, the API, the machine proxy, and live telemetry. (Earlier 2.x
+releases ran five internal services under s6-overlay: nginx, a FastAPI server, an
+MCP server, a Mosquitto broker, and an MQTT bridge; these were removed in 3.0.0.
+See [Removed in 3.0.0](#-removed-in-300-server-version).)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                      Metic Container                       │
+│                       Metic Container                        │
 │  ┌────────────────────────────────────────────────────────┐  │
-│  │                    nginx (:3550)                       │  │
-│  │             Web UI + API Reverse Proxy                 │  │
+│  │            Bun server, single binary (:3550)            │  │
+│  │                                                         │  │
+│  │   • Web UI (static SPA)                                 │  │
+│  │   • REST API (/api) → @metic/core                       │  │
+│  │       (AI, profiles, analysis, recommendations,         │  │
+│  │        dial-in) with a Gemini AI provider seam          │  │
+│  │   • Machine proxy (/api/v1/* → Meticulous)              │  │
+│  │   • Live telemetry (/api/ws/live WebSocket)             │  │
 │  └────────────────────────────────────────────────────────┘  │
 │                           │                                  │
-│       ┌───────────────────┼───────────────┐                  │
-│       ▼                   ▼               ▼                  │
-│  ┌──────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │  Server  │  │ MCP Server  │  │ Gemini CLI  │             │
-│  │ (FastAPI) │  │(Meticulous) │  │    (AI)     │             │
-│  │  :8000   │  │   :8080     │  │             │             │
-│  └──────────┘  └─────────────┘  └─────────────┘             │
-│       │                                                      │
-│       │ MQTT                                                 │
-│       ▼                                                      │
-│  ┌──────────┐  ┌─────────────────┐                           │
-│  │Mosquitto │◄─│Meticulous Bridge│◄── Machine (Socket.IO)    │
-│  │  :1883   │  │  (MQTT Bridge)  │                           │
-│  └──────────┘  └─────────────────┘                           │
+│                           ▼                                  │
+│                Machine (Socket.IO / HTTP)                     │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Real-time telemetry**: The [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon) bridge connects to your machine via Socket.IO and publishes live sensor data (pressure, flow, weight, temperature) to the internal MQTT broker. The FastAPI server subscribes and pushes updates to the web UI via WebSocket.
+**Real-time telemetry**: The Bun server connects to your machine and pushes live
+sensor data (pressure, flow, weight, temperature) to the web UI over the built-in
+`/api/ws/live` WebSocket. No separate MQTT broker or bridge is required.
 
 **Optional sidecars:**
 - **Tailscale** - Secure remote access
@@ -281,15 +285,11 @@ Metic v2.0 runs as a single unified container with five internal services manage
 ### Viewing Logs
 
 ```bash
-# Container logs (stdout)
+# Container logs (stdout) — the single Bun process logs here
 docker logs meticai -f
 
-# Structured logs via API (last 100 entries, filterable by level)
-curl http://<SERVER_IP>:3550/api/logs
-curl "http://<SERVER_IP>:3550/api/logs?level=ERROR&lines=200"
-
-# Restart a single service
-docker exec meticai s6-svc -r /run/service/server
+# Restart the container (e.g. after editing .env)
+docker compose restart meticai
 ```
 
 ### Container won't start
@@ -311,7 +311,7 @@ docker compose ps
 ### API returns errors
 
 ```bash
-# Check relay logs specifically
+# Filter the container logs for errors
 docker compose logs meticai | grep -i error
 ```
 
@@ -340,7 +340,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-Runs on [pyMeticulous](https://github.com/MeticulousHome/pyMeticulous), [meticulous-mcp](https://github.com/twchad/meticulous-mcp), [meticulous-addon](https://github.com/nickwilsonr/meticulous-addon), and caffeine ☕
+Runs on [Bun](https://bun.sh), TypeScript, [Google Gemini](https://ai.google.dev/), and caffeine ☕
 
 Made with ❤️ by <a href="https://github.com/hessius">@hessius</a>
 

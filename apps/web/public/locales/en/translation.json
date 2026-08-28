@@ -1,4 +1,17 @@
 {
+  "charts": {
+    "layout": {
+      "label": "Chart layout",
+      "combined": "Combined",
+      "separated": "Separated"
+    },
+    "metric": {
+      "pressure": "Pressure",
+      "flow": "Flow",
+      "weight": "Weight",
+      "temperature": "Temperature"
+    }
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",
@@ -316,7 +329,10 @@
     "newProfileNamePlaceholder": "New profile name...",
     "titleRun": "Run",
     "temperatureBoost": "Temperature Boost",
-    "temperatureBoostDescription": "Cold-start shots can run ~3 °C cooler. Boost temporarily raises brew temperature by 3 °C (max 99 °C) so the first shot still hits the mark."
+    "temperatureBoostDescription": "Cold-start shots can run ~3 °C cooler. Boost temporarily raises brew temperature by 3 °C (max 99 °C) so the first shot still hits the mark.",
+    "autoStart": "Auto-start when stable",
+    "autoStartDescription": "Wait for the temperature to stabilize, then start the shot automatically. Unlike the Meticulous auto-start, this holds until both temperatures are steady on target.",
+    "autoStartAppOpenNote": "Keep the Metic app open for this to trigger, unless you run the Metic server (e.g. on a Raspberry Pi) in the background."
   },
   "shotHistory": {
     "title": "Shot History",
@@ -512,11 +528,6 @@
     "geminiModelDescriptionDynamic": "Models loaded from Google AI. Select which model to use.",
     "modelsLoading": "Loading models…",
     "modelDefault": "Default model",
-    "mqttEnabled": "MQTT Bridge",
-    "mqttEnabledDescription": "Real-time machine telemetry via MQTT. Powers the live Control Center dashboard.",
-    "addToHomeAssistant": "Add to Home Assistant",
-    "homeAssistantDescription": "Connect Home Assistant to Metic's MQTT broker to auto-discover your Meticulous machine (24 sensors + 11 commands). Point HA to this server's IP on port 1883.",
-    "homeAssistantGuide": "Home Assistant Guide",
     "poweredBy": "Powered by",
     "credits": {
       "pyMeticulous": "Official Python client for the Meticulous API",
@@ -636,9 +647,59 @@
     "geminiModel31FlashLite": "Gemini 3.1 Flash Lite",
     "aiSettings": "AI Settings",
     "versionAndChangelog": "Version & Changelog",
-    "mqttBridge": "MQTT Bridge",
     "disclaimer": "Metic is an independent, open-source project and is not affiliated with, endorsed by, or connected to Meticulous Home, the manufacturer of the Meticulous espresso machine.",
-    "localModelDownloadKeepOpen": "Keep the app open and stay on this screen until the download finishes."
+    "localModelDownloadKeepOpen": "Keep the app open and stay on this screen until the download finishes.",
+    "diagnostics": {
+      "title": "Diagnostics",
+      "description": "If the app freezes or behaves unexpectedly, generate a diagnostics report and send it to us. It records app freezes and errors on your device and contains no personal data.",
+      "generate": "Generate Report",
+      "copy": "Copy",
+      "clear": "Clear",
+      "enable": "Enable diagnostics",
+      "enableHint": "Off by default. Turn on to let Metic record freezes and errors so you can send a report. No personal data is collected.",
+      "overlay": {
+        "title": "Metic diagnostics",
+        "intro": "Metic detected a freeze. Copy or share this report and send it to the developers so they can fix it.",
+        "copy": "Copy report",
+        "share": "Share",
+        "copied": "Copied",
+        "copyFailed": "Copy failed",
+        "dismiss": "Dismiss"
+      }
+    },
+    "widgets": {
+      "sectionTitle": "Widgets",
+      "openAppOnStart": "Open Metic when starting a shot from a widget",
+      "openAppOnStartHint": "When off, starting a profile from a widget runs in the background without opening the app."
+    },
+    "liveActivity": {
+      "title": "Live Activity",
+      "hint": "Choose which stat shows at a glance on the Lock Screen and Dynamic Island.",
+      "shotStat": "Shot stat",
+      "heatingStat": "Heating stat",
+      "stat": {
+        "weight": "Weight",
+        "pressure": "Pressure",
+        "flow": "Flow",
+        "temp": "Temperature",
+        "estimatedTime": "Estimated time to ready"
+      },
+      "widget": {
+        "brewChamber": "Brew Chamber",
+        "brewHead": "Brew Head",
+        "ready": "Ready",
+        "start": "Start",
+        "weight": "Weight",
+        "pressure": "Pressure",
+        "flow": "Flow",
+        "time": "Time",
+        "shotComplete": "Shot complete",
+        "ratio": "Ratio",
+        "avgTemp": "Avg Temp",
+        "done": "Done",
+        "resumeHint": "Open Metic to resume live updates"
+      }
+    }
   },
   "profileBreakdown": {
     "title": "Profile Details",
@@ -759,16 +820,10 @@
     "bulkImportStartFailed": "Failed to start bulk import",
     "noResponseStream": "No response stream available",
     "fetchDetailsFailed": "Failed to fetch profile details",
-    "fromUrl": "From URL",
-    "jsonOrMet": ".json / .met",
-    "importFromUrl": "Import from URL",
-    "urlPlaceholder": "Paste profile URL...",
-    "urlHint": "Supports .json and .met profile URLs",
     "back": "Back",
     "importButton": "Import",
     "fetchingUrl": "Fetching profile from URL...",
     "importUrlFailed": "Failed to import from URL",
-    "invalidUrl": "Please enter a valid URL",
     "decentEspresso": "Decent",
     "decentDescription": "Convert & import",
     "decentImportHint": "Upload or paste a Decent Espresso profile JSON to convert it to Meticulous format.",
@@ -781,7 +836,24 @@
     "notDecentFormat": "Not a valid Decent Espresso profile format",
     "profileName": "Name",
     "stages": "stages",
-    "triggers": "triggers"
+    "triggers": "triggers",
+    "fromLink": "From link",
+    "linkOrJson": "Link or JSON",
+    "importFromLink": "Import from link or JSON",
+    "sourcePlaceholder": "Paste a metprofiles link, a profile URL, or profile JSON...",
+    "sourceHint": "Supports metprofiles.link, direct .json/.met links, and pasted profile JSON",
+    "invalidSource": "Enter a valid link or profile JSON",
+    "shareResult": {
+      "importingTitle": "Importing profile",
+      "importingBody": "Adding the shared profile to your library...",
+      "successTitle": "Profile imported",
+      "successBody": "\"{{name}}\" was imported successfully.",
+      "existsTitle": "Already imported",
+      "existsBody": "\"{{name}}\" is already in your library.",
+      "errorTitle": "Import failed",
+      "errorBody": "The profile could not be imported.",
+      "errorBodyWithReason": "The profile could not be imported: {{reason}}"
+    }
   },
   "imageCrop": {
     "title": "Crop Profile Image",
@@ -821,7 +893,11 @@
       "temperatureChart": "Temperature",
       "deltaToTarget": "To target",
       "target": "Target",
-      "stabilityReached": "Temperature stable"
+      "stabilityReached": "Temperature stable",
+      "autoStart": "Auto-start when stable",
+      "autoStartDescription": "Start the shot automatically once both temperatures hold steady on target.",
+      "autoStartAppOpenNote": "Keep this app open for auto-start to fire, unless the Metic server is running in the background.",
+      "autoStartArmed": "Stable · auto-starting in {{seconds}}s"
     },
     "offline": "Machine is offline",
     "stale": "Stale",
@@ -1877,5 +1953,11 @@
       "skip": "Skip",
       "analyzeWithTaste": "Analyze with taste"
     }
+  },
+  "favourites": {
+    "sectionTitle": "Favourites",
+    "add": "Add to favourites",
+    "remove": "Remove from favourites",
+    "empty": "Star a profile to add it to your favourites."
   }
 }

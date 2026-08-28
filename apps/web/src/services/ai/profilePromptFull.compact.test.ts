@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildFullProfilePrompt, buildCompactProfilePrompt } from './profilePromptFull'
 
 describe('buildFullProfilePrompt (compact / on-device)', () => {
-  const args = ['Metic', 'light roast, 1:3 ratio', ['turbo'], false] as const
+  const args: [string, string, string[], boolean] = ['Metic', 'light roast, 1:3 ratio', ['turbo'], false]
 
   it('is materially smaller than the full prompt', () => {
     const full = buildFullProfilePrompt(...args)

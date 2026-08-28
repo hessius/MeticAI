@@ -579,6 +579,7 @@ export function ShotDetail({
         isPlaying={mainReplay.isPlaying}
         playbackSpeed={mainReplay.playbackSpeed}
         isDark={isDark}
+        profileTargetCurves={profileTargetCurves}
         variant={variant}
       />
     )
@@ -600,6 +601,7 @@ export function ShotDetail({
         comparisonIsPlaying={compReplay.isPlaying}
         comparisonPlaybackSpeed={compReplay.playbackSpeed}
         isDark={isDark}
+        profileTargetCurves={profileTargetCurves}
         variant={variant}
       />
     )

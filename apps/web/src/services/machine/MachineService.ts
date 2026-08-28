@@ -81,6 +81,13 @@ export interface MachineService {
   listProfiles(): Promise<ProfileIdent[]>
   fetchAllProfiles(): Promise<Profile[]>
   getProfile(id: string): Promise<Profile>
+  /**
+   * The *effective* loaded profile, reflecting temporary edits made directly on
+   * the machine. Returns null when no profile has been loaded. Prefer this over
+   * getProfile(id) when deriving live targets (e.g. target weight), because a
+   * stored profile fetched by id misses on-machine tweaks.
+   */
+  getLastProfile(): Promise<Profile | null>
   saveProfile(profile: Profile): Promise<ProfileIdent>
   deleteProfile(id: string): Promise<void>
 

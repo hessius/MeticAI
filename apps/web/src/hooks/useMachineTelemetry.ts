@@ -153,17 +153,21 @@ function useDirectTelemetry(enabled: boolean): MachineState {
         addTempSample(boilerSamplesRef, data.sensors.t)
       }
 
-      // Fetch target weight from loaded profile when profile changes
+      // Fetch the effective target weight from the *loaded* profile when the
+      // profile changes. We read /profile/last (the effective loaded profile)
+      // rather than the stored profile by id, so temporary edits made directly
+      // on the machine — e.g. a changed target weight for a single shot — are
+      // reflected even when the app is opened after the shot has started.
       // (side effect — kept outside setState updater to avoid calling async
       // functions from a pure function)
       const ext = data as typeof data & {loaded_profile?: string; id?: string}
       const profileId = ext.id
       if (profileId && profileId !== lastProfileIdRef.current) {
         lastProfileIdRef.current = profileId
-        machine.getProfile(profileId)
+        machine.getLastProfile()
           .then((profile) => {
             const weight = (profile as unknown as {final_weight?: number})?.final_weight
-            if (weight) {
+            if (typeof weight === 'number') {
               setState(s => ({ ...s, target_weight: weight }))
             }
           })
@@ -254,8 +258,24 @@ function useDirectTelemetry(enabled: boolean): MachineState {
       })
     }))
 
+    // Profile update events — the machine emits these when a profile is loaded
+    // or edited (including temporary on-machine edits that don't change the
+    // status `id`). Re-read the effective target weight so it stays in sync.
+    unsubs.push(machine.onProfileUpdate((update) => {
+      const change = update?.change
+      if (change === 'load' || change === 'update' || change === 'full_reload') {
+        machine.getLastProfile()
+          .then((profile) => {
+            const weight = (profile as unknown as {final_weight?: number})?.final_weight
+            if (typeof weight === 'number') {
+              setState(s => ({ ...s, target_weight: weight }))
+            }
+          })
+          .catch(() => {/* ignore */})
+      }
+    }))
+
     return () => {
-      unsubs.forEach(fn => fn())
       if (staleTimerRef.current) clearTimeout(staleTimerRef.current)
       if (tempIntervalRef.current) clearInterval(tempIntervalRef.current)
       boilerSamplesRef.current = []

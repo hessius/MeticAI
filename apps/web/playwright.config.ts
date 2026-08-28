@@ -2,6 +2,18 @@ import { defineConfig, devices } from '@playwright/test'
 
 const isCI = !!process.env.CI
 
+/* Specs that require infrastructure CI does not provide.
+   - verify-tasks.spec.ts needs a running Docker container (port 3550); it is
+     executed separately in the docker-build job, which sets BASE_URL.
+   - fullapp-sweep.spec.ts is a local live-verify tool: it needs the unified
+     Bun server (port 35590) AND a real machine on the LAN, so it can never
+     run on a hosted CI runner. */
+const ciTestIgnore: string[] = []
+if (isCI) {
+  ciTestIgnore.push('**/fullapp-sweep.spec.ts')
+  if (!process.env.BASE_URL) ciTestIgnore.push('**/verify-tasks.spec.ts')
+}
+
 // In CI, only run Chromium to keep E2E fast. Locally, test all browsers.
 const projects = isCI
   ? [
@@ -33,8 +45,10 @@ export default defineConfig({
   testDir: './e2e',
   /* verify-tasks.spec.ts needs a running Docker container (port 3550),
      so it's excluded from normal CI e2e runs and executed separately
-     in the docker-build job (which sets BASE_URL). */
-  testIgnore: isCI && !process.env.BASE_URL ? ['**/verify-tasks.spec.ts'] : [],
+     in the docker-build job (which sets BASE_URL). fullapp-sweep.spec.ts
+     is a local-only live-verify tool (needs the unified Bun server + a real
+     machine), so it is always excluded in CI. */
+  testIgnore: ciTestIgnore,
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,

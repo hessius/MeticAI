@@ -85,7 +85,8 @@ export function useGenerationProgress(active: boolean): UseGenerationProgressRet
 
     let cancelled = false
 
-    // In direct mode, listen for CustomEvents dispatched by DirectModeInterceptor
+    // In direct mode, listen for CustomEvents dispatched by the browser Platform
+    // (browserPlatform.reportProgress).
     const directMode = isDirectMode()
     if (directMode) {
       const handler = (e: Event) => {

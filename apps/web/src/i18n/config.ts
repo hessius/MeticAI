@@ -41,4 +41,10 @@ i18n
     },
   });
 
+// Expose the i18n singleton for non-React surfaces that must render before /
+// outside the React tree (e.g. the plain-DOM boot diagnostics overlay in
+// src/lib/diagnostics.ts). Those call sites always pass an English defaultValue,
+// so this is a progressive enhancement, not a hard dependency.
+;(globalThis as Record<string, unknown>).i18next = i18n;
+
 export default i18n;

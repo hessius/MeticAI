@@ -1,5 +1,46 @@
 # 🔄 Updating Metic
 
+> **3.0.0 note:** the in-app self-updater has been removed (the `/api/trigger-update`
+> endpoint now returns 503). Updating is handled by pulling the image, or
+> automatically via the optional Watchtower sidecar.
+
+## ⚠️ Upgrading from 2.x to 3.0.0 (read this first)
+
+The 3.0.0 image is a single distroless binary with **no shell and no `curl`**.
+The old 2.x `docker-compose.yml` used a `curl` based healthcheck, so if you keep
+your old compose file the container is flagged **unhealthy** even though it is
+serving fine. If you run autoheal/Watchtower this shows up as the container being
+restarted every few minutes and the web home screen getting stuck on "loading".
+
+If Watchtower auto-updated your image to 3.0.0, it updated the image but **not**
+your compose file, so you will hit this. Fix it by refreshing your compose file:
+
+**Recommended: re-pull the maintained compose file, then recreate the container.**
+
+```bash
+cd ~/Metic   # or ~/MeticAI, wherever your compose file lives
+curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/docker-compose.yml -o docker-compose.yml
+docker compose up -d --force-recreate meticai
+```
+
+**Or edit the healthcheck by hand** in `docker-compose.yml`:
+
+```yaml
+    healthcheck:
+      # 3.0.0: distroless image has no curl; the binary self-probes /health
+      test: ["CMD", "/app/metic", "healthcheck"]
+```
+
+then `docker compose up -d --force-recreate meticai`.
+
+Verify it stays healthy (no restart loop):
+
+```bash
+docker inspect meticai --format 'Health={{.State.Health.Status}} RestartCount={{.RestartCount}}'
+```
+
+You should see `Health=healthy` and a stable `RestartCount`.
+
 ## Quick Update (v2.x)
 
 ```bash
@@ -32,6 +73,8 @@ docker compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d
 If your Metic instance is outdated and Watchtower didn't update it (or you don't have Watchtower), try these options in order:
 
 ### Option A: Update from the Web UI
+
+> Removed in 3.0.0. Use Option B or C below instead.
 
 1. Open Metic in your browser (`http://<server-ip>:3550`)
 2. Go to **Settings**
@@ -125,6 +168,12 @@ docker compose up -d
 | Web UI | Basic React app | Full-featured React + shadcn/ui |
 | MQTT/Telemetry | Not included | Built-in bridge + live dashboard |
 | Home Assistant | Not supported | MQTT auto-discovery |
+
+> **Note:** The table above describes v2.0. Several of these changed again in
+> **3.0.0**: s6-overlay was dropped in favour of a single Bun binary, and the
+> built-in MQTT bridge and Home Assistant MQTT auto-discovery were removed (live
+> telemetry still streams to the Metic dashboard over `/api/ws/live`). See
+> [Removed in 3.0.0](README.md#-removed-in-300-server-version).
 
 ## Troubleshooting Updates
 
