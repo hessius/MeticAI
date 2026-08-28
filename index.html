@@ -257,33 +257,14 @@
 
             <div class="reveal">
                 <h3 class="install-heading">Installation</h3>
-                <div class="install-tabs">
-                    <button class="install-tab active" data-panel="linux">Linux / macOS</button>
-                    <button class="install-tab" data-panel="windows">Windows</button>
-                    <button class="install-tab" data-panel="macos-app">macOS App</button>
-                </div>
 
                 <div class="install-panel" id="panel-linux">
-                    <p class="install-label">One-line install for Raspberry Pi, Linux, and macOS:</p>
+                    <p class="install-label">One-line Docker install for Raspberry Pi, Linux, macOS, and Windows (WSL2):</p>
                     <div class="install-command-wrapper">
                         <code class="install-command">curl -fsSL https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.sh | bash</code>
                         <button class="copy-btn" title="Copy to clipboard" aria-label="Copy command"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
                     </div>
-                    <p class="install-note">Checks prerequisites, pulls the Docker image, and starts all services automatically.</p>
-                </div>
-
-                <div class="install-panel" id="panel-windows" style="display:none">
-                    <p class="install-label">PowerShell installer for Windows 10/11 (requires Docker Desktop):</p>
-                    <div class="install-command-wrapper">
-                        <code class="install-command">irm https://raw.githubusercontent.com/hessius/MeticAI/main/scripts/install.ps1 | iex</code>
-                        <button class="copy-btn" title="Copy to clipboard" aria-label="Copy command"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
-                    </div>
-                    <p class="install-note">Runs in PowerShell 5.1+. See the <a href="https://github.com/hessius/MeticAI/blob/main/WINDOWS.md" target="_blank" rel="noopener noreferrer">Windows guide</a> for details.</p>
-                </div>
-
-                <div class="install-panel" id="panel-macos-app" style="display:none">
-                    <p class="install-label">Prefer a GUI? Download the macOS installer &mdash; no terminal required.</p>
-                    <a href="https://github.com/hessius/MeticAI/releases/latest" class="cta-button cta-secondary macos-installer-link">Download macOS Installer</a>
+                    <p class="install-note">Checks prerequisites, pulls the Docker image, and starts the container automatically.</p>
                 </div>
 
                 <div class="install-cta-row">
@@ -379,15 +360,6 @@
                 var t = btn.getAttribute('data-tab');
                 document.getElementById('gallery-desktop').style.display = t === 'desktop' ? '' : 'none';
                 document.getElementById('gallery-mobile').style.display = t === 'mobile' ? '' : 'none';
-            });
-        });
-
-        document.querySelectorAll('.install-tab').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.install-tab').forEach(function(b) { b.classList.remove('active'); });
-                btn.classList.add('active');
-                document.querySelectorAll('.install-panel').forEach(function(p) { p.style.display = 'none'; });
-                document.getElementById('panel-' + btn.getAttribute('data-panel')).style.display = '';
             });
         });
 

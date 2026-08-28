@@ -783,41 +783,6 @@ nav {
   color: var(--color-text);
 }
 
-.macos-installer-link {
-  margin-top: 1rem;
-}
-
-.install-tabs {
-  display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-bottom: 2rem;
-}
-
-.install-tab {
-  padding: 0.5rem 1.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--color-text-muted);
-  font-family: var(--font-sans);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.install-tab:hover {
-  color: var(--color-text-secondary);
-  border-color: var(--color-border-hover);
-}
-
-.install-tab.active {
-  background: var(--color-accent);
-  color: #111;
-  border-color: var(--color-accent);
-}
-
 .install-panel {
   text-align: left;
   margin-bottom: 2rem;
