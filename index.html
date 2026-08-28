@@ -36,7 +36,7 @@
     <!-- Hero -->
     <section class="hero">
         <div class="hero-content">
-            <span class="version-badge">v2.2 &mdash; Now with Profile Sync &amp; Shot Annotations</span>
+            <span class="version-badge">v3.0.0 &mdash; Unified Bun core, iOS Live Activities &amp; Widgets</span>
             <h1 class="brand-title">Metic<span class="accent">AI</span></h1>
             <p class="hero-subtitle">Your AI Barista Coach for the Meticulous Espresso Machine</p>
         </div>
@@ -115,48 +115,48 @@
         </div>
     </section>
 
-    <!-- What's New in v2.2 -->
+    <!-- What's New in v3.0.0 -->
     <section id="whats-new" class="whats-new">
         <div class="container">
             <span class="section-label">Latest Release</span>
-            <h2 class="section-title">What&rsquo;s New in v2.2</h2>
-            <p class="section-subtitle">The biggest update yet &mdash; profile management, shot annotations, and machine auto-detection.</p>
+            <h2 class="section-title">What&rsquo;s New in v3.0.0</h2>
+            <p class="section-subtitle">A ground-up rearchitecture &mdash; one unified Bun binary, native iOS Live Activities and home-screen widgets, and richer live telemetry.</p>
 
             <div class="whats-new-grid">
                 <div class="whats-new-card reveal">
-                    <div class="whats-new-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg></div>
-                    <h3>Profile Catalogue &amp; Sync</h3>
-                    <p>Full profile management with two-way sync between MeticAI and your machine. Delete, rename, export, and detect orphaned profiles.</p>
+                    <div class="whats-new-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01"/><path d="M6 18h.01"/></svg></div>
+                    <h3>Unified Single-Binary Core</h3>
+                    <p>The five-service Python/s6 stack is gone, replaced by a single distroless Bun process serving the web UI, API, machine proxy, and live telemetry &mdash; smaller, faster, simpler to run.</p>
                 </div>
 
                 <div class="whats-new-card reveal reveal-delay-1">
-                    <div class="whats-new-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
-                    <h3>Shot Annotations</h3>
-                    <p>Rate every shot with 1&ndash;5 stars and add rich markdown notes. Your personal tasting journal, linked to every data point.</p>
+                    <div class="whats-new-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></div>
+                    <h3>iOS Live Activities</h3>
+                    <p>Watch your shot unfold live on the Lock Screen and Dynamic Island &mdash; heating ETA, real-time pressure, flow and weight, and a completion summary that lingers after the pour.</p>
                 </div>
 
                 <div class="whats-new-card reveal reveal-delay-2">
-                    <div class="whats-new-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16V8"/><path d="M11 16V4"/><path d="M15 16v-6"/><path d="M19 16v-2"/></svg></div>
-                    <h3>Shot Analysis View</h3>
-                    <p>Dedicated analysis interface with recent shots, by-profile grouping, and AI-powered insights into your brewing patterns.</p>
+                    <div class="whats-new-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+                    <h3>Home-Screen Widgets &amp; Control Center</h3>
+                    <p>Favourite profiles and a Control Center widget with live scale weight, one-tap deep links, and open-on-start &mdash; your machine, a glance away.</p>
                 </div>
 
                 <div class="whats-new-card reveal">
-                    <div class="whats-new-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></div>
-                    <h3>Profile Editing</h3>
-                    <p>Edit profile names, temperatures, dose weights, and variables directly in the web interface. No more guessing.</p>
+                    <div class="whats-new-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16V8"/><path d="M11 16V4"/><path d="M15 16v-6"/><path d="M19 16v-2"/></svg></div>
+                    <h3>Separated Live &amp; History Graphs</h3>
+                    <p>Toggle combined or per-metric small-multiple charts across Live View, single-shot, and comparison views &mdash; with scrubbing, target overlays, and brew-head temperature.</p>
                 </div>
 
                 <div class="whats-new-card reveal reveal-delay-1">
-                    <div class="whats-new-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.86a10 10 0 0 1 14 0"/><path d="M8.5 16.43a5 5 0 0 1 7 0"/></svg></div>
-                    <h3>Machine Auto-Detect</h3>
-                    <p>mDNS/Zeroconf discovery finds your Meticulous automatically. Just connect to your network and go.</p>
+                    <div class="whats-new-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6h6"/><path d="M20 20v-6h-6"/><path d="M20 4a16 16 0 0 0-12.8 6.4"/><path d="M4 20a16 16 0 0 1 12.8-6.4"/></svg></div>
+                    <h3>Auto-Start &amp; Profile Sharing</h3>
+                    <p>Shots auto-start once temperature stabilises, and profiles import straight from Met Profiles links, direct URLs, or the native iOS/Android share sheet.</p>
                 </div>
 
                 <div class="whats-new-card reveal reveal-delay-2">
-                    <div class="whats-new-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></div>
-                    <h3>AI Controls</h3>
-                    <p>Fine-tune AI behavior with auto-analyze toggles, AI visibility controls, and automatic description generation.</p>
+                    <div class="whats-new-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg></div>
+                    <h3>Shared Native Core</h3>
+                    <p>AI analysis, profile generation, and dial-in logic now live in one <code>@metic/core</code> package shared by the server and the native apps &mdash; identical behaviour everywhere, no duplicated code paths.</p>
                 </div>
             </div>
         </div>
@@ -202,7 +202,7 @@
                 <div class="how-step reveal">
                     <div class="step-number">1</div>
                     <h3>Install</h3>
-                    <p>Run a one-line installer on Linux/macOS, PowerShell on Windows, or use the macOS app. Everything starts automatically.</p>
+                    <p>Run a one-line Docker installer on Linux, macOS, or Windows (WSL2). Everything starts automatically in a single container.</p>
                 </div>
                 <div class="how-step reveal reveal-delay-1">
                     <div class="step-number">2</div>
@@ -305,12 +305,12 @@
                 <div class="tech-stack reveal">
                     <h3>Built With</h3>
                     <ul class="tech-list">
-                        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></svg> <strong>Google Gemini 2.0 Flash</strong> &mdash; Vision AI</li>
-                        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> <strong>FastAPI + Uvicorn</strong> &mdash; Backend</li>
+                        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></svg> <strong>Google Gemini</strong> &mdash; Vision AI</li>
+                        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> <strong>Bun</strong> &mdash; Unified server &amp; core</li>
                         <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 8.35V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h7.69"/><path d="M2 6h20"/><path d="M2 10h10"/><path d="M13 22l3.5-7 3.5 7"/><path d="M14.3 19h5.4"/></svg> <strong>React + TypeScript</strong> &mdash; Frontend</li>
-                        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 8.35V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h7.69"/><path d="M2 6h20"/><path d="M2 10h10"/><path d="M13 22l3.5-7 3.5 7"/><path d="M14.3 19h5.4"/></svg> <strong>Docker + s6-overlay</strong> &mdash; Container</li>
-                        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg> <strong>MQTT + Socket.IO</strong> &mdash; Telemetry</li>
-                        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-6 6 6 6 0 0 1-6-6V8Z"/></svg> <strong>FastMCP</strong> &mdash; Machine API</li>
+                        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01"/><path d="M6 18h.01"/></svg> <strong>Docker</strong> &mdash; Distroless single binary</li>
+                        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> <strong>Capacitor</strong> &mdash; Native iOS &amp; Android apps</li>
+                        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg> <strong>Socket.IO</strong> &mdash; Live telemetry</li>
                     </ul>
                 </div>
 
@@ -331,7 +331,7 @@
         <p>Built with &#x2764;&#xFE0F; for coffee lovers</p>
         <p>Not affiliated with Meticulous Espresso.</p>
         <p><a href="privacy.html" style="color: var(--color-text-muted); text-decoration: none;">Privacy Policy</a></p>
-        <p class="footer-version">MeticAI v2.2</p>
+        <p class="footer-version">Metic v3.0.0</p>
     </footer>
 
     <script>
