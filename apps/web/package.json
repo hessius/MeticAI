@@ -161,7 +161,7 @@
     "jest-image-snapshot": "^6.5.2",
     "jsdom": "^29.1.1",
     "playwright": "^1.61.0",
-    "storybook": "^10.4.6",
+    "storybook": "^10.6.4",
     "tailwindcss": "^4.3.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.0",
