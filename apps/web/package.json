@@ -157,7 +157,7 @@
     "eslint-plugin-react-refresh": "^0.5.3",
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.7.0",
-    "happy-dom": "^20.10.6",
+    "happy-dom": "^21.0.4",
     "jest-image-snapshot": "^6.5.2",
     "jsdom": "^29.1.1",
     "playwright": "^1.61.0",
