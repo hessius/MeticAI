@@ -1959,5 +1959,119 @@
     "add": "Aggiungi ai preferiti",
     "remove": "Rimuovi dai preferiti",
     "empty": "Aggiungi una stella a un profilo per inserirlo nei preferiti."
+  },
+  "portal": {
+    "title": "Belka Portal",
+    "status": {
+      "connected": "Connesso",
+      "connecting": "Connessione…",
+      "lost": "Connessione persa",
+      "notConnected": "Non connesso"
+    },
+    "actions": {
+      "connect": "Connetti via Bluetooth",
+      "disconnect": "Disconnetti",
+      "deleteRecording": "Elimina registrazione",
+      "saveReading": "Salva lettura",
+      "removeReading": "Rimuovi"
+    },
+    "settings": {
+      "intro": "Il Belka Portal è un sensore Bluetooth sotto il portafiltro che misura la conducibilità (EC) dell'espresso mentre scorre. Metic la registra a ogni estrazione e, una volta abbinate alcune estrazioni a letture del rifrattometro, stima il TDS di quelle non misurate.",
+      "enable": "Registra il Portal durante le estrazioni",
+      "enableHint": "Mostra la conducibilità in tempo reale nella vista estrazione e una sezione Portal nel dettaglio di ogni estrazione.",
+      "showAllDevices": "Mostra tutti i dispositivi Bluetooth nelle vicinanze",
+      "pairHint": "Chiudi prima l'app Belka sul telefono: il Portal accetta una sola connessione alla volta. Chrome ti chiederà di scegliere il dispositivo.",
+      "connectionCheck": "Verifica della connessione",
+      "settle": "Continua a registrare dopo l'arresto della pompa (s)",
+      "settleHint": "Raccoglie le ultime gocce prima di salvare la registrazione.",
+      "lag": "Anticipo del Portal rispetto alla tazza (s)",
+      "lagHint": "Positivo se il liquido raggiunge il Portal prima che la bilancia lo rilevi.",
+      "autoGraph": "Mostra il grafico sullo schermo del Portal durante l'estrazione",
+      "autoGraphHint": "Invia al Portal il comando mostra-grafico all'avvio e lo nasconde dopo.",
+      "pending_one": "{{count}} registrazione attende di essere associata alla sua estrazione; avverrà quando la macchina la elencherà.",
+      "pending_other": "{{count}} registrazioni attendono di essere associate alle loro estrazioni; avverrà quando la macchina le elencherà."
+    },
+    "env": {
+      "insecure": "Web Bluetooth richiede una pagina sicura. Apri Metic via https (ad esempio tramite Tailscale) o su http://localhost sul computer che lo esegue; un indirizzo http:// della rete locale non può usare il Bluetooth.",
+      "noApi": "Questo browser non ha Web Bluetooth. Usa Google Chrome o Microsoft Edge su un computer o un dispositivo Android.",
+      "noAdapter": "Nessun adattatore Bluetooth è disponibile per il browser. Su macOS attiva il Bluetooth e consenti Chrome in Impostazioni di Sistema → Privacy e sicurezza → Bluetooth."
+    },
+    "steps": {
+      "device": "Portal scelto",
+      "gatt": "GATT connesso",
+      "service": "Servizio 0x7400 trovato",
+      "measurement": "Misura 0x7410 trovata",
+      "command": "Comando 0x7420 trovato",
+      "notify": "Notifiche avviate",
+      "packet": "Pacchetti da 13 byte in arrivo"
+    },
+    "live": {
+      "ec": "EC del Portal",
+      "outletTemp": "al Portal",
+      "recording_one": "Registrazione · {{count}} campione",
+      "recording_other": "Registrazione · {{count}} campioni",
+      "settling": "Ultime gocce…",
+      "saving": "Salvataggio…",
+      "ready": "Pronto",
+      "notConnected": "Non connesso"
+    },
+    "chart": {
+      "cupMass": "massa in tazza (g)",
+      "ec": "EC (mS/cm)",
+      "integral": "∫EC dm"
+    },
+    "metrics": {
+      "meanEcPerG": "EC media per grammo",
+      "integral": "∫EC dm sulla tazza",
+      "peak": "EC di picco a {{mass}} g",
+      "coverage": "della massa in tazza coperta",
+      "firstDrop": "prima goccia",
+      "outletTemp": "temperatura media in uscita",
+      "massAt90": "massa in tazza al 90 % di ∫",
+      "last5g": "di ∫ dagli ultimi 5 g"
+    },
+    "shot": {
+      "none": "Nessuna registrazione Portal per questa estrazione. Le registrazioni vengono acquisite automaticamente mentre il Portal è connesso e la macchina estrae.",
+      "noMachineData": "Il registro della macchina per questa estrazione non è ancora disponibile, quindi il flusso EC non può essere abbinato al peso in tazza. L'analisi comparirà quando la macchina elencherà l'estrazione.",
+      "samples_one": "{{count}} campione",
+      "samples_other": "{{count}} campioni",
+      "statusOk": "utilizzabile",
+      "status": {
+        "low-coverage": "copertura bassa",
+        "no-portal-data": "nessun dato Portal",
+        "no-weight-data": "nessun dato di peso",
+        "insufficient-mass": "troppo poco in tazza"
+      },
+      "coffee": "Caffè",
+      "coffeePlaceholder": "es. Hatch Supernova",
+      "coffeeHint": "La calibrazione è raggruppata per caffè; mantieni la stessa etichetta per tutta la busta. È anche il valore predefinito per la prossima estrazione.",
+      "dose": "Dose (g)",
+      "measured": "rifrattometro",
+      "estimated": "stima",
+      "extractionYield": "resa di estrazione",
+      "estimateFrom": "Stima da",
+      "calibrationSummary": "Basato su {{pool}} · {{count}} estrazioni di riferimento · k = {{k}} %TDS per mS/cm · errore leave-one-out ±{{err}} % · modello {{model}}",
+      "readingTds": "TDS del rifrattometro (%)",
+      "readingBeverage": "Bevanda pesata (g)",
+      "readingHint": "Inserisci la lettura del rifrattometro per questa tazza. Ogni lettura migliora la calibrazione EC → TDS di questo caffè; con cinque o più la stima diventa affidabile nell'intervallo misurato.",
+      "readingInvalid": "Inserisci il TDS del rifrattometro in percentuale, es. 9,2."
+    },
+    "pools": {
+      "auto": "auto: questo caffè, altrimenti tutti",
+      "coffee": "solo questo caffè",
+      "all": "tutti i caffè"
+    },
+    "toast": {
+      "connected": "Connesso a {{name}}",
+      "connectFailed": "Impossibile connettersi al Portal: {{message}}",
+      "saved_one": "Registrazione Portal salvata con l'estrazione ({{count}} campione).",
+      "saved_other": "Registrazione Portal salvata con l'estrazione ({{count}} campioni).",
+      "pendingAttached_one": "Associata {{count}} registrazione Portal precedente alla sua estrazione.",
+      "pendingAttached_other": "Associate {{count}} registrazioni Portal precedenti alle loro estrazioni.",
+      "saveFailed": "Impossibile salvare: {{message}}",
+      "detailsSaved": "Caffè e dose salvati.",
+      "readingSaved": "Lettura salvata; calibrazione aggiornata.",
+      "deleted": "Registrazione Portal eliminata."
+    }
   }
 }

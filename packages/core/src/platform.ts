@@ -92,6 +92,8 @@ export interface PlatformStorage {
   descriptions: Repo<string>;
   /** AI-generated profile tag lists, keyed by profile name. */
   aiTags: Repo<string[]>;
+  /** Belka Portal conductivity recordings, keyed by `${date}/${filename}` like annotations. */
+  portalShots: Repo<unknown>;
   aiCache: Cache;
   images: BlobStore;
 }

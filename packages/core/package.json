@@ -39,7 +39,10 @@
     "./routes/analyzeAndProfile": "./src/routes/analyzeAndProfile.ts",
     "./ai/modelResolver": "./src/ai/modelResolver.ts",
     "./data/recipes": "./src/data/recipes.ts",
-    "./routes/recipes": "./src/routes/recipes.ts"
+    "./routes/recipes": "./src/routes/recipes.ts",
+    "./logic/portalAnalysis": "./src/logic/portalAnalysis.ts",
+    "./logic/portalProtocol": "./src/logic/portalProtocol.ts",
+    "./routes/portal": "./src/routes/portal.ts"
   },
   "scripts": {
     "test": "vitest run",

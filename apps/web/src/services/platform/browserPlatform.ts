@@ -250,6 +250,7 @@ export function createBrowserPlatform(deps: BrowserPlatformDeps = {}): Platform 
       schedules: idbMapRepo("schedules"),
       descriptions: idbMapRepo("profile_descriptions"),
       aiTags: idbMapRepo("profile_ai_tags"),
+      portalShots: idbMapRepo("portal_shots"),
       aiCache: memoryCache(clock),
       images: idbBlobStore(),
     },

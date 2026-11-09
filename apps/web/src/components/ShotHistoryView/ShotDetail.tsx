@@ -40,6 +40,7 @@ import {
 import { domToPng } from 'modern-screenshot'
 import { ExpertAnalysisView } from '@/components/ExpertAnalysisView'
 import { ShotAnnotation } from '@/components/ShotAnnotation'
+import { PortalShotPanel } from '@/components/portal/PortalShotPanel'
 import { ReplayChart, CompareChart, AnalyzeChart } from '@/components/ShotCharts'
 import { computeLeftAxisMax } from '@/components/charts/chartConstants'
 import { pointAtTime } from '@/components/charts/pointAtTime'
@@ -1536,6 +1537,9 @@ export function ShotDetail({
                   onAnnotationChange={handleAnnotationChange}
                 />
               </Card>
+
+              {/* Belka Portal conductivity recording (renders nothing when the feature is off) */}
+              <PortalShotPanel date={selectedShot.date} filename={selectedShot.filename} isDark={isDark} className="mt-4" />
             </div>{/* end left column */}
 
             {/* Right column — desktop chart (hidden on mobile) */}

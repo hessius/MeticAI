@@ -1959,5 +1959,119 @@
     "add": "Lägg till i favoriter",
     "remove": "Ta bort från favoriter",
     "empty": "Stjärnmärk en profil för att lägga till den bland dina favoriter."
+  },
+  "portal": {
+    "title": "Belka Portal",
+    "status": {
+      "connected": "Ansluten",
+      "connecting": "Ansluter…",
+      "lost": "Anslutningen bröts",
+      "notConnected": "Inte ansluten"
+    },
+    "actions": {
+      "connect": "Anslut via Bluetooth",
+      "disconnect": "Koppla från",
+      "deleteRecording": "Radera inspelning",
+      "saveReading": "Spara mätning",
+      "removeReading": "Ta bort"
+    },
+    "settings": {
+      "intro": "Belka Portal är en Bluetooth-sensor under portafiltret som mäter espressons konduktivitet (EC) medan den rinner. Metic spelar in den för varje shot och uppskattar TDS för de shots du inte mätt, när några shots har parats med refraktometervärden.",
+      "enable": "Spela in Portalen under shots",
+      "enableHint": "Visar konduktiviteten live i shotvyn och en Portal-sektion på varje shots detaljsida.",
+      "showAllDevices": "Visa alla Bluetooth-enheter i närheten",
+      "pairHint": "Stäng Belka-appen i telefonen först — Portalen tillåter en anslutning åt gången. Chrome ber dig välja enheten.",
+      "connectionCheck": "Anslutningskontroll",
+      "settle": "Fortsätt spela in efter att pumpen stannat (s)",
+      "settleHint": "Fångar de sista dropparna innan inspelningen sparas.",
+      "lag": "Portalens försprång mot koppen (s)",
+      "lagHint": "Positivt om vätskan når Portalen innan vågen ser den.",
+      "autoGraph": "Visa grafen på Portalens skärm under shoten",
+      "autoGraphHint": "Skickar Portalens visa-graf-kommando vid start och döljer den efteråt.",
+      "pending_one": "{{count}} inspelning väntar på att kopplas till sin shot; det sker när maskinen listar den.",
+      "pending_other": "{{count}} inspelningar väntar på att kopplas till sina shots; det sker när maskinen listar dem."
+    },
+    "env": {
+      "insecure": "Web Bluetooth kräver en säker sida. Öppna Metic via https (till exempel genom Tailscale) eller på http://localhost på datorn som kör det; en vanlig http://-adress i nätverket kan inte använda Bluetooth.",
+      "noApi": "Den här webbläsaren saknar Web Bluetooth. Använd Google Chrome eller Microsoft Edge på en dator eller Android-enhet.",
+      "noAdapter": "Ingen Bluetooth-adapter är tillgänglig för webbläsaren. På macOS: slå på Bluetooth och tillåt Chrome under Systeminställningar → Integritet och säkerhet → Bluetooth."
+    },
+    "steps": {
+      "device": "Portal vald",
+      "gatt": "GATT ansluten",
+      "service": "Tjänst 0x7400 hittad",
+      "measurement": "Mätning 0x7410 hittad",
+      "command": "Kommando 0x7420 hittat",
+      "notify": "Notiser startade",
+      "packet": "13-bytespaket kommer in"
+    },
+    "live": {
+      "ec": "Portal EC",
+      "outletTemp": "vid Portalen",
+      "recording_one": "Spelar in · {{count}} prov",
+      "recording_other": "Spelar in · {{count}} prover",
+      "settling": "Fångar droppar…",
+      "saving": "Sparar…",
+      "ready": "Redo",
+      "notConnected": "Inte ansluten"
+    },
+    "chart": {
+      "cupMass": "koppvikt (g)",
+      "ec": "EC (mS/cm)",
+      "integral": "∫EC dm"
+    },
+    "metrics": {
+      "meanEcPerG": "medel-EC per gram",
+      "integral": "∫EC dm över koppen",
+      "peak": "topp-EC vid {{mass}} g",
+      "coverage": "av koppvikten täckt",
+      "firstDrop": "första droppen",
+      "outletTemp": "medeltemperatur vid utloppet",
+      "massAt90": "koppvikt vid 90 % av ∫",
+      "last5g": "av ∫ från de sista 5 g"
+    },
+    "shot": {
+      "none": "Ingen Portal-inspelning för den här shoten. Inspelningar görs automatiskt när Portalen är ansluten och maskinen extraherar.",
+      "noMachineData": "Maskinens egen logg för shoten finns inte ännu, så EC-strömmen kan inte paras med koppvikten. Analysen visas när maskinen listar shoten.",
+      "samples_one": "{{count}} prov",
+      "samples_other": "{{count}} prover",
+      "statusOk": "användbar",
+      "status": {
+        "low-coverage": "låg täckning",
+        "no-portal-data": "inga Portal-data",
+        "no-weight-data": "inga viktdata",
+        "insufficient-mass": "för lite i koppen"
+      },
+      "coffee": "Kaffe",
+      "coffeePlaceholder": "t.ex. Hatch Supernova",
+      "coffeeHint": "Kalibreringen grupperas per kaffe; håll etiketten oförändrad genom en påse. Den blir också standard för nästa shot.",
+      "dose": "Dos (g)",
+      "measured": "refraktometer",
+      "estimated": "uppskattning",
+      "extractionYield": "extraktionsutbyte",
+      "estimateFrom": "Uppskatta från",
+      "calibrationSummary": "Baserat på {{pool}} · {{count}} referensshots · k = {{k}} %TDS per mS/cm · leave-one-out-fel ±{{err}} % · {{model}}-modell",
+      "readingTds": "Refraktometer-TDS (%)",
+      "readingBeverage": "Vägd dryck (g)",
+      "readingHint": "Ange refraktometerns värde för den här koppen. Varje mätning förbättrar EC → TDS-kalibreringen för kaffet; fem eller fler gör uppskattningen pålitlig inom det uppmätta intervallet.",
+      "readingInvalid": "Ange refraktometerns TDS i procent, t.ex. 9,2."
+    },
+    "pools": {
+      "auto": "auto — detta kaffe, annars alla",
+      "coffee": "bara detta kaffe",
+      "all": "alla kaffen"
+    },
+    "toast": {
+      "connected": "Ansluten till {{name}}",
+      "connectFailed": "Kunde inte ansluta till Portalen: {{message}}",
+      "saved_one": "Portal-inspelningen sparades med shoten ({{count}} prov).",
+      "saved_other": "Portal-inspelningen sparades med shoten ({{count}} prover).",
+      "pendingAttached_one": "Kopplade {{count}} tidigare Portal-inspelning till sin shot.",
+      "pendingAttached_other": "Kopplade {{count}} tidigare Portal-inspelningar till sina shots.",
+      "saveFailed": "Kunde inte spara: {{message}}",
+      "detailsSaved": "Kaffe och dos sparade.",
+      "readingSaved": "Mätning sparad; kalibreringen uppdaterad.",
+      "deleted": "Portal-inspelningen raderades."
+    }
   }
 }

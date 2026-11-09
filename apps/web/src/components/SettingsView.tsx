@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
+import { PortalSettingsSection } from '@/components/portal/PortalSettingsSection'
 import {
   Select,
   SelectContent,
@@ -1848,6 +1849,9 @@ export function SettingsView({ onBack, onRestartOnboarding, showBlobs, onToggleB
                 )}
               </CollapsibleSection>
             )}
+
+            {/* Belka Portal conductivity sensor — Web Bluetooth, so not in the native shells */}
+            {!isNativePlatform() && <PortalSettingsSection />}
 
             {/* Beta Testing */}
             {hasFeature('watchtowerUpdate') && (

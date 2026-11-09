@@ -126,6 +126,7 @@ export function makeMockPlatform(overrides: Partial<Platform> = {}): Platform {
       schedules: memRepo(),
       descriptions: memRepo(),
       aiTags: memRepo(),
+      portalShots: memRepo(),
       aiCache: memCache(),
       images: memBlobStore(),
     },

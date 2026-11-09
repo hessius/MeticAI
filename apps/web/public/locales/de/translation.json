@@ -1959,5 +1959,119 @@
     "add": "Zu Favoriten hinzufügen",
     "remove": "Aus Favoriten entfernen",
     "empty": "Markiere ein Profil mit einem Stern, um es zu deinen Favoriten hinzuzufügen."
+  },
+  "portal": {
+    "title": "Belka Portal",
+    "status": {
+      "connected": "Verbunden",
+      "connecting": "Verbinde…",
+      "lost": "Verbindung verloren",
+      "notConnected": "Nicht verbunden"
+    },
+    "actions": {
+      "connect": "Über Bluetooth verbinden",
+      "disconnect": "Trennen",
+      "deleteRecording": "Aufzeichnung löschen",
+      "saveReading": "Messung speichern",
+      "removeReading": "Entfernen"
+    },
+    "settings": {
+      "intro": "Das Belka Portal ist ein Bluetooth-Sensor unter dem Siebträger, der die Leitfähigkeit (EC) des Espressos im Fluss misst. Metic zeichnet sie zu jedem Bezug auf und schätzt – sobald einige Bezüge mit Refraktometerwerten gepaart sind – den TDS der nicht gemessenen Bezüge.",
+      "enable": "Portal während der Bezüge aufzeichnen",
+      "enableHint": "Zeigt die Leitfähigkeit live in der Bezugsansicht und einen Portal-Abschnitt auf der Detailseite jedes Bezugs.",
+      "showAllDevices": "Alle Bluetooth-Geräte in der Nähe anzeigen",
+      "pairHint": "Zuerst die Belka-App am Telefon schließen – das Portal erlaubt nur eine Verbindung. Chrome fragt nach dem Gerät.",
+      "connectionCheck": "Verbindungsprüfung",
+      "settle": "Nach dem Pumpenstopp weiter aufzeichnen (s)",
+      "settleHint": "Erfasst die letzten Tropfen, bevor die Aufzeichnung gespeichert wird.",
+      "lag": "Vorlauf des Portals gegenüber der Tasse (s)",
+      "lagHint": "Positiv, wenn die Flüssigkeit das Portal erreicht, bevor die Waage sie sieht.",
+      "autoGraph": "Während des Bezugs den Graphen auf dem Portal-Display zeigen",
+      "autoGraphHint": "Sendet beim Start den Show-Graph-Befehl des Portals und blendet ihn danach wieder aus.",
+      "pending_one": "{{count}} Aufzeichnung wartet darauf, ihrem Bezug zugeordnet zu werden; das geschieht, sobald die Maschine ihn auflistet.",
+      "pending_other": "{{count}} Aufzeichnungen warten darauf, ihren Bezügen zugeordnet zu werden; das geschieht, sobald die Maschine sie auflistet."
+    },
+    "env": {
+      "insecure": "Web Bluetooth braucht eine sichere Seite. Öffne Metic über https (z. B. per Tailscale) oder unter http://localhost auf dem Rechner, der es ausführt; eine einfache http://-Adresse im LAN kann kein Bluetooth nutzen.",
+      "noApi": "Dieser Browser hat kein Web Bluetooth. Verwende Google Chrome oder Microsoft Edge auf einem Computer oder Android-Gerät.",
+      "noAdapter": "Dem Browser steht kein Bluetooth-Adapter zur Verfügung. Unter macOS: Bluetooth einschalten und Chrome unter Systemeinstellungen → Datenschutz & Sicherheit → Bluetooth erlauben."
+    },
+    "steps": {
+      "device": "Portal ausgewählt",
+      "gatt": "GATT verbunden",
+      "service": "Dienst 0x7400 gefunden",
+      "measurement": "Messung 0x7410 gefunden",
+      "command": "Befehl 0x7420 gefunden",
+      "notify": "Benachrichtigungen gestartet",
+      "packet": "13-Byte-Pakete kommen an"
+    },
+    "live": {
+      "ec": "Portal-EC",
+      "outletTemp": "am Portal",
+      "recording_one": "Aufzeichnung · {{count}} Messwert",
+      "recording_other": "Aufzeichnung · {{count}} Messwerte",
+      "settling": "Letzte Tropfen…",
+      "saving": "Speichern…",
+      "ready": "Bereit",
+      "notConnected": "Nicht verbunden"
+    },
+    "chart": {
+      "cupMass": "Tassengewicht (g)",
+      "ec": "EC (mS/cm)",
+      "integral": "∫EC dm"
+    },
+    "metrics": {
+      "meanEcPerG": "mittlere EC pro Gramm",
+      "integral": "∫EC dm über die Tasse",
+      "peak": "EC-Spitze bei {{mass}} g",
+      "coverage": "des Tassengewichts abgedeckt",
+      "firstDrop": "erster Tropfen",
+      "outletTemp": "mittlere Auslauftemperatur",
+      "massAt90": "Tassengewicht bei 90 % von ∫",
+      "last5g": "von ∫ aus den letzten 5 g"
+    },
+    "shot": {
+      "none": "Keine Portal-Aufzeichnung für diesen Bezug. Aufzeichnungen entstehen automatisch, solange das Portal verbunden ist und die Maschine extrahiert.",
+      "noMachineData": "Der maschineneigene Datensatz dieses Bezugs ist noch nicht verfügbar, daher kann der EC-Strom nicht mit dem Tassengewicht gepaart werden. Die Analyse erscheint, sobald die Maschine den Bezug auflistet.",
+      "samples_one": "{{count}} Messwert",
+      "samples_other": "{{count}} Messwerte",
+      "statusOk": "verwertbar",
+      "status": {
+        "low-coverage": "geringe Abdeckung",
+        "no-portal-data": "keine Portal-Daten",
+        "no-weight-data": "keine Gewichtsdaten",
+        "insufficient-mass": "zu wenig in der Tasse"
+      },
+      "coffee": "Kaffee",
+      "coffeePlaceholder": "z. B. Hatch Supernova",
+      "coffeeHint": "Die Kalibrierung wird je Kaffee gruppiert; behalte die Bezeichnung über eine Packung hinweg bei. Sie ist zugleich die Vorgabe für den nächsten Bezug.",
+      "dose": "Dosis (g)",
+      "measured": "Refraktometer",
+      "estimated": "Schätzung",
+      "extractionYield": "Extraktionsausbeute",
+      "estimateFrom": "Schätzen aus",
+      "calibrationSummary": "Basis: {{pool}} · {{count}} Referenzbezüge · k = {{k}} %TDS pro mS/cm · Leave-one-out-Fehler ±{{err}} % · {{model}}-Modell",
+      "readingTds": "Refraktometer-TDS (%)",
+      "readingBeverage": "Gewogenes Getränk (g)",
+      "readingHint": "Gib den Refraktometerwert für diese Tasse ein. Jede Messung verbessert die EC → TDS-Kalibrierung für diesen Kaffee; ab fünf wird die Schätzung innerhalb des gemessenen Bereichs vertrauenswürdig.",
+      "readingInvalid": "Gib den Refraktometer-TDS in Prozent ein, z. B. 9,2."
+    },
+    "pools": {
+      "auto": "auto – dieser Kaffee, sonst alle",
+      "coffee": "nur dieser Kaffee",
+      "all": "alle Kaffees"
+    },
+    "toast": {
+      "connected": "Verbunden mit {{name}}",
+      "connectFailed": "Verbindung zum Portal fehlgeschlagen: {{message}}",
+      "saved_one": "Portal-Aufzeichnung zum Bezug gespeichert ({{count}} Messwert).",
+      "saved_other": "Portal-Aufzeichnung zum Bezug gespeichert ({{count}} Messwerte).",
+      "pendingAttached_one": "{{count}} frühere Portal-Aufzeichnung ihrem Bezug zugeordnet.",
+      "pendingAttached_other": "{{count}} frühere Portal-Aufzeichnungen ihren Bezügen zugeordnet.",
+      "saveFailed": "Speichern fehlgeschlagen: {{message}}",
+      "detailsSaved": "Kaffee und Dosis gespeichert.",
+      "readingSaved": "Messung gespeichert; Kalibrierung aktualisiert.",
+      "deleted": "Portal-Aufzeichnung gelöscht."
+    }
   }
 }

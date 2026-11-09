@@ -50,6 +50,7 @@ import { isAIConfigured, apiKeyStorageKey, getActiveProviderId } from '@/service
 // Phase 3 — Control Center & live telemetry
 import { useMachineTelemetry } from '@/hooks/useMachineTelemetry'
 import { useShotTelemetryRecorder } from '@/hooks/useShotTelemetryRecorder'
+import { usePortalRecorder } from '@/hooks/usePortal'
 import { useLiveActivitySync } from '@/hooks/useLiveActivitySync'
 import { useOptionalMachineService } from '@/services/machine/MachineServiceContext'
 import { useWidgetSync } from '@/hooks/useWidgetSync'
@@ -154,6 +155,9 @@ function App() {
   // Continuously record heating + shot telemetry into a persistent buffer so the
   // live-shot graph can be back-filled whenever the view is opened (issue #582).
   useShotTelemetryRecorder(machineState)
+  // Record the Belka Portal's conductivity stream alongside every shot and hand
+  // finished recordings to the core once the machine has saved the shot.
+  usePortalRecorder(machineState)
   // Mirror shots into an iOS Live Activity app-wide so it triggers the moment a
   // shot is detected/started, regardless of the current view (native-only).
   useLiveActivitySync(machineState)
