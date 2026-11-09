@@ -54,6 +54,7 @@ import { getServerUrl } from '@/lib/config'
 import { getActiveShotOverride } from '@/lib/activeShotOverride'
 import { useProfileImageSrc } from '@/hooks/useProfileImageSrc'
 import { HeatingDashboard } from './LiveShotView/HeatingDashboard'
+import { PortalLiveTiles } from '@/components/portal/PortalLiveTiles'
 import { useAutoStart } from '@/hooks/useAutoStart'
 import {
   subscribe as subscribeShotTelemetry,
@@ -533,6 +534,8 @@ export function LiveShotView({ machineState, onBack, onAnalyzeShot, profileData,
                     : undefined}
                 />
               </div>
+              {/* Row 3: Belka Portal conductivity (only when the Portal feature is enabled) */}
+              <PortalLiveTiles />
             </div>
           )}
 

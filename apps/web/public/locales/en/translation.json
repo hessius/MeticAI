@@ -1959,5 +1959,119 @@
     "add": "Add to favourites",
     "remove": "Remove from favourites",
     "empty": "Star a profile to add it to your favourites."
+  },
+  "portal": {
+    "title": "Belka Portal",
+    "status": {
+      "connected": "Connected",
+      "connecting": "Connecting…",
+      "lost": "Connection lost",
+      "notConnected": "Not connected"
+    },
+    "actions": {
+      "connect": "Connect over Bluetooth",
+      "disconnect": "Disconnect",
+      "deleteRecording": "Delete recording",
+      "saveReading": "Save reading",
+      "removeReading": "Remove"
+    },
+    "settings": {
+      "intro": "The Belka Portal is a Bluetooth sensor under the portafilter that measures the conductivity (EC) of the espresso as it flows. Metic records it alongside each shot and, once you have paired a few shots with refractometer readings, estimates TDS for the ones you did not measure.",
+      "enable": "Record the Portal during shots",
+      "enableHint": "Shows live conductivity on the shot view and a Portal section on each shot's detail page.",
+      "showAllDevices": "Show every nearby Bluetooth device",
+      "pairHint": "Close the Belka phone app first — the Portal accepts one connection at a time. Chrome asks you to choose the device.",
+      "connectionCheck": "Connection check",
+      "settle": "Keep recording after the pump stops (s)",
+      "settleHint": "Catches the last drips before the recording is saved.",
+      "lag": "Portal lead vs. cup (s)",
+      "lagHint": "Positive if liquid reaches the Portal before the scale sees it.",
+      "autoGraph": "Show the graph on the Portal's screen during a shot",
+      "autoGraphHint": "Sends the Portal's show-graph command at the start and hides it afterwards.",
+      "pending_one": "{{count}} recording is waiting to be attached to its shot; it will be once the machine lists it.",
+      "pending_other": "{{count}} recordings are waiting to be attached to their shots; they will be once the machine lists them."
+    },
+    "env": {
+      "insecure": "Web Bluetooth needs a secure page. Open Metic over https (for example through Tailscale) or at http://localhost on the computer running it; a plain http:// LAN address cannot use Bluetooth.",
+      "noApi": "This browser has no Web Bluetooth. Use Google Chrome or Microsoft Edge on a computer or Android device.",
+      "noAdapter": "No Bluetooth adapter is available to the browser. On macOS, turn Bluetooth on and allow Chrome under System Settings → Privacy & Security → Bluetooth."
+    },
+    "steps": {
+      "device": "Portal chosen",
+      "gatt": "GATT connected",
+      "service": "Service 0x7400 found",
+      "measurement": "Measurement 0x7410 found",
+      "command": "Command 0x7420 found",
+      "notify": "Notifications started",
+      "packet": "13-byte packets arriving"
+    },
+    "live": {
+      "ec": "Portal EC",
+      "outletTemp": "at the Portal",
+      "recording_one": "Recording · {{count}} sample",
+      "recording_other": "Recording · {{count}} samples",
+      "settling": "Catching drips…",
+      "saving": "Saving…",
+      "ready": "Ready",
+      "notConnected": "Not connected"
+    },
+    "chart": {
+      "cupMass": "cup mass (g)",
+      "ec": "EC (mS/cm)",
+      "integral": "∫EC dm"
+    },
+    "metrics": {
+      "meanEcPerG": "mean EC per gram",
+      "integral": "∫EC dm over the cup",
+      "peak": "peak EC at {{mass}} g",
+      "coverage": "of cup mass covered",
+      "firstDrop": "first drop",
+      "outletTemp": "mean outlet temperature",
+      "massAt90": "cup mass at 90% of ∫",
+      "last5g": "of ∫ from the last 5 g"
+    },
+    "shot": {
+      "none": "No Portal recording for this shot. Recordings are captured automatically while the Portal is connected and the machine is extracting.",
+      "noMachineData": "The machine's own record of this shot is not available yet, so the EC stream cannot be paired with the cup weight. The analysis appears once the machine lists the shot.",
+      "samples_one": "{{count}} sample",
+      "samples_other": "{{count}} samples",
+      "statusOk": "usable",
+      "status": {
+        "low-coverage": "low coverage",
+        "no-portal-data": "no Portal data",
+        "no-weight-data": "no weight data",
+        "insufficient-mass": "too little in the cup"
+      },
+      "coffee": "Coffee",
+      "coffeePlaceholder": "e.g. Hatch Supernova",
+      "coffeeHint": "Calibration is grouped by coffee; keep the label stable while you work through a bag. It is also the default for your next shot.",
+      "dose": "Dose (g)",
+      "measured": "refractometer",
+      "estimated": "estimate",
+      "extractionYield": "extraction yield",
+      "estimateFrom": "Estimate from",
+      "calibrationSummary": "Based on {{pool}} · {{count}} reference shots · k = {{k}} %TDS per mS/cm · leave-one-out error ±{{err}}% · {{model}} model",
+      "readingTds": "Refractometer TDS (%)",
+      "readingBeverage": "Beverage weighed (g)",
+      "readingHint": "Type the refractometer's reading for this cup. Each reading improves the EC → TDS calibration for this coffee; five or more make the estimate trustworthy inside the measured range.",
+      "readingInvalid": "Enter the refractometer TDS as a percentage, e.g. 9.2."
+    },
+    "pools": {
+      "auto": "auto — this coffee, else all",
+      "coffee": "this coffee only",
+      "all": "all coffees"
+    },
+    "toast": {
+      "connected": "Connected to {{name}}",
+      "connectFailed": "Could not connect to the Portal: {{message}}",
+      "saved_one": "Portal recording saved with the shot ({{count}} sample).",
+      "saved_other": "Portal recording saved with the shot ({{count}} samples).",
+      "pendingAttached_one": "Attached {{count}} earlier Portal recording to its shot.",
+      "pendingAttached_other": "Attached {{count}} earlier Portal recordings to their shots.",
+      "saveFailed": "Could not save: {{message}}",
+      "detailsSaved": "Coffee and dose saved.",
+      "readingSaved": "Reading saved; calibration updated.",
+      "deleted": "Portal recording deleted."
+    }
   }
 }

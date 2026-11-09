@@ -68,6 +68,19 @@ curl -X POST http://<SERVER_IP>:3550/api/analyze_coffee \
 | POST | `/api/shots/analyze` | Analyze shot data |
 | POST | `/api/shots/analyze-llm` | LLM-powered shot analysis |
 
+### Belka Portal (conductivity sensor)
+
+Recordings of a [Belka Portal](https://www.belkacoffee.com) EC stream, keyed like annotations by `{date}/{filename}`. The web app captures the stream over Web Bluetooth while the machine extracts and stores it here; the core pairs it with the shot's cup-weight curve and computes the analysis, the per-coffee EC → TDS calibration and a flagged estimate. See [`docs/belka-portal.md`](docs/belka-portal.md).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/portal/shots` | Per-shot summaries (sample count, mean EC/g, reading or estimate) for list badges |
+| GET | `/api/portal/shots/{date}/{filename}?mode=auto\|coffee\|all` | Recording + analysis + calibration fit + estimate |
+| PUT | `/api/portal/shots/{date}/{filename}` | Store a recording: `{ samples: [{t, ec, tOut?, tInt?, status?}], startedAt, lagSec?, stopTimeSec?, deviceName?, coffee?, doseG? }` |
+| PATCH | `/api/portal/shots/{date}/{filename}` | Update `coffee`, `doseG`, `lagSec` and/or `reading: { tdsPct, beverageG? } \| null` |
+| DELETE | `/api/portal/shots/{date}/{filename}` | Remove the recording |
+| GET | `/api/portal/calibration?coffee=…&mode=…` | The fit an estimate for that coffee would use, with its reference points |
+
 ---
 
 ## Machine Control

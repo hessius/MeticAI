@@ -355,6 +355,7 @@ function buildJsonStorage(dataDir: string): DocumentStorage {
     schedules: fsRepo(join(dataDir, "schedules")),
     descriptions: fsKeyedMapRepo(join(dataDir, "profile_descriptions.json")),
     aiTags: fsKeyedMapRepo(join(dataDir, "profile_ai_tags.json")),
+    portalShots: fsKeyedMapRepo(join(dataDir, "portal_shots.json")),
     images: fsBlobStore(join(dataDir, "images")),
   };
 }
@@ -371,6 +372,7 @@ function buildSqliteStorage(dataDir: string, logger: Logger): DocumentStorage {
     schedules: handles.documentRepo("schedules"),
     descriptions: handles.documentRepo("descriptions"),
     aiTags: handles.documentRepo("aiTags"),
+    portalShots: handles.documentRepo("portalShots"),
     images: handles.blobStore(),
   };
 }

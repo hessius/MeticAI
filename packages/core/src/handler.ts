@@ -15,6 +15,7 @@ import { handleMachineCommandRoutes } from "./routes/machineCommands";
 import { handleProfilesCrudRoutes } from "./routes/profilesCrud";
 import { handleRecipesRoutes } from "./routes/recipes";
 import { handleSchedulingRoutes } from "./routes/scheduling";
+import { handlePortalRoutes } from "./routes/portal";
 
 /**
  * The single shared request handler for the unified TS core.
@@ -82,6 +83,9 @@ export async function tryHandle(req: Request, platform: Platform): Promise<Respo
 
   const scheduling = await handleSchedulingRoutes(req, platform);
   if (scheduling) return scheduling;
+
+  const portal = await handlePortalRoutes(req, platform);
+  if (portal) return portal;
 
   return null;
 }

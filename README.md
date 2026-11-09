@@ -41,6 +41,7 @@ When I got my Meticulous, after a loooong wait, I was overwhelmed with the optio
 - 📊 **Detailed Guidance** - Dose, grind, temperature recommendations
 - 🔬 **Expert Knowledge** - Explanations of why each profile works
 - ⚡️ **Modern Techniques** - Turbo shots, flow profiling, and more
+- 💧 **Belka Portal** - Record the conductivity sensor alongside every shot and estimate TDS from your refractometer readings ([docs](docs/belka-portal.md))
 
 ### For Power Users
 - 🔌 **REST API** - Integrate with any automation system

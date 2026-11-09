@@ -40,6 +40,7 @@ const KEYED_MAP_FILES: Array<{ file: string; collection: string }> = [
   { file: "dialin_sessions.json", collection: "dialInSessions" },
   { file: "profile_descriptions.json", collection: "descriptions" },
   { file: "profile_ai_tags.json", collection: "aiTags" },
+  { file: "portal_shots.json", collection: "portalShots" },
 ];
 
 /** Directory-of-`${id}.json` collections. */

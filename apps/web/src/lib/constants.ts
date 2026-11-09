@@ -37,6 +37,10 @@ export const STORAGE_KEYS = {
   ANALYSIS_CACHE: 'meticai-direct-analysis-cache',
   POUR_OVER_PREFS: 'meticai-direct-pour-over-prefs',
 
+  // -- Belka Portal (conductivity sensor) --
+  PORTAL_SETTINGS: 'meticai-portal-settings',
+  PORTAL_PENDING: 'meticai-portal-pending-recording',
+
   // -- Machine connection --
   MACHINE_URL: 'meticai-machine-url',
 
