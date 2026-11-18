@@ -167,7 +167,7 @@
     "typescript-eslint": "^8.62.0",
     "vite": "^8.0.16",
     "vite-plugin-pwa": "^1.3.0",
-    "vitest": "4.1.5"
+    "vitest": "4.1.11"
   },
   "overrides": {
     "esbuild": "^0.28.1",
